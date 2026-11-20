@@ -29,6 +29,45 @@
         "src": "media/introducing-hexagon-cover.png",
         "alt": "An ASCII fleet of independent agent craft converges behind one product interface, with Sandbox, Harness, and Tools forming each execution unit."
       }
+    },
+    {
+      "slug": "agent-control-plane-harness-sandbox",
+      "title": "Agent control plane, harness, and sandbox: what each layer owns",
+      "summary": "Separate application authorization, durable execution management, agent reasoning, and cloud process isolation before choosing your infrastructure.",
+      "date": "2026-11-20",
+      "author": "Hexagon",
+      "tags": [
+        "Engineering",
+        "Agent infrastructure"
+      ],
+      "language": "en",
+      "draft": false
+    },
+    {
+      "slug": "embed-agents-in-existing-backend",
+      "title": "How to embed an agent in your existing application backend",
+      "summary": "A practical integration map for ownership checks, durable submission intent, event delivery, and authorized artifacts.",
+      "date": "2026-11-20",
+      "author": "Hexagon",
+      "tags": [
+        "Engineering",
+        "Agent infrastructure"
+      ],
+      "language": "en",
+      "draft": false
+    },
+    {
+      "slug": "recover-agent-stream-disconnects",
+      "title": "Recover an agent task after an event stream disconnects",
+      "summary": "Separate lost observation from lost submission responses and unknown external side effects to avoid duplicate work.",
+      "date": "2026-11-20",
+      "author": "Hexagon",
+      "tags": [
+        "Engineering",
+        "Agent infrastructure"
+      ],
+      "language": "en",
+      "draft": false
     }
   ]
 }
