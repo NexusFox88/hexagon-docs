@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "posts": [
+    {
+      "slug": "writing-a-post",
+      "title": "Writing a Hexagon blog post",
+      "date": "2026-11-20",
+      "summary": "A draft template for contributors. Replace this metadata and write your article before publishing.",
+      "author": "Hexagon",
+      "tags": ["Engineering"],
+      "language": "en",
+      "draft": true
+    }
+  ]
+}
