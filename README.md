@@ -7,6 +7,6 @@ Documentation and blog content for [Hexagon](https://github.com/NexusFox88/Hexag
 - `style.css`, `fonts/`, `logo/`: monochrome ASCII controls and brand assets.
 - `resources/`: public source/example/evidence snapshots referenced by the documentation; excluded from Mintlify page rendering.
 - [`blog/`](blog/README.md): blog metadata, articles and media, rendered by [Haxegon-Website](https://github.com/NexusFox88/Haxegon-Website).
-- [`PUBLISHING.md`](PUBLISHING.md): local editing, verification and deployment workflow.
+- [`PUBLISHING.md`](PUBLISHING.md): canonical publishing SOP (本地更新 → GitHub → Mintlify), including optional imports, verification, troubleshooting and rollback.
 
 Mintlify project `sponson/hexagon` publishes the repository root on `main` to https://docs.hexagon.autos. The website continues to render `blog/` independently. Documentation deployment does not certify product acceptance tests.

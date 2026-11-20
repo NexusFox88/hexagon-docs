@@ -11,3 +11,5 @@ Product source links must use the canonical repository URL `https://github.com/N
 Write Blog titles, summaries, article bodies and cover text in English. Optional article covers belong in `blog/media/`, referenced by `cover.src` with meaningful `cover.alt` in `blog/index.json`; follow the schema in `blog/README.md`. Keep requested previews as drafts until publication is explicitly authorized.
 
 Public documentation links in Blog articles must use `https://docs.hexagon.autos/en` and verified routes beneath it. The product GitHub link is `https://github.com/NexusFox88/Hexagon`.
+
+Before updating or publishing product documentation, read [PUBLISHING.md](PUBLISHING.md). It is the canonical local-to-GitHub-to-Mintlify workflow. Use this repository as the publishing source; do not publish through the former `NexusFox88/docs` repository.
