@@ -4,4 +4,4 @@ Content repository for Hexagon. The public website lives at https://hexagon.auto
 
 - [`blog/`](blog/README.md): blog metadata, Markdown articles and media, rendered by the website.
 
-The existing product documentation remains in [Haxegon/docs/product](https://github.com/NexusFox88/Haxegon/tree/main/docs/product) until explicitly migrated. This repository does not duplicate it.
+The existing product documentation remains in [Hexagon/docs/product](https://github.com/NexusFox88/Hexagon/tree/main/docs/product) until explicitly migrated. This repository does not duplicate it.

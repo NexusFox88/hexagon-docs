@@ -17,4 +17,4 @@ Use relative images from `../media/your-image.png`, and link another published a
 
 ## Explain the limits
 
-Separate verified behavior from planned work. Link to the relevant [Hexagon source](https://github.com/NexusFox88/Haxegon) when helpful.
+Separate verified behavior from planned work. Link to the relevant [Hexagon source](https://github.com/NexusFox88/Hexagon) when helpful.
