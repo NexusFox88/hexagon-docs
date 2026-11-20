@@ -1,5 +1,6 @@
 ---
 title: "Local deployment settings HTTP contract"
+description: "These four routes manage the current local control-plane workspace."
 ---
 
 These four routes manage the current local control-plane workspace. They are registered only when a deployment settings service exists, require owner authentication and additionally require tenant `local-workspace`. Other tenants receive `403 deployment_management_forbidden`; application tokens are rejected by the owner route policy. This is not an API for provisioning hosted deployments.

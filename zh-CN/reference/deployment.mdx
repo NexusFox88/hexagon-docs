@@ -1,5 +1,6 @@
 ---
 title: "本地部署配置 HTTP 契约"
+description: "四个接口管理当前本地控制平面工作区，只有部署配置服务存在时才注册，要求 owner 身份并额外要求租户为 local-workspace。"
 ---
 
 四个接口管理当前本地控制平面工作区，只有部署配置服务存在时才注册，要求 owner 身份并额外要求租户为 local-workspace。其他租户返回 `403 deployment_management_forbidden`，应用 Token 在路由权限检查中被拒绝。这不是创建 hosted 部署的 API。

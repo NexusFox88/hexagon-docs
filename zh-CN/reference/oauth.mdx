@@ -1,5 +1,6 @@
 ---
 title: "Applications 与 OAuth HTTP 契约"
+description: "六个管理路由均要求 owner 认证和租户归属。 OAuth 同意与单次操作审批不同；授权 flow 不是 Run，取消它不会撤销已有 Provider 账户或撤回外部操作。"
 ---
 
 六个管理路由均要求 owner 认证和租户归属。OAuth 同意与单次操作审批不同；授权 flow 不是 Run，取消它不会撤销已有 Provider 账户或撤回外部操作。示例使用 owner Token 和不带 `/v1` 的 API origin。

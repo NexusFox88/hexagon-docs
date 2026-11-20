@@ -1,5 +1,6 @@
 ---
 title: "Sessions HTTP 契约"
+description: "Session 固定工作配置并承载连续的 Runs。 创建 Session 不会提交任务，也不证明云 Sandbox 能够执行任务。"
 ---
 
 Session 固定工作配置并承载连续的 Runs。创建 Session 不会提交任务，也不证明云 Sandbox 能够执行任务。本文说明创建、检查、初始文件和生命周期操作的源码契约。路径均包含 `/v1`；示例假定使用可信后端 Token，`HEXAGON_API_URL` 为不带该前缀的控制平面 origin。

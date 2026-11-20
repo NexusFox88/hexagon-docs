@@ -1,5 +1,6 @@
 ---
 title: "监控与集合查询 HTTP 契约"
+description: "这些读取模型反映持久化控制平面状态，不是直接 Provider 检查、账单测量或模型执行成功证明。 全部 /v1 路由要求认证和租户归属。"
 ---
 
 这些读取模型反映持久化控制平面状态，不是直接 Provider 检查、账单测量或模型执行成功证明。全部 `/v1` 路由要求认证和租户归属。Health、Run 集合与 Session 列表/活动允许应用 Token；overview、pending、Fleet 要求 owner。
