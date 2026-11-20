@@ -123,7 +123,7 @@ const run = await hexagon.submit(
 await saveTaskRun(taskId, run.id);
 ```
 
-`saveTaskSession` and `saveTaskRun` stand for your application's persistence logic. For client initialization, project upload, completion handling, and cleanup, follow the [backend integration guide](https://github.com/NexusFox88/Hexagon/blob/main/docs/product/en/build/backend-integration.md).
+`saveTaskSession` and `saveTaskRun` stand for your application's persistence logic. For client initialization, project upload, completion handling, and cleanup, follow the [backend integration guide](https://docs.hexagon.autos/en/build/backend-integration).
 
 Submission gives you a trackable Run. Map its events to your own progress UI and present results and artifacts where users need them. A browser disconnect does not cancel the Run: your backend can resume observing the same task when the user returns.
 
@@ -137,6 +137,6 @@ Your product owns the experience. Sandboxes provide the workspaces. Harnesses ad
 
 That is a headless agent fleet: many independent execution units working behind the product you are building.
 
-Hexagon is currently in Developer Preview. Review the [capabilities and verified combinations](https://github.com/NexusFox88/Hexagon/blob/main/docs/product/en/integrations/verified-combinations.md) for your workload; cloud resources and model calls use the accounts you connect.
+Hexagon is currently in Developer Preview. Review the [capabilities and verified combinations](https://docs.hexagon.autos/en/integrations/verified-combinations) for your workload; cloud resources and model calls use the accounts you connect.
 
-Start with [your first Session](https://github.com/NexusFox88/Hexagon/blob/main/docs/product/en/start/first-session.md), or explore the source on [GitHub](https://github.com/NexusFox88/Hexagon). Pick a useful action in your product, and put an agent behind it.
+Start with [your first Session](https://docs.hexagon.autos/en/start/first-session), or explore the source on [GitHub](https://github.com/NexusFox88/Hexagon). Pick a useful action in your product, and put an agent behind it.
