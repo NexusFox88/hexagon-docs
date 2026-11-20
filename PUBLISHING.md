@@ -59,3 +59,7 @@ Review imported `resources/` for public suitability. Those files are excluded fr
 ## Blog ownership
 
 Do not move or overwrite `blog/`. It remains excluded from Mintlify rendering. Blog changes follow `blog/README.md` and the existing website workflow; documentation-only changes do not match that workflow's blog path filter.
+
+## GitHub account access
+
+Use a GitHub account with write permission to `NexusFox88/hexagon-docs`. If a push returns 403, check the authenticated account and repository permissions before retrying. On the migration workstation, the publishing checkout uses a repository-local credential helper for the already authenticated `hexagon-maintainer` account; it reads the credential from the GitHub CLI keyring without storing a token in this repository. Other checkouts need their own valid authentication.
