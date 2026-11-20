@@ -22,3 +22,20 @@ Put PNG, JPEG, GIF or WebP images in `media/` and reference them with `../media/
 ## Deployment setup
 
 The workflow `.github/workflows/publish-blog.yml` uses the repository secret `WEBSITE_DEPLOY_HOOK`, a Cloudflare Workers Builds hook for the existing `haxegon-website` Worker and website branch `main`. Keep the URL secret. The connection and token are held by GitHub/Cloudflare, so authors only need GitHub write access. Website commits also rebuild the blog from this repository's `main` branch.
+
+## Article covers
+
+Blog editorial content, titles, summaries and cover text are written in English.
+
+Add an optional `cover` object to the article entry in `index.json`:
+
+```json
+"cover": {
+  "src": "media/introducing-hexagon-cover.png",
+  "alt": "An ASCII agent fleet behind a product interface."
+}
+```
+
+Use a repository-local PNG, JPEG or WebP under `blog/media/`; paths are relative to `blog/`. A 1200 × 630 image is recommended for list thumbnails and social sharing. The article displays the full image without cropping. Supply meaningful English alt text. The same image appears in the Blog list, article header and Open Graph / Twitter sharing metadata. Covers are optional; existing articles without covers retain their text layout. Invalid paths, empty alt text and missing published cover files fail the build.
+
+An editable SVG source may accompany an exported raster cover for maintenance, but reference the PNG/JPEG/WebP in metadata. Keep the article as a draft during review; adding a cover does not publish it.

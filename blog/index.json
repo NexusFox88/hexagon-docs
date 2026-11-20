@@ -7,9 +7,28 @@
       "date": "2026-11-20",
       "summary": "A draft template for contributors. Replace this metadata and write your article before publishing.",
       "author": "Hexagon",
-      "tags": ["Engineering"],
+      "tags": [
+        "Engineering"
+      ],
       "language": "en",
       "draft": true
+    },
+    {
+      "slug": "introducing-hexagon",
+      "title": "Introducing Hexagon: an agent fleet inside your product",
+      "date": "2026-11-20",
+      "summary": "Your interface. Your workflow. Connect many Sandboxes, Harnesses, and Tools through a headless API, and embed an agent fleet into the product you already have.",
+      "author": "Hexagon",
+      "tags": [
+        "Product",
+        "Agent infrastructure"
+      ],
+      "language": "en",
+      "draft": false,
+      "cover": {
+        "src": "media/introducing-hexagon-cover.png",
+        "alt": "An ASCII fleet of independent agent craft converges behind one product interface, with Sandbox, Harness, and Tools forming each execution unit."
+      }
     }
   ]
 }
