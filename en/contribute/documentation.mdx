@@ -1,0 +1,154 @@
+---
+title: "Write, check, and translate documentation"
+---
+
+Product content lives in docs/product/zh-CN and docs/product/en. Internal design decisions belong in engineering directories such as docs/plans; actual results belong in testing/evidence. Append-only engineering history is not a current tutorial.
+
+## Start from a user question
+
+Use the [content brief](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/plans/2026-11-19-documentation-content-architecture.tmp.md) to confirm ID, path, audience, and responsibility. Each page has one primary purpose: fixed-task tutorial, goal-specific how-to, conceptual explanation, or exact reference.
+
+Include a direct answer, when to use it, version/capability prerequisites, steps/definitions, success checks, important failure exits, sources, and at most three next steps. Follow the [glossary](/en/reference/glossary); do not translate API fields, method names, or state values.
+
+## Make claims verifiable
+
+Fields/defaults come from schema/implementation, capabilities from registries, and verified scope from dated SDK/protocol/scenario evidence. Examples identify dependencies, client initialization, inputs, results, and cleanup. Label excerpts and prerequisite variables. Placeholder domains/test objects are not ready-to-use public services.
+
+Avoid independently maintained copies of field tables. Put runnable examples in examples and link/extract them. Generated tables identify sources/snapshot dates. Do not shrink the acceptance journey to match missing implementation; investigate conflicts explicitly.
+
+## A complete small change
+
+For an E2B template clarification:
+
+1. Check integrations/sandboxes/e2b.ts and evidence: is the change a schema default, resource prerequisite, or new verification scope?
+2. Edit both languages at integrations/sandboxes/e2b.md. Update overview/OCI references where affected, retaining historical dates.
+3. Change actual example sources if parameters change, then run appropriate syntax/type checks. Explicitly state when cloud execution was not repeated.
+4. Update the coverage.json entry with actual status/scope. Draft does not automatically become complete; file presence does not establish content quality.
+5. Run structural checks and read both versions for equivalent sources, constraints, and next steps.
+
+```sh
+python3 tooling/check-product-docs.py --report testing/evidence/2026-11-19-product-docs-structure.json
+```
+
+This checks planned IDs, files, inline Markdown file targets, fence pairing, and index reachability only. External URLs, anchors, examples, and cloud behavior require separate verification. --require-complete checks ledger status but does not replace editorial review. Use a new dated evidence filename for later acceptance rather than overwriting unrelated history.
+
+## Check local chapter links and embedded assets
+
+Run the complementary link checker after moving a page, changing a heading or updating a directory link:
+
+```sh
+node tooling/check-product-doc-links.mjs --self-test
+node tooling/check-product-doc-links.mjs --report testing/evidence/2026-11-20-product-doc-links.json
+```
+
+It parses Markdown links, reference-style links and images, plus quoted HTML href/src and single-source srcset attributes. It includes both root READMEs, resolves percent-encoded local paths and checks fragments against explicit HTML anchors or normalized headings. Fenced code examples do not become links to validate. Its self-test exercises parsing edge cases, not the accuracy of article content.
+
+The report states the exact heading normalization rule; it does not claim parity with an unconfigured documentation renderer. Use explicit stable anchors for important directory destinations and preserve them when translating or renaming headings. Multi-candidate srcset and fragments on non-Markdown files are reported as unsupported rather than silently passed. The check makes no external requests; an external badge or URL still needs separate verification. A passing link report does not close visual, translation, example-execution or publication gates. Use a new report filename when retaining a later review.
+
+## Parse Python and TypeScript examples
+
+After installing repository dependencies and Python 3, check product-document code blocks without executing them:
+
+```sh
+node tooling/check-product-doc-code.mjs --report testing/evidence/2026-11-20-product-doc-code-syntax.json
+```
+
+The Markdown parser finds `python`/`py` and `typescript`/`ts` blocks, including nested blocks. Python AST and the TypeScript parser report syntax errors by page, code-block number and line within the block. Reports retain page/snippet hashes and parser versions. A syntax error fails the command; shell, JSON and other languages are outside its scope. The current interpreter's syntax acceptance does not establish support for every declared minimum Python/runtime version.
+
+Parsing does not resolve variables/imports, type-check TypeScript, execute setup, contact the API or verify results. Context-dependent snippets may parse even when a required client, ID or credential is absent. Use the actual installed SDK to type-check or run the applicable examples separately, and keep simulation, local package and real-cloud evidence distinct.
+
+## Regenerate references instead of patching tables by hand
+
+SDK method navigation is maintained in [sdk-reference-map.json](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/tooling/sdk-reference-map.json). Each exact method name maps to its response/error contract and a contextual example. Both generators reject missing or stale mappings; TypeScript also rejects duplicate mapped names. When adding or renaming a method, update the mapping, review the actual example and regenerate both references. Method-name presence and a working link do not prove that the example is correct or that the method passed a real journey.
+
+
+The repository currently has three source-index generators. After installing repository dependencies, run the affected generators from the repository root. They update files; they are not read-only checks:
+
+```sh
+./node_modules/.bin/tsx tooling/generate-http-doc-index.ts
+python3 tooling/generate-python-doc-index.py
+node tooling/generate-typescript-doc-index.mjs
+```
+
+| Generator | Updated output | Editorial work still required |
+| --- | --- | --- |
+| HTTP index | Bilingual HTTP route tables and http-operation-coverage.json, using http-operation-pages.json assignments | Request/response schemas, state preconditions, errors, effects and examples |
+| Python index | Method signatures within bilingual Python SDK markers | Parameter meaning, response projections, prerequisites and runnable examples |
+| TypeScript index | Declarations and inferred returns within bilingual TypeScript SDK markers | Runtime validation boundaries, errors, usage and precise response contracts |
+
+Preserve the paired begin/end markers for `http-routes`, `python-methods` and `ts-methods`. Check they exist before generation and review changes afterward. Do not put manually maintained explanation inside generated regions and expect it to survive regeneration; keep prose and examples outside the markers.
+
+The HTTP generator recognizes literal `api.get/post/put/patch/delete` registrations in the current server.ts and evaluates the authorization classifier. It does not start a server, send API requests or enumerate other listeners or dynamic registrations. Add new routes to the page assignment map and both resource contracts. Assignment to a draft page is not proof of exhaustive field coverage.
+
+## Deliver a complete content change
+
+| Change | Keep synchronized | Minimum review scope |
+| --- | --- | --- |
+| API field, default or error | Resource reference, affected SDK explanation, guides and real example sources | Current schema/branch review and proportionate example validation |
+| SDK method | Source index, installation/import prerequisites and usage | Type/syntax checks; installed-artifact validation when consumption changes |
+| Capability or verified scope | Capability page, matrix and evidence links | Exact versions and execution scope without extrapolating untested combinations |
+| Reading path or file move | Both-language navigation, assignments and incoming links | File targets and index reachability, plus manual anchor review |
+| Code or UI screenshot | Runnable source or actual interface and surrounding text | Expected result, failure exit and sanitization; separate visual review for screenshots |
+
+An editorial record should identify the page ID, source/evidence inspected, changes, actual commands/results and unverified scope. coverage.json state is not a substitute for that record. Reviewed and complete should correspond to explicit review conclusions. Do not promote a page to complete while its own requirements remain unfinished; publication also needs a separate audit of the brief and release conditions.
+
+## Compare meaning across languages
+
+Compare ownership, defaults, success/failure conditions, retry permission, cleanup completion, versions and evidence dates item by item. Repeating an identical idempotent submission intent must not become executing the task again in translation. A completed call must not become a successful business write. Preserve API identifiers, decimal cursors and error codes; label illustrative and actual output consistently in both languages.
+
+Structural checks do not verify this equivalence, render Mermaid or execute every command. Separately review rendered tables, code, diagrams and narrow layouts before publication, and confirm that next-step links match the reader's task. Limit verification claims to what was actually checked.
+
+## Worked bilingual review: cleanup wording
+
+The capacity guide's cleanup row is a small example of a semantic correction. A universal instruction to confirm remote absence is too broad: some Providers require a deletion receipt and associated-resource checks. The current [English capacity guide](/en/operate/capacity-and-cost) and [Chinese capacity guide](/zh-CN/operate/capacity-and-cost) use the same narrower completion condition.
+
+| Review item | What to keep synchronized |
+| --- | --- |
+| Claim | Verify Provider-specific deletion completion evidence and associated resources; keep private identifiers |
+| Source | Reconciliation guide and the relevant connector's deletion contract; do not infer purge from an unrelated 404 |
+| Example impact | If the example has no cleanup code, record that fact; if it polls deletion, inspect the actual condition before changing its prose |
+| Translation | Preserve “evidence required” and “identifiers retained”; do not translate either into an automatic retry instruction |
+| Verification | Link the dated [capacity/troubleshooting review](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-capacity-troubleshooting-review.json); distinguish structural checks from live deletion acceptance |
+| Status | Keep draft until its other requirements and publication gates are satisfied; this wording review alone does not certify the page |
+
+This example changed a specific condition in both languages; it did not change the API or execute a new deletion. When changing executable parameters, also update and validate their shared example source rather than copying this no-code verification scope.
+
+## Worked snippet change: keep one Python environment
+
+The Python reference originally installed the SDK into an activated `.venv`, but its later diagnostic command used `.local/docs-example-venv/bin/python`. The latter is a valid environment chosen by the separate tutorials; this page had not created it. The small fix makes the diagnostic command use the interpreter already selected by the page's setup.
+
+| Review dimension | Actual change and verification |
+| --- | --- |
+| Command before | `.local/docs-example-venv/bin/python examples/documentation/inspect-run.py --session YOUR_SESSION_ID --run YOUR_RUN_ID --after 0 --max-pages 20` |
+| Command after | `python examples/documentation/inspect-run.py --session YOUR_SESSION_ID --run YOUR_RUN_ID --after 0 --max-pages 20`, with the same page's `.venv` activated |
+| Safe entry check | Add `python examples/documentation/inspect-run.py --help`; parsing help exits before workspace discovery and API reads |
+| Canonical source | Inspect the [diagnostic CLI](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/inspect-run.py) and [package requirements](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/python/pyproject.toml); the CLI interface did not change, so its program source required no edit |
+| Translation | Apply the same command and environment prerequisite to both SDK reference pages; keep `--session`, `--run`, `--after`, `--max-pages` and API/resource identifiers unchanged |
+| Validation | A newly created temporary environment installed the checkout package; isolated import outside the checkout and the help command passed. This is package/entry validation, not a live diagnostic query or a clean control-plane installation |
+| Status | At the time of this correction, both translations were synchronized; the article remained draft pending its broader semantic/runtime acceptance |
+
+The corrected [Python reference](/en/reference/python) and dated [setup/syntax evidence](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-doc-example-setup-syntax-review.json) make the change reviewable. The evidence records the tested interpreter and scope. If the CLI later changes, update the actual program first, then both commands and their verification; do not preserve a stale translation merely because its code still parses.
+
+## Languages and UI
+
+Use matching slugs and equivalent steps. Synchronize safety boundaries, error actions, parameters, and completion checks, not just titles. Clearly identify stale translations/version fallback; do not publish empty translations or label older content current.
+
+Documentation translation differs from UI catalogs. UI changes must satisfy the [Console contract](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/console-design.md): complete en/zh-CN catalogs, matching interpolation, accessible names, dynamic errors, Intl formatting, and browser review in both languages. Use actual UI screenshots without credentials/private resources.
+
+## Review Mermaid rendering
+
+Parsing proves syntax, not readability. A local browser preview on 2026-11-20 used Mermaid 12.3.0 and generated SVG for all 20 diagrams, but default HTML node labels clipped long text. With `htmlLabels: false` and HTML labels also disabled for flowcharts, sampled homepage labels wrapped visibly. Pin the actual site's Mermaid version and review again; this temporary preview configuration is not an implemented site feature.
+
+Do not force complex sequence diagrams into phone width using only max-width: 100%. Preserve readable text with horizontal scrolling inside a dedicated container, or provide a zoomable standalone diagram. Give the container an understandable name and keyboard access. Check that it does not widen the page, its right side remains reachable and surrounding prose explains the diagram. Record parsing, SVG generation, visual sampling and full accessibility checks separately.
+
+The visual sample covered both homepages, the English codebase map and worker recovery sequence. Narrow-layout checks used a local preview, not every page or a final site theme. See the [render record](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-mermaid-render.json).
+
+A later concept-page review generated all 26 current concept diagrams successfully in the same Mermaid version. Desktop sampling found and corrected a Chinese Harness label split. The English worker-recovery sequence measured 1727.5 SVG units across only 292 CSS pixels in a 390px viewport and was unreadable under automatic shrinking. Treat it as a responsive regression case; successful SVG generation does not close the visual gate. See the [concept render review](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-concept-diagram-render.json).
+
+The subsequent [current-diagram review](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-current-diagram-review.json) rendered 42 product-document diagrams. It found and fixed a semicolon parsing failure in the English backend recovery sequence and an unwanted split inside “Runtime” in the Chinese overview. Eight diagrams from overview, first-task explanation, Session relationships and serverless lifecycle received bilingual desktop review. A 390px preview retained natural SVG width inside named, focusable scrolling regions; the page did not widen and the worker sequence responded to the right-arrow key. This validates that preview technique, not an already deployed site feature or every diagram's visual/accessibility quality.
+
+## Publication review
+
+Review task executability, failure recovery, cleanup, and evidence scope. Separate contract, simulation, real-cloud, and planned; planned is not passed. Public content excludes .local, Tokens, backups, and unsanitized user data.
+
+This workflow does not claim the full content plan is already complete. Next: [proposals and contributions](/en/contribute/proposals-and-prs), [reading evidence](/en/integrations/verified-combinations).

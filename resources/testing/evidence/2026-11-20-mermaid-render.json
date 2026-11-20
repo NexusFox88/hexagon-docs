@@ -1,0 +1,132 @@
+{
+  "scope": "Temporary localhost diagram gallery, not a published documentation website",
+  "browser": "ego-browser task space 77, closed after review",
+  "mermaid_version": "12.3.0",
+  "svg_results": [
+    {
+      "path": "docs/product/zh-CN/index.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/index.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/start/overview.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/contribute/codebase.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/sessions-runs-agents.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/serverless-lifecycle.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/execution-architecture.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/events-and-recovery.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/events-and-recovery.md",
+      "index": 2,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/events-and-recovery.md",
+      "index": 3,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/security-boundaries.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/start/overview.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/contribute/codebase.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/sessions-runs-agents.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/serverless-lifecycle.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/execution-architecture.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/events-and-recovery.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/events-and-recovery.md",
+      "index": 2,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/events-and-recovery.md",
+      "index": 3,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/security-boundaries.md",
+      "index": 1,
+      "passed": true
+    }
+  ],
+  "visual_sample": [
+    "Chinese and English homepage",
+    "English codebase map",
+    "English worker recovery sequence"
+  ],
+  "findings": [
+    "Default HTML labels clipped long node text",
+    "SVG text mode resolved sampled homepage clipping",
+    "Codebase long identifiers wrap awkwardly at default node width",
+    "Sequence diagram unreadably small when compressed to narrow container",
+    "Intrinsic width with container scrolling preserved readable labels in narrow sample"
+  ],
+  "narrow_observed_css_width": 433,
+  "narrow_scroll_container": {
+    "client_width": 368,
+    "scroll_width": 1751,
+    "document_width": 416
+  },
+  "remaining": [
+    "All-diagram visual inspection",
+    "Final-site theme integration",
+    "Keyboard and accessibility behavior",
+    "Exact 390 CSS-pixel viewport validation; browser reported 433"
+  ],
+  "screenshots": "Local private docs-diagram-review directory; not published"
+}

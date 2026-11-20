@@ -1,0 +1,107 @@
+---
+title: "错误码与处理建议"
+---
+
+先确定错误发生在 HTTP 请求、后台 Run、Tool 调用，还是本地命令。请求被接受后，Run 仍可能失败或等待；HTTP 成功不能证明云任务成功。下表是常见错误的处理索引，不是全部内部错误字符串的公开稳定承诺。
+
+## HTTP 与 SDK 错误格式
+
+```json
+{"error":{"code":"invalid_request","fields":["harness","resources.timeout_seconds"]}}
+```
+
+这是说明格式的示例，不是执行日志。[HTTP handler](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts)将 Zod 校验失败转换为 400 `invalid_request` 和字段路径；ExecutionError 返回自己的状态码及 `error.code`。Fastify 的客户端请求错误变为对应 4xx 的 `invalid_http_request`，例如请求体过大；未分类异常返回 500 `internal_error`，不泄露数据库查询或上游异常。
+
+缺失或无效身份返回 401 `unauthorized`。不能通过重试修复权限；核对部署 URL、Token 和角色。租户范围查不到的资源可返回 404，不透露它是否属于其他租户。
+
+Python 与 TypeScript 的 `HexagonError` 均提供 `status`、`code`，普通请求在响应缺少结构化码时使用 `http_error`。SDK 不保留上述 `fields` 数组为异常属性。网络断开、超时、JSON 解析或本地发现错误不保证包装成 HexagonError；TypeScript 流打开失败使用 `event_stream_failed`，Python 流截断可能抛 ConnectionError。不要把所有异常都当作服务端已拒绝请求。实现见 [Python](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/python/hexagon/__init__.py)、[TypeScript](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/typescript/index.ts)。
+
+## 按阶段处理
+
+“HTTP”列记录对应 ExecutionError 分支的状态；后台 worker 路径也可能把该错误记录到 Run 或事件中，而不是直接作为当前客户端响应。源码链接标识真实分支，不能据此推断该分支本轮已测试通过。
+
+| 错误码 | HTTP | 阶段 | 下一步与资源影响 | 来源 |
+| --- | --- | --- | --- | --- |
+| `invalid_submission` | 400 | 提交 | 修正空白输入或 key，不原样重试。 | [runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| `idempotency_conflict` | 409 | 提交 | 已有原请求，比对 input/origin，恢复原意图，不换新 key。 | [runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| `session_busy` | 409 | 提交 | 已有活动 Run，先观察，由应用保留后续消息。 | [runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| `session_closed` | 409 | 提交 | 查询当前 Session 状态，确需新上下文时再创建。 | [runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| `sandbox_expired` | 409 | 提交 | 新任务前检查原资源清理。 | [runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| `connection_not_ready` | 409 | 提交 | 重试前检查验证、启用和固定版本；新连接 revision 不会改写已有 Session，旧资源可能仍存在。 | [runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| `context_file_missing` | 409 | 提交 | 在同一 Session 的初始上传窗口内上传引用文件；执行开始后先检查固定 context，不能假定仍可上传修复。 | [runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| `context_file_changed` | 409 | 提交 | 比对固定 SHA-256 与上传字节，不忽略差异。 | [runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| `context_file_encoding` | 400 | 提交 | 提供不含 NUL 的有效 UTF-8。 | [runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| `context_file_too_large` | 413 | 提交 | 缩小引用背景文本，见限制参考。 | [runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| `input_too_large` | 413 | 提交 | 缩小 input 与编译背景的合计字节。 | [runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| `initialization_too_large` | 413 | 初始化 | 缩小序列化或编译后的初始化内容。 | [initialization.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/initialization.ts) |
+| `upload_too_large` | 413 | 上传 | 缩小解码总量或分批，单文件限制仍生效。 | [inputs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/inputs.ts) |
+| `connection_changed_during_validation` | 409 | 连接验证 | 读取当前配置，重新验证当前版本。 | [connections.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/connections/connections.ts) |
+| `connection_in_use` | 409 | 删除连接 | 检查依赖 Session 或定义，处理依赖时保留清理访问。 | [connections.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/connections/connections.ts) |
+| `harness_version_conflict` | 409 | 注册 | 检查 OCI 与源码包注册，两者共享 id/version；复用相同 OCI 定义或明确选择新版本，不覆盖旧身份。 | [images.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/images.ts) |
+| `preview_session_unavailable` | 409 | 预览 | 检查 Session 和资源状态，预览不可用不等于 Run 失败。 | [previews.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/previews.ts) |
+| `preview_unauthorized` | 401 | 访问预览 | 检查授权过期、撤销和访问权限，不记录含授权的 URL。 | [previews.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/previews.ts) |
+| `tool_call_conflict` | 409 | Tool 调用或对账 | 比对调用身份、参数和精确 hash，不修改证据强行通过。 | [broker.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/broker.ts) |
+| `tool_call_in_flight` | 409 | Tool 对账 | 等待 broker 锁释放后重新查询，不并发强行对账。 | [reconciliation.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/reconciliation.ts) |
+| `tool_outcome_not_unknown` | 409 | Tool 对账 | 读取当前调用状态，resolve 只处理未知结果。 | [reconciliation.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/reconciliation.ts) |
+| `tool_resolution_conflict` | 409 | Tool 对账 | 已有不同结论，检查记录，不覆盖。 | [reconciliation.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/reconciliation.ts) |
+| `tool_authorization_not_pending` | 409 | 拒绝授权 | 重新查询原调用，其授权等待状态已经变化。 | [reconciliation.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/reconciliation.ts) |
+| `tool_run_not_active` | 409 | Tool 决定 | 不要恢复已终止或取消中的工作，检查已记录副作用。 | [broker.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/broker.ts) |
+| `tool_account_changed` | 409 | Tool 执行 | 核对账户身份与固定绑定，不静默切换账户。 | [broker.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/broker.ts) |
+| `mcp_schema_changed` | 409 | Tool 执行 | 重新验证发现结果，必要时选择新的兼容绑定或 Session。 | [broker.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/broker.ts) |
+| `tool_operation_unavailable` | 400 | Tool 执行 | 检查选定和固定操作目录，不自动扩大权限。 | [broker.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/broker.ts) |
+| `lease_lost` | 409 | worker 更新 | 执行权限已过期，由当前持有者恢复，不强行重复调用。 | [artifacts.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/artifacts/artifacts.ts) |
+| `invalid_artifact_manifest` | 400 | 产物捕获 | 检查重名和总量，捕获失败不撤销任务。 | [artifacts.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/artifacts/artifacts.ts) |
+| `artifact_integrity_failed` | 400 | 产物捕获 | 核对大小、规范 Base64 与 SHA-256，不交付损坏内容。 | [artifacts.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/artifacts/artifacts.ts) |
+| `artifact_conflict` | 409 | 产物捕获 | 同一 Run/name 已有不同字节，保留并调查。 | [artifacts.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/artifacts/artifacts.ts) |
+| `duplicate_input_path` | 400 | 上传 | 删除同一请求内的重复路径；此时尚未开始上传事务。 | [inputs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/inputs.ts) |
+| `reserved_initialization_path` | 400 | 上传 | 初始化占用 SOUL.md 时不能覆盖；为项目文件选择其他路径。 | [inputs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/inputs.ts) |
+| `workspace_already_started` | 409 | 上传 | 已有 Run 或已分配资源后初始输入关闭；由 Agent 后续工作修改，不继续上传。 | [inputs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/inputs.ts) |
+| `ambiguous_variables` | 400 | 定义 | 不要同时提供 variables 与非空 env；已有 Session 不会被重写。 | [sessions.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts) |
+| `connection_kind_mismatch` | 400 | 绑定 | 将 sandbox/model/tool/http ID 填入对应字段，不把凭据值当作 ID。 | [sessions.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts) |
+| `missing_tool_binding` | 400 | 创建 Session | 按名称绑定每个声明的 Tool；可选就绪不代表可以省略绑定。 | [sessions.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts) |
+| `agent_archived` | 409 | 使用或更新 Agent | 检查归档模板；新 Session 使用活动模板或明确的新定义。 | [sessions.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts) |
+| `agent_revision_changed` | 409 | 更新 Agent | 重新读取当前 revision，核对完整替换内容后再尝试。 | [sessions.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts) |
+| `stale_approval` | 409 | 审批决定 | 刷新原审批和 Run；取消或其他决定可能已经使它结束。 | [runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| `session_connection_changed` | 409 | 凭据访问 | 固定连接版本不匹配；检查绑定并处理旧工作，必要时明确创建替代 Session。 | [access.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/access/access.ts) |
+
+## 成功响应中也可能包含失败结果
+
+HTTP 成功不一定表示操作成功。连接验证会捕获远程验证失败，返回 `status: invalid`、限定范围的 `validation.code` 和 `enabled: false`，不一定触发 SDK 异常。启用前重新检查 `status`。`connection_changed_during_validation` 则表示验证期间配置变化或被删除，原版本已无法更新；远程验证请求可能已经发生。
+
+同样，Tool 对账返回 `state: completed` 表示结果已持久交付。调用方核实的 `outcome: failed` 会使交付的 Tool 结果包含错误，不代表外部写入成功。重复已记录的相同 resolution 会返回原记录，不兼容的替代证据产生 `tool_resolution_conflict`。应检查 resolution 内容，不只看外层 state。
+
+## 预检原因不是另一套重试指令
+
+[组合预检](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/compatibility.ts)返回 `compatibility.reasons`，包括 `incompatible_model`、`harness_tools_unsupported`、`sandbox_oci_image_unsupported`、`sandbox_private_image_unsupported`、`harness_initialization_unsupported`、`missing_capability`、`network_policy_unsupported`、`credential_proxy_not_allowed_by_network_policy`。它们是能力不匹配原因，不应一律解释成相同 HTTP 响应或远程分配失败。修正组合或明确调整用户要求；不能把 allowlist 静默改为 unrestricted。
+
+## 重试之前确认原操作
+
+- 查询或事件流的传输故障：有界退避，重连同一 Run 与已提交游标，认证错误先修正身份。
+- Run 提交响应丢失：用同一 Session、input、origin、幂等键恢复原提交，不生成新键。
+- Session 或云资源创建响应丢失：保留意图、原 ID 和时间，查询原对象及操作，不假设有 Run 提交同样的幂等契约。
+- Tool 写入结果未知：检查调用、request hash 和固定执行策略，核实上游结果后 resolve，不重发写入。
+- 关闭或删除未确认：保留资源与删除回执，对账原操作；停止服务或没有列表结果并不普遍证明清理完成。
+
+资源可能已存在、写入可能已生效。`internal_error` 或客户端超时都不能保证“没有发生任何事情”。参考[恢复](/zh-CN/build/recovery)与[对账](/zh-CN/operate/reconciliation)。
+
+## 三种恢复判断
+
+**服务端已接受提交，但客户端超时。** 在持久请求记录中保留原 Session ID、完整 input、origin 和幂等键，再提交完全相同的意图。哈希匹配时服务端返回原 Run；在相同 key 下修改文本或 origin 会产生 `idempotency_conflict`。新 key 代表另一次提交，可能重复执行。见[持久后端示例](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/backend-intents.py)。
+
+**用户在取消之后点击批准。** 过时决定可能返回 `stale_approval`，应读取原审批和 Run，不创建新审批绕过响应。重复已记录的相同决定可以返回该记录，但仍不能证明外部操作已经执行；Tool 结果及取消竞态结果需要单独核查。
+
+**模型产生输出，但导出失败。** 即使 Harness 进程已经运行，worker 也可能以 `artifact_export_rejected` 将 Run 结束为 failed。查询已持久化产物、原 Run 与事件。重新执行整个任务可能重复文件修改或外部副作用；先诊断导出失败，再判断是否需要下一轮。该 worker 错误记录在 Run 上，不是此前成功 submit 请求的 HTTP 状态。
+
+## 记录错误时保留原本含义
+
+应用错误记录应包括操作种类、请求关联 ID、异常类别、可取得的 HTTP 状态和 code，以及是否已经知道 Run ID。恢复所需的完整输入、key 和资源引用放在私有持久状态中，不写入公开日志。只凭 SDK 异常文本不足以选择重试策略。
+
+写操作丢失响应时，应单独记录“提交结果未知”，不能因为客户端抛异常就标记为“已拒绝”。只读事件观察可以重连同一 Run；创建资源或外部写入需要先查询原操作。一个通用 HTTP 409/500 处理器不能为这些情况安全地选择相同动作。
+
+## 未分类错误与本地命令
+
+记录发生时间、请求方法和去除秘密的路径、HTTP 状态、结构化码、应用关联 ID，以及私有 Session/Run/操作标识。查询持久 Run、Tool call 和资源操作状态，再导出[诊断](/zh-CN/operate/observability)。不要记录 Authorization、带访问授权的预览 URL、原始凭据或完整用户输入。
+
+本地启动器、依赖探测、Provider SDK 和部分 Runtime 错误仍可能是文本或普通异常，没有统一 HTTP 码。按 [CLI](/zh-CN/reference/cli)及对应集成页处理，不能为它们臆造 API code。源码或证据仍不明确时保留未知状态，并报告已观察事实与未验证部分。
+
+常见错误表的全部 41 行均已匹配所链接源码中的实际 code/status 分支，见[分支核对记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-errors-reference-review.json)。这验证本页索引，不代表穷举每个内部错误字符串或运行路径，也不声称新执行了远程故障注入。下一步：[按症状排查](/zh-CN/operate/troubleshooting)、[限制](/zh-CN/reference/limits)、[恢复](/zh-CN/build/recovery)。

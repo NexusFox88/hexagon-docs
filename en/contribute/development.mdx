@@ -1,0 +1,88 @@
+---
+title: "Set up a development environment"
+---
+
+Use this tutorial to run the control plane and make a first documentation change without provider or model credentials. Local development refers to the control plane; real execution still uses cloud sandboxes. Project code is Apache-2.0. Get the source from the main repository, [NexusFox88/Hexagon](https://github.com/NexusFox88/Hexagon).
+
+## Prepare isolated dependencies
+
+From the repository root, install Node.js 22.19 or newer, npm, Python 3.10 or newer, and PostgreSQL. Create two disposable databases using your normal PostgreSQL administration process: one for development and one for tests. The role must be able to create schemas and tables. Do not point either URL at production or an existing personal Hexagon installation.
+
+```sh
+npm ci
+python3 -m venv .venv
+. .venv/bin/activate
+python3 -m pip install 'setuptools>=68' wheel
+python3 -m pip install -e sdk/python
+npm --prefix sdk/typescript run build
+export DATABASE_URL='postgres://hexagon@127.0.0.1:5432/hexagon_dev'
+export TEST_DATABASE_URL='postgres://hexagon@127.0.0.1:5432/hexagon_test'
+export HEXAGON_DATA_DIR="$PWD/.local/contributor-dev"
+export PORT=18787
+export PREVIEW_PORT=18788
+export HEXAGON_ACCESS_PORT=18789
+export HEXAGON_ACCESS_TUNNEL=
+export HEXAGON_ACCESS_URL=
+```
+
+The URLs are examples: substitute existing databases and your local authentication configuration. These commands do not create PostgreSQL or its databases. Keep credentials out of committed files. The virtual environment supplies Python packaging tools required by installed-package verification; package installation may access registries.
+
+The three ports isolate the management API, private preview and credential listener from a default local installation. Check that all three are free. The explicit empty ingress environment values suppress the default development tunnel for this no-cloud exercise; this does not make protected cloud model calls usable. Keep these values in the same shell for start/status/stop. Before a separate cloud exercise, choose its intended ingress policy using the installation guide. A different data directory alone does not isolate a reused database.
+
+## Start and inspect the control plane
+
+```sh
+npm run local -- doctor
+npm run local -- start
+npm run local -- status
+```
+
+The managed launcher applies migrations and stores identity, encryption material, settings, and logs in the selected data directory. Open `http://127.0.0.1:18787/console/`. Inspect authenticated health through the launcher; a listening socket alone is not readiness. `doctor` reports optional cloudflared and OpenSSH availability too: cloudflared is needed for temporary development credential ingress, and OpenSSH is needed for Instabox. See [installation](/en/start/install) for ingress configuration before cloud execution.
+
+A development Console can be inspected without creating cloud connections. Do not enable cloud runners as part of this first change. If the port is occupied or startup remains pending, inspect the selected private service log and process identity before attempting another start. Keep development and personal installations in separate databases/data directories and use distinct ports if running simultaneously.
+
+For foreground debugging, stop the managed instance first, then use `npm run db:migrate` followed by `npm run dev` with the same selected development environment. `dev` is not a file-watching command. Do not run two workers against your development dataset accidentally.
+
+## Make one small, reviewable change
+
+A suitable first task is clarifying the E2B template prerequisites in both translations of [the E2B guide](/en/integrations/sandboxes/e2b). Read the linked connector and dated evidence; change only wording justified by those sources. Preserve the distinction between the built-in OpenCode memory requirement and Session-owned OCI template preparation. Follow the concrete workflow in [documentation contributions](/en/contribute/documentation).
+
+For that documentation-only edit, run the structural checker and compare both translations:
+
+```sh
+python3 tooling/check-product-docs.py --report testing/evidence/2026-11-19-product-docs-structure.json
+```
+
+Use a new dated report filename when recording a later review. Confirm valid local links, equivalent prerequisites, and unchanged evidence scope. The checker cannot certify prose accuracy or cloud execution. No provider account is required for this exercise.
+
+For implementation changes, select relevant tests and then the repository gates:
+
+```sh
+npm run verify
+npm run verify:packages
+npm run release:check
+```
+
+Both verification commands require the exported `TEST_DATABASE_URL`. `verify` runs TypeScript checking and Vitest; installed-package verification builds and consumes a Python wheel and npm tarball in temporary directories. Neither command is real cloud acceptance. Review the exact scope and additional startup/backup requirements in [testing](/en/contribute/testing). A release audit is a check, not publication authorization.
+
+## Identify the check that failed
+
+| Failure | Inspect and resolve before continuing |
+| --- | --- |
+| `TEST_DATABASE_URL is required` | The verification gate has stopped before its checks. Export the disposable test database URL in this shell; do not remove the guard or count the run as passed. |
+| Connection refused or authentication failure | Check the intended PostgreSQL server, role and database. Installing npm dependencies does not start PostgreSQL. |
+| Python wheel build cannot find setuptools | Confirm the active Python environment contains the documented build tools; package verification uses `--no-build-isolation`. |
+| Service process exists but cannot be authenticated | Inspect this data directory's process identity, selected API port and private log. The launcher intentionally avoids signalling an unverified process. |
+| Source checks pass but package consumption fails | Inspect the built wheel/tarball and installed consumer test; source imports alone do not validate the distributed SDK. |
+
+## Finish the local exercise
+
+```sh
+npm run local -- stop
+```
+
+The launcher refuses to stop while Runs are active. If you went beyond this exercise and created cloud Sessions, cancel/close them and reconcile resource cleanup first; stopping the control plane does not destroy provider resources. Keep the data directory needed to decrypt credentials and investigate unfinished operations. This tutorial requires no commit or publication.
+
+A successful first change has a readable bilingual diff, an actual checker result, and an honest list of checks not run. Product behavior changes additionally require reading [architecture](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/architecture.md) and [acceptance](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/acceptance.md), preserving the complete user journey.
+
+Next: [codebase map](/en/contribute/codebase), [testing and evidence](/en/contribute/testing), [proposals and PRs](/en/contribute/proposals-and-prs).

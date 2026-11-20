@@ -1,0 +1,117 @@
+---
+title: "Connect a Remote MCP service"
+---
+
+Remote MCP connects service discovery/calls to Hexagon ToolBroker. Streamable HTTP (default) and legacy SSE use the official MCP SDK for initialization, paginated tools/list, and tools/call. You do not need to turn the server into an HTTP JSON Tool.
+
+## Scope and prerequisites
+
+Prepare a reachable public HTTPS MCP endpoint, authorized account, and controlled acceptance tool. The endpoint excludes userinfo, query, and fragment; supply credentials separately. authentication accepts none, bearer, or header. Header mode uses header_name, defaulting to x-api-key. Explicitly select none for public services rather than inventing a Token.
+
+This interface does not expose stdio, local process launch, resources/prompts subscriptions, sampling, or elicitation. It does not automatically register arbitrary OAuth clients or refresh Tokens. OAuth-only services need an externally obtained suitable Bearer Token and manual renewal. MCP support does not imply every extension.
+
+## Discover, select, and enable
+
+Prepare a tool returning known content in a controlled service and set MCP_TOOL_NAME to its exact name. These examples retain approval=true. Review discovered names, descriptions, and schemas before saving selection. External descriptions are data, not instructions to expand access.
+
+The examples use local management clients with private configuration; see [self-hosting](/en/operate/self-host) for hosted initialization. Each execution creates a connection; save/reuse its ID.
+
+```python
+import os
+from hexagon import Hexagon
+client = Hexagon.local()
+connection = client.create_connection(
+    kind="tool", provider="mcp-remote", name="Controlled MCP service",
+    credential=os.environ["MCP_TOKEN"],
+    config={"endpoint": os.environ["MCP_ENDPOINT"],
+            "transport": "streamable-http", "authentication": "bearer"},
+)
+connection = client.discover_mcp_tools(connection["id"])
+selected = {key: tool for key, tool in connection["config"]["tools"].items()
+            if tool["name"] == os.environ["MCP_TOOL_NAME"]}
+if len(selected) != 1:
+    raise RuntimeError("Expected exactly one selected tool")
+client.update_connection(connection["id"],
+    config={**connection["config"], "tools": selected})
+if client.validate_connection(connection["id"])["status"] != "ready":
+    raise RuntimeError("Inspect MCP verification diagnostics")
+client.update_connection(connection["id"], enabled=True)
+```
+
+```typescript
+import { Hexagon } from '@hexagon/agent-sdk';
+const client = await Hexagon.local();
+const { MCP_TOKEN: credential, MCP_ENDPOINT: endpoint, MCP_TOOL_NAME: name } = process.env;
+if (!credential || !endpoint || !name) throw new Error('Set MCP configuration');
+let connection = await client.createConnection({
+  kind: 'tool', provider: 'mcp-remote', name: 'Controlled MCP service', credential,
+  config: { endpoint, transport: 'streamable-http', authentication: 'bearer' },
+});
+connection = await client.discoverMcpTools(connection.id);
+const selected = Object.fromEntries(Object.entries(connection.config.tools)
+  .filter(([, tool]) => (tool as { name: string }).name === name));
+if (Object.keys(selected).length !== 1) throw new Error('Expected one selected tool');
+await client.updateConnection(connection.id, { config: { ...connection.config, tools: selected } });
+if ((await client.validateConnection(connection.id)).status !== 'ready')
+  throw new Error('Inspect MCP verification diagnostics');
+await client.updateConnection(connection.id, { enabled: true });
+```
+
+Keep the discovered key rather than treating the remote name as an operation ID. Stable mcp_ hash keys retain original names; duplicate tools/collisions fail instead of silently overwriting. Give separate connections different Session binding aliases.
+
+Discovery is bounded to 100 tools, 20 pages, and 2 MiB responses. Input schemas must be locally compilable synchronous object schemas. Validation rediscovers and compares selected tools; it does not execute business operations. Name, description, or schema changes produce mcp_schema_changed. Rediscover, review, validate, enable, then create a new Session. Existing Sessions do not silently gain operations.
+
+## Invoke from a Session
+
+Follow [Tools](/en/build/tools), binding connection.id as `tools: {research: connection_id}` with a Tools-capable Harness, then preflight. Required Tools are checked for authorization during initialization; optional Tools still require authorization when used.
+
+Submit a precise task reading a dedicated test object through the selected tool and reporting its known content. With approval=true, inspect the pending approval and follow [approval handling](/en/build/approvals). Confirm rejection produces no actual remote call. Read-only annotations do not disable approval automatically; an administrator explicitly reviews that policy.
+
+Inspect Tool call records and actual content, not only the final natural-language answer. Handle changed/expired credentials through [authorization](/en/build/tool-authorization). Original Tokens remain in the control plane, not Sandbox environment.
+
+## Interpret results and changes
+
+An MCP call can return a valid result with `isError: true`. Hexagon records the call as completed because a result was obtained; inspect `is_error` in Tool call records and the actual result instead of equating completed with business success. A valid Tool error differs from a lost response after dispatch, where the remote outcome may remain unknown.
+
+Keep the selected tool definition as a reviewed snapshot. Adding a new remote tool does not authorize an existing Session to call it. A name, description or schema change to a selected tool requires rediscovery and review; do not bypass drift detection by editing a local hash key to resemble the old tool. Approval policy and remote read-only annotations are distinct: annotations are not permission to remove human consent.
+
+| Situation | Response |
+| --- | --- |
+| `mcp_discovery_required` | Discover tools and retain an explicitly selected set before validation. |
+| `mcp_schema_changed` | Review discovery differences, update and validate configuration, then use a new Session for the intended definition. |
+| Authentication rejected | Repair the bound account credential and observe the original Run's authorization flow. |
+| Handshake fails before dispatch | The adapter may reconnect once; persistent failure is surfaced as a connection failure. |
+| Transport fails after tools/call starts | Investigate the original call and external outcome; do not invoke it again as a probe. |
+| Valid result contains isError | Present the Tool error to the task/application without claiming the business operation succeeded. |
+
+## Network and retry boundaries
+
+Socket-time DNS checks reject private/mixed addresses. Redirects and cross-origin SSE POST targets are rejected. Fake-IP DNS may fail validation; do not disable checks for convenience. Operators can configure the existing trusted egress proxy/exact-host mechanism described in [networking](/en/operate/networking).
+
+Definitions are checked before invocation. One connection retry is allowed before tools/call begins; after dispatch, a lost response is never automatically replayed, including read-only-annotated tools. All MCP operations have replay=never.
+
+A remote write may complete before its response disappears. Retain the original call/hash, verify remotely, and record the conclusion through [reconciliation](/en/operate/reconciliation). Cancellation does not undo writes. Rediscovery does not resolve unknown side effects; do not issue a new call to test whether the old one succeeded.
+
+## A concrete discovery-to-call example
+
+The historical public-service example uses `https://mcp.deepwiki.com/mcp`, `authentication: none`, Streamable HTTP, and the selected remote name `read_wiki_structure`. The requested repository was `modelcontextprotocol/typescript-sdk`. For a public service, omit the credential rather than using the bearer example unchanged; keep the discovered key when selecting the tool. Your administrator must review the discovered schema and approval policy before enabling it.
+
+The November 18 record used one TypeScript Session with Vercel/Pi 1.5.2 and one Python Session with Vercel/OpenCode 1.2.27, both with the configured SiliconFlow international DeepSeek-V4-Flash model. It checked an actual completed call and returned documentation topics, then confirmed cleanup. The operator explicitly disabled approval for that selected read; this does not prove the approval-rejection branch or a remote write. It also does not establish today's service availability.
+
+| Transport evidence | Protocol/version scope | What was checked |
+| --- | --- | --- |
+| Local Streamable HTTP fixture | Initialization response `2025-03-26` | Authenticated initialize, paginated discovery and actual SDK `tools/call` round trip |
+| Local legacy SSE fixture | Initialization response `2024-11-05` | Header authentication and discovery through same-origin message endpoint |
+| Historical public DeepWiki | Negotiated by SDK; the cited summary does not record the negotiated version | Real Streamable HTTP discovery and cloud calls; legacy `/sse` returned 410 |
+
+The dependency is `@modelcontextprotocol/sdk` 1.32.2 in this repository. A fixture's selected protocol version must not be copied into the public service's evidence. An SDK version and a negotiated protocol version are different fields.
+
+## Evidence and protocol versions
+
+The SDK negotiates protocol during initialization; configuration does not expose an arbitrary protocolVersion switch. Record SDK dependency version, negotiated server version, transport, tool/schema, and scenario. Do not claim every protocol version is verified.
+
+The [2026-11-18 acceptance record](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-18-mcp-lark-responses.md) scopes public DeepWiki Streamable HTTP through both SDKs and real cloud Harnesses. Its legacy SSE endpoint returned 410 then; SSE compatibility was separately checked with a deterministic protocol server. Do not present these as equivalent public-service live passes. This page did not revisit that service or rerun cloud tasks.
+
+Verify your service independently: discovery-to-call, insufficient permissions, expired Token, schema drift, zero calls on rejection, lost write-response reconciliation, and Session cleanup. Sharing a transport with a historically verified service is insufficient.
+
+Sources: [MCP adapter](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/mcp/remote.ts), [original contract](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/remote-mcp.md). Next: [Tool binding](/en/build/tools), [authorization](/en/build/tool-authorization), [Tool connector development](/en/contribute/tool-connectors).

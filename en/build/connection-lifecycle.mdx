@@ -1,0 +1,76 @@
+---
+title: "Change connections and manage existing Sessions"
+---
+
+A connection holds a Provider, model, or Tool account configuration. Updating, disabling, closing dependent Sessions, and deleting a connection have different effects.
+
+Use a management identity; ordinary execution Tokens cannot update or delete connections. Record the connection ID, affected Sessions, and execution evidence before changing it.
+
+## Revalidate after changes
+
+```python
+import os
+client.update_connection(connection_id, credential=os.environ['REPLACEMENT_CREDENTIAL'])
+checked = client.validate_connection(connection_id)
+if checked['status'] != 'ready':
+    raise RuntimeError('Connection verification failed; keep it disabled')
+client.update_connection(connection_id, enabled=True)
+```
+
+```typescript
+const replacement = process.env.REPLACEMENT_CREDENTIAL;
+if (!replacement) throw new Error('Missing replacement credential');
+await client.updateConnection(connectionId, { credential: replacement });
+const checked = await client.validateConnection(connectionId);
+if (checked.status !== 'ready') throw new Error('Verification failed; keep disabled');
+await client.updateConnection(connectionId, { enabled: true });
+```
+
+These are backend snippets; never log the replacement value. Configuration/credential changes invalidate verification and disable the connection. Setting enabled in the same update cannot bypass revalidation. Verification contacts upstream services and model verification can incur usage.
+
+## Disablement
+
+For Sandbox/model connections, disabling blocks new Sessions and new Runs on existing Sessions. The worker checks again before a new Harness invocation, including work queued before disablement. An identical already-accepted idempotency request can still return its original Run. Existing invocation recovery and resource cleanup remain necessary.
+
+```python
+client.update_connection(connection_id, enabled=False)
+```
+
+```typescript
+await client.updateConnection(connectionId, { enabled: false });
+```
+
+Disablement does not terminate every dispatched request or revoke upstream credentials. Existing Sessions retain pinned configurations. Create new Sessions when you need a newly selected execution definition.
+
+## Roll out a configuration change
+
+Separate credential repair from changing the execution environment. After a credential change, validation and enablement restore eligibility, but do not prove that an existing cloud resource is accessible under the new credential. Keep enough private resource evidence to investigate account or permission mismatches. Changing a connection's account is not a resource migration.
+
+For a planned environment change, identify dependent Sessions, settle their active work, prepare and verify the intended connection, then create a canary Session with the desired definition. Run the actual required task and cleanup checks before directing new work to it. Existing Sessions retain their pinned execution configuration; a new validation result does not rewrite that snapshot.
+
+| Change | Existing work to inspect |
+| --- | --- |
+| Disable Sandbox/model connection | New submissions and not-yet-started invocations are blocked; already accepted request lookup and cleanup remain distinct. |
+| Rotate credentials | Readiness is invalidated; inspect access to already-owned resources after revalidation. |
+| Change Tool account or selected operations | Check pinned account/operation restrictions and refresh version-sensitive approval records. |
+| Delete a connection | Confirm dependent Sessions are closed and resource outcomes known; deletion does not revoke the upstream account credential. |
+
+## Close dependencies before deletion
+
+Inspect dependent Sessions, settle active Runs, close each, and confirm cleanup. Deletion with remaining dependencies returns `connection_in_use`. Reconcile unknown deletions rather than removing database records to hide dependencies.
+
+Then use `delete_connection` / `deleteConnection`. This deletes the Hexagon connection, not the upstream account or its API key. Upstream revocation requires the corresponding Provider management action.
+
+## Verify
+
+On a dedicated test connection, demonstrate successful work, disablement, rejection of new work, continued ability to clean up old resources, and deletion after dependencies clear. Test invalid replacement credentials remaining disabled and valid credentials enabling only after verification. Check that old initialization snapshots remain unchanged.
+
+Sources: [connection implementation](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/connections/connections.ts), [execution boundaries](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/architecture.md). Next: [Recovery](/en/build/recovery).
+
+## Compare the procedure with a recorded lifecycle
+
+The [November 15 API lifecycle record](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-connection-lifecycle.md) follows an actual E2B/OpenCode/MiniMax task through configuration changes, invalid credential validation, restoration, explicit enablement, disablement, rejected new work, cleanup while disabled and dependency-aware deletion. A separate connection using the same upstream credential remained valid, distinguishing connection deletion from account/key revocation. The [Console record](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-connection-lifecycle-gui.md) covers the corresponding interactive edits and validation states.
+
+Use this as an acceptance pattern, not permission to rotate a shared production credential for a tutorial. Work on a dedicated connection and preserve its original intended configuration privately. If cleanup fails under a changed account, retain the old resource identity and investigate account access; deleting local records does not delete the remote resource. These dated E2B records do not establish all provider/account behavior or a fresh execution of the snippets above.
+
+Next: [credential rotation](/en/operate/credentials), [resource reconciliation](/en/operate/reconciliation), [initialization snapshots](/en/concepts/initialization).

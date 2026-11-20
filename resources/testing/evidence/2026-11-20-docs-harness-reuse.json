@@ -1,0 +1,55 @@
+{
+  "scope": "I15/I16/D04 combined evidence review: exact OCI image dual-SDK cloud records, existing custom-package full journey, scoped source-difference review, current isolated DB/parser checks. No new cloud execution.",
+  "oci": [
+    {
+      "language": "typescript",
+      "image_digest": "sha256:763ea3bce6bdaee6d6092775c83c03a90b11b2a74dcfb89942a4cb82a99f974e",
+      "passed": true,
+      "artifact_verified": true,
+      "cleanup": "confirmed",
+      "source": ".local/evidence/compatibility-69500e96-1808-44b7-a785-767cbbda4ced/modal-oci-opencode-anthropic-compatible/oci-opencode-typescript.json",
+      "source_sha256": "de48edc54df500ae618acce4cdc9c579df86ac71e267964094e5451086ee4613"
+    },
+    {
+      "language": "python",
+      "image_digest": "sha256:763ea3bce6bdaee6d6092775c83c03a90b11b2a74dcfb89942a4cb82a99f974e",
+      "passed": true,
+      "artifact_verified": true,
+      "cleanup": "confirmed",
+      "source": ".local/evidence/compatibility-9e91f2b8-f47d-42e3-9399-9e394aaaf1ce/modal-oci-opencode-anthropic-compatible/oci-opencode-python.json",
+      "source_sha256": "3177ef6f8528bf70e67ae3d71aaa49fbf13bc5d3dc906c217ed8b03bfc1b112f"
+    }
+  ],
+  "source_package": {
+    "full_journey": ".local/evidence/api-smoke-bd3fa042-fa5c-47fc-bff6-dbf73cb4a07c.json",
+    "source_sha256": "c6c94a1fdda8cd4e1cf4dcb2cd0341badecbf49f78db2160dbd88f4935243493",
+    "recorded_behaviors": [
+      "independent Python and TypeScript tasks",
+      "two-turn and cross-language continuation",
+      "Tool authorization/approval and one write after approval",
+      "artifact bytes and previews",
+      "queued cancellation",
+      "confirmed resource cleanup"
+    ],
+    "later_source_matched_journey": ".local/evidence/api-smoke-3802415c-55cb-4afe-9fa7-fb22c0820b9c.json",
+    "archived_package_digest": "c9aa899350bad1178f03f7b42c1468259f86e16eee18eff7453462e4d48ca5e8",
+    "current_package_digest": "ccb0d48f6dbdd8599fc31e4da1236bc875ce6c9abe7fe76480afa9d6e0ec1489",
+    "difference": "Compared current main.py to retained beta-candidate-2 main.py: adds initialization.context to empty history and initialization.system to the prompt. Other lines identical. Canonical archived package digest matches the later Vercel cloud journal.",
+    "reuse_boundary": "No-initialization path only; does not establish new context/system behavior or a new cloud run for the current digest. Cancellation evidence is queued cancellation, not every in-flight interrupt race."
+  },
+  "current_contract_checks": {
+    "scope": "Real isolated PostgreSQL version immutability/tenant reconstruction and OCI pre-allocation rejection; local strict result/parser tests. No registry pull or real cloud in these checks.",
+    "command": "vitest run --no-file-parallelism modules/execution/harness-packages.test.ts modules/harnesses/session-images.test.ts modules/harnesses/runtime-adapter.test.ts testing/execution-preflight.test.ts",
+    "exit_code": 0,
+    "source_sha256": {
+      "modules/execution/harness-packages.test.ts": "2e23d705b4d527d2de1e3beb4c848fe5db28a838e5aff1d22d45d28c671be6d2",
+      "modules/harnesses/session-images.test.ts": "c7afd0140455dd6e8f4cdea9ccb9e5bdef6b06af641daab4aa20fe15d6e6bbe4",
+      "modules/harnesses/runtime-adapter.test.ts": "ed2d50c2d98a538eba278df712fb67201c670b14643b77a46efee9075a47210f",
+      "testing/execution-preflight.test.ts": "cabf148efcc2f1e0997c75d279503a0cac9a8d3ddc5f8e7b1f2fc4c50b188fce"
+    },
+    "cleanup": "isolated schema dropped",
+    "log": ".local/docs-content-checks/closeout-harness-contracts.log",
+    "files_passed": 4,
+    "tests_passed": 16
+  }
+}

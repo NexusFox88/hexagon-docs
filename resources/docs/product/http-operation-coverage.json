@@ -1,0 +1,561 @@
+{
+  "scope": "Current literal management routes and editorial page assignments. A draft assignment does not certify exhaustive schemas, executable examples or runtime acceptance.",
+  "total": 79,
+  "assigned": 79,
+  "pending": 0,
+  "operations": [
+    {
+      "method": "GET",
+      "path": "/v1/tokens",
+      "application": false,
+      "page": "tokens.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/tokens",
+      "application": false,
+      "page": "tokens.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/tokens/:id/rotate",
+      "application": false,
+      "page": "tokens.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/tokens/:id",
+      "application": false,
+      "page": "tokens.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/health",
+      "application": true,
+      "page": "monitoring.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/deployment",
+      "application": false,
+      "page": "deployment.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/deployment",
+      "application": false,
+      "page": "deployment.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/deployment/ingress/retry",
+      "application": false,
+      "page": "deployment.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/deployment/ingress/stop",
+      "application": false,
+      "page": "deployment.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/secrets",
+      "application": false,
+      "page": "secrets.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/secrets",
+      "application": false,
+      "page": "secrets.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/secrets/:id",
+      "application": false,
+      "page": "secrets.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "PATCH",
+      "path": "/v1/secrets/:id",
+      "application": false,
+      "page": "secrets.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/secrets/:id",
+      "application": false,
+      "page": "secrets.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/applications",
+      "application": false,
+      "page": "oauth.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/applications/:provider/oauth-client",
+      "application": false,
+      "page": "oauth.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/connections/:id/authorize",
+      "application": false,
+      "page": "oauth.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/authorization-flows/:id",
+      "application": false,
+      "page": "oauth.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/authorization-flows/:id",
+      "application": false,
+      "page": "oauth.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/catalog",
+      "application": true,
+      "page": "harness-registration.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/harnesses",
+      "application": false,
+      "page": "harness-registration.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/harness-packages",
+      "application": false,
+      "page": "harness-registration.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/connections",
+      "application": true,
+      "page": "connections.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/connections",
+      "application": false,
+      "page": "connections.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/connections/:id/usage",
+      "application": false,
+      "page": "connections.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/connections/:id/dependencies",
+      "application": false,
+      "page": "connections.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/connections/:id",
+      "application": true,
+      "page": "connections.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "PATCH",
+      "path": "/v1/connections/:id",
+      "application": false,
+      "page": "connections.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/connections/:id/discover-mcp",
+      "application": false,
+      "page": "connections.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/connections/:id/authorization",
+      "application": false,
+      "page": "oauth.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/connections/:id/disconnect",
+      "application": false,
+      "page": "connections.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/connections/:id/validate",
+      "application": false,
+      "page": "connections.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/connections/:id",
+      "application": false,
+      "page": "connections.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/agents",
+      "application": true,
+      "page": "agents.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/agents",
+      "application": true,
+      "page": "agents.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/agents/:id",
+      "application": true,
+      "page": "agents.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/agents/:id",
+      "application": false,
+      "page": "agents.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/agents/:id/archive",
+      "application": false,
+      "page": "agents.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/agents/:id/copy",
+      "application": false,
+      "page": "agents.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/agents/preflight",
+      "application": true,
+      "page": "agents.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/overview",
+      "application": false,
+      "page": "monitoring.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/pending",
+      "application": false,
+      "page": "monitoring.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/runs",
+      "application": true,
+      "page": "runs.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/sessions",
+      "application": true,
+      "page": "monitoring.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/sessions/activity",
+      "application": true,
+      "page": "monitoring.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/fleet",
+      "application": false,
+      "page": "monitoring.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/sessions/preflight",
+      "application": true,
+      "page": "sessions.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/sessions",
+      "application": true,
+      "page": "sessions.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/sessions/:id/access",
+      "application": true,
+      "page": "session-access.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/sessions/:id/access",
+      "application": true,
+      "page": "session-access.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/access/:id",
+      "application": true,
+      "page": "session-access.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/sessions/:id/environment",
+      "application": false,
+      "page": "session-access.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/sessions/:id/authorization",
+      "application": false,
+      "page": "session-access.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/sessions/:id/connections/:connection",
+      "application": false,
+      "page": "session-access.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/sessions/:id/initialization",
+      "application": true,
+      "page": "sessions.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/sessions/:id",
+      "application": true,
+      "page": "sessions.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/sessions/:id/files",
+      "application": true,
+      "page": "sessions.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/sessions/:id/files",
+      "application": true,
+      "page": "sessions.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/resource-operations",
+      "application": false,
+      "page": "resource-operations.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/resource-operations/:id",
+      "application": false,
+      "page": "resource-operations.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/resource-operations/:id/review",
+      "application": false,
+      "page": "resource-operations.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/sessions/:id/pause",
+      "application": false,
+      "page": "sessions.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/sessions/:id/resume",
+      "application": false,
+      "page": "sessions.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/sessions/:id/close",
+      "application": true,
+      "page": "sessions.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/sessions/:id/previews",
+      "application": true,
+      "page": "artifacts-previews.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/previews/:id",
+      "application": true,
+      "page": "artifacts-previews.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/sessions/:id/runs",
+      "application": true,
+      "page": "runs.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/sessions/:id/runs",
+      "application": true,
+      "page": "runs.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/runs/:id",
+      "application": true,
+      "page": "runs.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/runs/:id/artifacts",
+      "application": true,
+      "page": "artifacts-previews.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/artifacts/:id/content",
+      "application": true,
+      "page": "artifacts-previews.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/runs/:id/events",
+      "application": true,
+      "page": "runs.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/runs/:id/stream",
+      "application": true,
+      "page": "runs.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/runs/:id/tool-calls",
+      "application": true,
+      "page": "approvals-tools.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/runs/:id/tool-calls/:call/resolve",
+      "application": false,
+      "page": "approvals-tools.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/runs/:id/tool-calls/:call/deny-authorization",
+      "application": false,
+      "page": "approvals-tools.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/runs/:id/cancel",
+      "application": true,
+      "page": "runs.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/runs/:id/approvals",
+      "application": true,
+      "page": "approvals-tools.md",
+      "status": "source-reviewed-draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/approvals/:id/decision",
+      "application": false,
+      "page": "approvals-tools.md",
+      "status": "source-reviewed-draft"
+    }
+  ]
+}

@@ -1,0 +1,1409 @@
+{
+  "source_repository": "https://github.com/NexusFox88/Hexagon",
+  "source_scope": "Current local product documentation snapshot; no private journals.",
+  "pages": [
+    {
+      "source": "docs/product/en/agents.md",
+      "destination": "en/agents.mdx",
+      "sha256": "ec0c871583bc0a42a8b0f0ff680abac91a9ed715e43e34b7f69279670508ca10",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/build/agent-templates.md",
+      "destination": "en/build/agent-templates.mdx",
+      "sha256": "79b9a9264f33e70089e2198c6666ca108caec5d475a8040176d1ad351844da2c",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/build/approvals.md",
+      "destination": "en/build/approvals.mdx",
+      "sha256": "65c7b5228caceb767228010e63cfc42899c629a2fee38c70110459bc62312a01",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/build/artifacts.md",
+      "destination": "en/build/artifacts.mdx",
+      "sha256": "343291a7bbf54dba05989ec7c58d760cba330a79a05eaa66432ef352d870166e",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/build/backend-integration.md",
+      "destination": "en/build/backend-integration.mdx",
+      "sha256": "b919726ef172494783454060763a209c2e5d552aa17d7022d245a8d142373018",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/build/connection-lifecycle.md",
+      "destination": "en/build/connection-lifecycle.mdx",
+      "sha256": "7a2b4e2c21e9089a7245f06cf5b6ecdea7721acba74a01bf81d2d8ac02eb636d",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/build/idle-and-wake.md",
+      "destination": "en/build/idle-and-wake.mdx",
+      "sha256": "4a7e5ab987d0e85c5171c4419f988d436d5f4d5da4182fe6a56adc3c7cc0440d",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/build/multi-turn.md",
+      "destination": "en/build/multi-turn.mdx",
+      "sha256": "1eeaca7f1c1b055f05bcc740191b56b6b9dc57a9d20c76b357942b8bb9a9fd9a",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/build/private-preview.md",
+      "destination": "en/build/private-preview.mdx",
+      "sha256": "fdf421c370046c7d06cf88ddbc844fd81a28f6ea992a8b8f19f49a1094ca4362",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/build/project-context.md",
+      "destination": "en/build/project-context.mdx",
+      "sha256": "65a61909f1968de6fd83d819103e8912101f719fca3953afda91a9e6705d731d",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/build/recovery.md",
+      "destination": "en/build/recovery.mdx",
+      "sha256": "39c7946a7b940d8fad0ad63b29ccd9ba8205f16658c54038b50285426137501b",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/build/sandbox-policy.md",
+      "destination": "en/build/sandbox-policy.mdx",
+      "sha256": "7e94e584f102bae38904b0ffd393633539bf70244e98499dad5e7fe9fe9d3fdb",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/build/stream-events.md",
+      "destination": "en/build/stream-events.mdx",
+      "sha256": "256f9ee4f4e3bcd9800a8f8a36a2f752ab55b8c72eca83a3dd5c48c66faeb3bf",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/build/tool-authorization.md",
+      "destination": "en/build/tool-authorization.mdx",
+      "sha256": "1d4df72ef748ecc2f22648f074733fd63807c170340d89eeaab0966dd213cb52",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/build/tools.md",
+      "destination": "en/build/tools.mdx",
+      "sha256": "4005d75616fb4f0f58162643b891f5a64ad9bbc48dde2cf8710a50ed16139997",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/changelog.md",
+      "destination": "en/changelog.mdx",
+      "sha256": "c908b262a931a1fd4c835e4bea459115df54f823893c3f9d9b1f1d4c3b7df8e2",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/concepts/capabilities-and-evidence.md",
+      "destination": "en/concepts/capabilities-and-evidence.mdx",
+      "sha256": "8195bad63cecd372b0a0d6b13bdab7a75afd1f58c4a1b4ae80680ce8bed8400d",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/concepts/events-and-recovery.md",
+      "destination": "en/concepts/events-and-recovery.mdx",
+      "sha256": "4f93c7ae85ca103f8a9d9e103b04692ee2fbda509ea0a90330e8d34a3e89c571",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/concepts/execution-architecture.md",
+      "destination": "en/concepts/execution-architecture.mdx",
+      "sha256": "9d05cff27367b0ed150105347b1fc806e48c2be3392a21d5b1f85ae9f78de580",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/concepts/initialization.md",
+      "destination": "en/concepts/initialization.mdx",
+      "sha256": "94b8fe902eed136e1b01fb59c752705265212a5ae39887231cb0b0abacc4e711",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/concepts/persistence.md",
+      "destination": "en/concepts/persistence.mdx",
+      "sha256": "1089e2d83bfd0bd1e25c42d4a392fcbc32941b47747332290c83d3ce7aac9d00",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/concepts/security-boundaries.md",
+      "destination": "en/concepts/security-boundaries.mdx",
+      "sha256": "5b8cff0779a768ea38658bb1df06acfcccb149f33954ced27988fe60d630fd1d",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/concepts/serverless-lifecycle.md",
+      "destination": "en/concepts/serverless-lifecycle.mdx",
+      "sha256": "20fd2229d47af7227337c1df19c4f89f0cf26e50e55030e65cd33dfbec3b280e",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/concepts/sessions-runs-agents.md",
+      "destination": "en/concepts/sessions-runs-agents.mdx",
+      "sha256": "327b5d53166f773d58fa82031678fc3bfbf2ec0457ee54d227f65ce4ca1f1d64",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/contribute/codebase.md",
+      "destination": "en/contribute/codebase.mdx",
+      "sha256": "c7fe24609f3c2f33294df35f04e9ce4dcfd7b67d32c0ff649424fd3274dd35cf",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/contribute/development.md",
+      "destination": "en/contribute/development.mdx",
+      "sha256": "292931e07a7ac73761ac5513a70912fc730aadcc18ce30e1f59b114c8a27ed8c",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/contribute/documentation.md",
+      "destination": "en/contribute/documentation.mdx",
+      "sha256": "9c77c6126461bdeb0faaf70187fb8e622f8c365461829b287d0f698cc6cd2eb6",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/contribute/harness-adapters.md",
+      "destination": "en/contribute/harness-adapters.mdx",
+      "sha256": "69aa7f14080e50ab4c08d9a4debbad99cb235ceb357b4db794e19b6a1a3d84f3",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/contribute/proposals-and-prs.md",
+      "destination": "en/contribute/proposals-and-prs.mdx",
+      "sha256": "9d6d5e2796d00cc9f90f9bc81c19d7a802aacf40343e50be75abc630ae0c32cf",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/contribute/sandbox-connectors.md",
+      "destination": "en/contribute/sandbox-connectors.mdx",
+      "sha256": "35ee8809cba741aec9ddc3ee8ba22956781935a05662983ebbb85d495754221b",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/contribute/testing.md",
+      "destination": "en/contribute/testing.mdx",
+      "sha256": "d4e984cb8bed56974f5d5fbb7c3b98165f63a2e0ce15c64e50971e312120dd99",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/contribute/tool-connectors.md",
+      "destination": "en/contribute/tool-connectors.mdx",
+      "sha256": "933463deaa0616c12fafc12042bfd1f961dfe43b9d7a7028e9fadb6f7e1b7e92",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/directory.md",
+      "destination": "en/directory.mdx",
+      "sha256": "7011f77fc647c06800dc3e8e68866a3e10344a637a51ab67b3358736cdbcb874",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/index.md",
+      "destination": "en/index.mdx",
+      "sha256": "a8a049d4d5a08856b54d2ccffd5db5036f2f971e0dd3ba7ad0bce61131baf950",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/integrations/apps.md",
+      "destination": "en/integrations/apps.mdx",
+      "sha256": "510dad51e846f55ab55cfdda4eb43fd967a2c29187c755070e48952719df719d",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/integrations/choose.md",
+      "destination": "en/integrations/choose.mdx",
+      "sha256": "fdd6676755cd9ac899453fc66fd6a90134ed811556372274f49ee847e63f69df",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/integrations/harnesses/oci.md",
+      "destination": "en/integrations/harnesses/oci.mdx",
+      "sha256": "9a070713d2fee1898f00c26d4068aac0c5e59eae0c7604389c87e49c25159294",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/integrations/harnesses/source-package.md",
+      "destination": "en/integrations/harnesses/source-package.mdx",
+      "sha256": "0d6ca52b9fe45befb99d027dc8721d9b2707dd20ff5067958ee5834fa2c94496",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/integrations/harnesses.md",
+      "destination": "en/integrations/harnesses.mdx",
+      "sha256": "a22bf77922f93b88c5b2faa9f8a49ac3251e995702377ef4fa22476fdfe53959",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/integrations/http-tools.md",
+      "destination": "en/integrations/http-tools.mdx",
+      "sha256": "a8469ea99005162af0909597875b20cbdd48580cedb8b6eab5dc9d824fab16c9",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/integrations/mcp.md",
+      "destination": "en/integrations/mcp.mdx",
+      "sha256": "2ec796bea989a5342c332459ccfd3f8c51764817d6bac561edb1763df93f7b42",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/integrations/model-protocols.md",
+      "destination": "en/integrations/model-protocols.mdx",
+      "sha256": "a44327e7b66e20bbfc7facb916f5fc4cf4a462a2cd5f7111b2e1db0bed61ba26",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/integrations/models.md",
+      "destination": "en/integrations/models.mdx",
+      "sha256": "bf1f08c07e7b4060bf092e7366a14039e44403a226960eec35e9426b15c1cbfd",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/integrations/sandboxes/agent37.md",
+      "destination": "en/integrations/sandboxes/agent37.mdx",
+      "sha256": "df7304b21927e2271745bae8e6c9198febbc5520f50979fd2b2915215073689e",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/integrations/sandboxes/blaxel.md",
+      "destination": "en/integrations/sandboxes/blaxel.mdx",
+      "sha256": "5d2e487b03e2c28d3339e591e3c63ac66f0d53f99d75e13c12c715f10f2212e5",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/integrations/sandboxes/boat.md",
+      "destination": "en/integrations/sandboxes/boat.mdx",
+      "sha256": "b08ccb1b9f7520bdd6529dffdfb6e47b19bd48d46492c039a9c5ed32861feacd",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/integrations/sandboxes/e2b.md",
+      "destination": "en/integrations/sandboxes/e2b.mdx",
+      "sha256": "639bce533468142c9ffbec82448b27b865b4e2fbf8a4227f69ab0b5267ba474f",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/integrations/sandboxes/fly-machines.md",
+      "destination": "en/integrations/sandboxes/fly-machines.mdx",
+      "sha256": "26605a794629d492d1f1da2072f7eb015dd9f7eb2e82a9e4ca4db5794c716378",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/integrations/sandboxes/fly-sprites.md",
+      "destination": "en/integrations/sandboxes/fly-sprites.mdx",
+      "sha256": "55947425d408769e64136912b1595fbb6007319340ceb0a5259a86c37701f408",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/integrations/sandboxes/freestyle.md",
+      "destination": "en/integrations/sandboxes/freestyle.mdx",
+      "sha256": "d314879fb4d53b87e26605916c719f6ab5c4713dfd4b8b1dbfaa652c190f8969",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/integrations/sandboxes/instabox.md",
+      "destination": "en/integrations/sandboxes/instabox.mdx",
+      "sha256": "703b805cb49f62ee31602467275292c1976061cc14a901c85ee8e29b62f2b932",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/integrations/sandboxes/modal.md",
+      "destination": "en/integrations/sandboxes/modal.mdx",
+      "sha256": "ef8fabfe8d3094a02c2f23c2f16cecdd7f47a514e7f301e74a48a64e1f15b7bf",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/integrations/sandboxes/upstash-box.md",
+      "destination": "en/integrations/sandboxes/upstash-box.mdx",
+      "sha256": "8129213e3bf1400aaab96920e86049da01bf71b643e4e99be56e91320ec9bba4",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/integrations/sandboxes/vercel.md",
+      "destination": "en/integrations/sandboxes/vercel.mdx",
+      "sha256": "a3200c61fa650af2e03d2a8d1254e3ab9f977c7458e94e1c2a8a37bf4da05cd1",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/integrations/sandboxes.md",
+      "destination": "en/integrations/sandboxes.mdx",
+      "sha256": "493322cd976ccd6177ae295849dc2661be3fc1cca61f862b58e17c648acc0620",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/integrations/verified-combinations.md",
+      "destination": "en/integrations/verified-combinations.mdx",
+      "sha256": "307ba10c7d2f77c99d0469f66883020efe79348a7fda9707aeb3a98868f4fe3a",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/operate/access-control.md",
+      "destination": "en/operate/access-control.mdx",
+      "sha256": "4a122e45fde3d5b097e055652b6628a2a83f73ed0f314f3667d2caf9d28ea059",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/operate/backup-restore.md",
+      "destination": "en/operate/backup-restore.mdx",
+      "sha256": "77130fa407789b152e4235c28041e17ab0d1c23a3ba7b8c4436b25fb0174a9cd",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/operate/capacity-and-cost.md",
+      "destination": "en/operate/capacity-and-cost.mdx",
+      "sha256": "e60782b02d0b261e33c5639d0fa4a76d807fee5fb19deab87b4f93d6d5326404",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/operate/credentials.md",
+      "destination": "en/operate/credentials.mdx",
+      "sha256": "4ad9b9a14a6eb1727d832ec7c4ce1131477c0a02863525c8fb447006b2b14715",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/operate/local-workspace.md",
+      "destination": "en/operate/local-workspace.mdx",
+      "sha256": "fe3e12640a61d5788dca1ad61a09184a3b2c83cb330c43858f882271179b46fa",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/operate/networking.md",
+      "destination": "en/operate/networking.mdx",
+      "sha256": "155288989c8e571d52bf775ef6bd9c9181dd978d96bd0046ef7fa25aa94a171d",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/operate/observability.md",
+      "destination": "en/operate/observability.mdx",
+      "sha256": "4dace5fc915c40e62aa7f04eb2efddf5222e08f7bc2be06de862d822b7bb3c50",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/operate/reconciliation.md",
+      "destination": "en/operate/reconciliation.mdx",
+      "sha256": "b5213e4407be414f99a60ff5d60087068be5a92f5860e07f5a41d87a5fe3fd12",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/operate/self-host.md",
+      "destination": "en/operate/self-host.mdx",
+      "sha256": "b6da1580cfcad0c076209dddda087761ecbcc61274c39b5bcb27f5c21a4c91b5",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/operate/troubleshooting.md",
+      "destination": "en/operate/troubleshooting.mdx",
+      "sha256": "a527cbd389ea538c320bc7c2536dd2e6315dfdaccd5e92dd40d2eaf01c23a5fb",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/operate/upgrades.md",
+      "destination": "en/operate/upgrades.mdx",
+      "sha256": "8b5f58efe12131ed4b8ebbd71c4b719ced32829e74325018b4235f90172c1522",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/reference/agents.md",
+      "destination": "en/reference/agents.mdx",
+      "sha256": "abcfbf375ddfe88a55c3a4b10e9cd00efe8d1ad08c88d57d558cb867d99cdf49",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/reference/approvals-tools.md",
+      "destination": "en/reference/approvals-tools.mdx",
+      "sha256": "7b0c48a645051e37d69c8a410d7887f718c37dcc6afb337d02db7c029e2a23e9",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/reference/artifacts-previews.md",
+      "destination": "en/reference/artifacts-previews.mdx",
+      "sha256": "395ad2bc3e0f6a7db4caff1339453b734a838d6b00c0681cdad91fc5bc38dbcd",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/reference/cli.md",
+      "destination": "en/reference/cli.mdx",
+      "sha256": "8bcfc1cfa536bef54b40167547c33eb3045253bfa114fa7132d8729d8594459f",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/reference/configuration.md",
+      "destination": "en/reference/configuration.mdx",
+      "sha256": "84d2ca62aaf58050e0159796aa5229481ac8521c61fbf6f8fcde1188c5a63bb8",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/reference/connections.md",
+      "destination": "en/reference/connections.mdx",
+      "sha256": "cbe9f49905b2dd15a60caa8c42741a228608ebaef1c73fc524c616dd854b84a3",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/reference/deployment.md",
+      "destination": "en/reference/deployment.mdx",
+      "sha256": "8368a3943d1637b5babe36a9a325e8c6a82e316f8a8d4f2ef8a42fecf6d627a3",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/reference/errors.md",
+      "destination": "en/reference/errors.mdx",
+      "sha256": "e31fcfced39278bcf9b267a3dc10a2947286ad518547410a10385e69f84a4ab3",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/reference/events-and-states.md",
+      "destination": "en/reference/events-and-states.mdx",
+      "sha256": "4ba9416898221a368283a95803fb1bb89f9121b0a70b8cc55ff0ffdd297dbf22",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/reference/glossary.md",
+      "destination": "en/reference/glossary.mdx",
+      "sha256": "63a0e0e7f790f256252210ae359b48005d298ec937cfd658dacce4d62780289a",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/reference/harness-registration.md",
+      "destination": "en/reference/harness-registration.mdx",
+      "sha256": "8a447e8a93d86556a1bda3ade96128d16183680503df7d9464dba2be08a9279a",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/reference/http.md",
+      "destination": "en/reference/http.mdx",
+      "sha256": "64c5811b3fd57b2bbcc35341246e3f61f7eb56966efacd01ea0a337cd53fd599",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/reference/limits.md",
+      "destination": "en/reference/limits.mdx",
+      "sha256": "a1046f4167168e7b96fbf25f4181a0939e70ef3d849a4a6eb9b89c1ff566d1c9",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/reference/monitoring.md",
+      "destination": "en/reference/monitoring.mdx",
+      "sha256": "af096630605049296311a7ef2fd244f888694c4adb6db480e3ce66e7b074faaa",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/reference/oauth.md",
+      "destination": "en/reference/oauth.mdx",
+      "sha256": "9dc8dbb1eced506664e36bce8dab9315df134b82332bb6cbf851b9b749f1bb8e",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/reference/python.md",
+      "destination": "en/reference/python.mdx",
+      "sha256": "da337a2012f39f9c63a95054cae4a91b78fab4a1e099417ab2c50ff7b6f5e370",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/reference/resource-operations.md",
+      "destination": "en/reference/resource-operations.mdx",
+      "sha256": "e1df19f6327db9c4c4158fe091f00e44c31a419730be00e035508ce3d00a1643",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/reference/runs.md",
+      "destination": "en/reference/runs.mdx",
+      "sha256": "dad75100794d64ce119002ed529fac1d205a7a84f2e45d52d52c60fce1aa736a",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/reference/secrets.md",
+      "destination": "en/reference/secrets.mdx",
+      "sha256": "6cd2696a91ea456e5e1d42b41b8086beb318214fec1c05b8dfa9b6270b4e9dee",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/reference/session-access.md",
+      "destination": "en/reference/session-access.mdx",
+      "sha256": "4109d2d6117f0d6289293a37121fb627fb1822ee1dee1369c693371999b3f844",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/reference/sessions.md",
+      "destination": "en/reference/sessions.mdx",
+      "sha256": "d8ec534b363d13b78dce1d70a1dfb71bd94cd44ccb285ac4e7453c1e244cdc2a",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/reference/tokens.md",
+      "destination": "en/reference/tokens.mdx",
+      "sha256": "8f5d59ff1c640abd7d7c0bd1e4d4ad718f40471c456cf9545ad7e004c976b449",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/reference/typescript.md",
+      "destination": "en/reference/typescript.mdx",
+      "sha256": "57adb4fff744d2c5957a3b94f118ea56fe41ac5baf1a86a55c1ab24637a9e828",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/start/first-session.md",
+      "destination": "en/start/first-session.mdx",
+      "sha256": "a6d054eacaa5bc15b120b5ee7c852dfd176af384a1ba808c6eacaf492d603afc",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/start/install.md",
+      "destination": "en/start/install.mdx",
+      "sha256": "da22dc8ef7d200e3797d7d0b8d86eb6448d7456015b38a51adf3584017c53e5e",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/start/overview.md",
+      "destination": "en/start/overview.mdx",
+      "sha256": "e81fbe752d0ac88c378c616303db1fda08efea482c68765678228cd94b4d978b",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/start/project-task.md",
+      "destination": "en/start/project-task.mdx",
+      "sha256": "48555a70ae9ac7b0d48d9613b73abd128bee45b2b5fc43d084713d2a475a935b",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/start/use-cases.md",
+      "destination": "en/start/use-cases.mdx",
+      "sha256": "1560b9b6a848c3a07abdaefefdc02615efe4424ebeb1f40e2948dfa784355955",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/en/start/what-happened.md",
+      "destination": "en/start/what-happened.mdx",
+      "sha256": "bccf90e6ddef9f074e75c41f323f3d800222a2b84de9ebe58178b485a7658cc8",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/agents.md",
+      "destination": "zh-CN/agents.mdx",
+      "sha256": "73fb6a2d1154a6be4df9204ff05b33d515991418ae6d2534b6ddbfcaacc4e95b",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/build/agent-templates.md",
+      "destination": "zh-CN/build/agent-templates.mdx",
+      "sha256": "9d87e33b2eafaf5e3eecb0a3bd3c4f9ec22a431da60f37656081421f7bfe05b5",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/build/approvals.md",
+      "destination": "zh-CN/build/approvals.mdx",
+      "sha256": "d7c220dbc185679d4a5507ef75b62956c898fc7b7049a07b507e4e9055917350",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/build/artifacts.md",
+      "destination": "zh-CN/build/artifacts.mdx",
+      "sha256": "faa96d1b8753e01840a0ef811cb065dde916c0d0160385752c900b4ac7b5da5d",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/build/backend-integration.md",
+      "destination": "zh-CN/build/backend-integration.mdx",
+      "sha256": "8564b9f31f8e403e74d0bc75232c53a75ade2e75c285d7f5a72cba4618a35f05",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/build/connection-lifecycle.md",
+      "destination": "zh-CN/build/connection-lifecycle.mdx",
+      "sha256": "6e2246bb4f4c3ab35b9fe1e3f20ca59891e73cff316459b44c1d3646b5fe070f",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/build/idle-and-wake.md",
+      "destination": "zh-CN/build/idle-and-wake.mdx",
+      "sha256": "2cf4b02d7160e0ab40d708af1b181f6e3308244a86e448969b73a4f21e1e1c16",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/build/multi-turn.md",
+      "destination": "zh-CN/build/multi-turn.mdx",
+      "sha256": "7d99deeb93210105d3db4e1dfc433064091328251f7ce6f95901235d9a759526",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/build/private-preview.md",
+      "destination": "zh-CN/build/private-preview.mdx",
+      "sha256": "2095f97f044451950f6eae3f0c24a80017a699e74c50cf9edc1e75aa46817f72",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/build/project-context.md",
+      "destination": "zh-CN/build/project-context.mdx",
+      "sha256": "094aa9ec754a505359f39ee6bcc6f54e58927def3c6b119d74739c692c20465f",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/build/recovery.md",
+      "destination": "zh-CN/build/recovery.mdx",
+      "sha256": "955475f5b1ff03bb5faf29da369b587ea5dd981daa8310c4178524a660574765",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/build/sandbox-policy.md",
+      "destination": "zh-CN/build/sandbox-policy.mdx",
+      "sha256": "b4ef138743cd82fb96fca281772e8b5794d967eb276d91ffc3d39111c99b9c44",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/build/stream-events.md",
+      "destination": "zh-CN/build/stream-events.mdx",
+      "sha256": "7c836f51f34a89dbbae2f00befd2a738f840a2bf2d415beecc4af91c45fcd21f",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/build/tool-authorization.md",
+      "destination": "zh-CN/build/tool-authorization.mdx",
+      "sha256": "50be44ce5d5dd12a465e18698144233337307074894b716cb8b76330268ebe12",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/build/tools.md",
+      "destination": "zh-CN/build/tools.mdx",
+      "sha256": "449c161121e9657ca08d0753b06bcc8fb7c01befd01924c1d39e07e0c33f7381",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/changelog.md",
+      "destination": "zh-CN/changelog.mdx",
+      "sha256": "20eb98f7ace4c76ef01d4ab52364b7ab793b1f326f4094068909c1dea1375a5f",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/concepts/capabilities-and-evidence.md",
+      "destination": "zh-CN/concepts/capabilities-and-evidence.mdx",
+      "sha256": "2aa182e327c87c55afa5ea8af7a6cf0a678c872cbf8af739d2077b353de150ee",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/concepts/events-and-recovery.md",
+      "destination": "zh-CN/concepts/events-and-recovery.mdx",
+      "sha256": "295836ba0e2692c7aa2a11764cea99de0fbe10e0cc2d8a11017226f218876a54",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/concepts/execution-architecture.md",
+      "destination": "zh-CN/concepts/execution-architecture.mdx",
+      "sha256": "c77559aa1f654a4f5201dde89a1049d1504c656e5b72ead98b04db50deaf088e",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/concepts/initialization.md",
+      "destination": "zh-CN/concepts/initialization.mdx",
+      "sha256": "67667bc02964c71d934978d12670984bf99575572647f1921836cc1aa7931b9a",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/concepts/persistence.md",
+      "destination": "zh-CN/concepts/persistence.mdx",
+      "sha256": "cdfec6554b6fb345ff675ca409b385ab18903365bae1c7bd57dc7e2d4c6c9657",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/concepts/security-boundaries.md",
+      "destination": "zh-CN/concepts/security-boundaries.mdx",
+      "sha256": "b1f0ca0070e552ffa926d10d8b069acf1389c6e8b807f450ab9644aca34dc520",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/concepts/serverless-lifecycle.md",
+      "destination": "zh-CN/concepts/serverless-lifecycle.mdx",
+      "sha256": "e3ca738e0a32e687f081999d7c2813518aabb0dee47aa8189471df87274add0d",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/concepts/sessions-runs-agents.md",
+      "destination": "zh-CN/concepts/sessions-runs-agents.mdx",
+      "sha256": "c8d9359d83b4c20f41ae2572f3bfac0e5aa3ea22a419399164dc64efbb484737",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/contribute/codebase.md",
+      "destination": "zh-CN/contribute/codebase.mdx",
+      "sha256": "c3595e20505bb8663094c556b08712ca806347cdb96aaaed8c6157b017fd814b",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/contribute/development.md",
+      "destination": "zh-CN/contribute/development.mdx",
+      "sha256": "090606c4aff1d334f6bc67de903a20e5ce57fbd2c19ff7b6b89bd1decc1271b3",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/contribute/documentation.md",
+      "destination": "zh-CN/contribute/documentation.mdx",
+      "sha256": "e43e162723742157b72ca607e2e704b1c0b293f97c07a867b16d5c0c6c4a0eec",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/contribute/harness-adapters.md",
+      "destination": "zh-CN/contribute/harness-adapters.mdx",
+      "sha256": "ee380ad2ddb4074439c3ece984bdf88ed076d63bb7379432aefa5b43db848813",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/contribute/proposals-and-prs.md",
+      "destination": "zh-CN/contribute/proposals-and-prs.mdx",
+      "sha256": "33c3e94bd01e61b026cd4b703a21bd0d90b36e4e6e8b395ce4608884f6beab66",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/contribute/sandbox-connectors.md",
+      "destination": "zh-CN/contribute/sandbox-connectors.mdx",
+      "sha256": "8fabebbadd7df7329d08fd6e136a0065de412b3c2f6408d393a680687b443e35",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/contribute/testing.md",
+      "destination": "zh-CN/contribute/testing.mdx",
+      "sha256": "3ad98e847020dd9ba2f7a844934dd088335a986478c64056d28478eee6d91292",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/contribute/tool-connectors.md",
+      "destination": "zh-CN/contribute/tool-connectors.mdx",
+      "sha256": "80b3115fea483a3e2b09d8cd5e0523011be9e0b5fb4199378185a273f8f6b23b",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/directory.md",
+      "destination": "zh-CN/directory.mdx",
+      "sha256": "c6cb96d62bf0512130e5a7f3531c26c0d047331bb17c2b251fb90ab959e0c4ed",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/index.md",
+      "destination": "zh-CN/index.mdx",
+      "sha256": "e38f14cd7a94bc7008300c014743f38b15b63e23cf77f88000f3253612fced78",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/integrations/apps.md",
+      "destination": "zh-CN/integrations/apps.mdx",
+      "sha256": "60ae5dd1a01776201d98ae960b733df035067c310ad312dc28191a48d421e483",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/integrations/choose.md",
+      "destination": "zh-CN/integrations/choose.mdx",
+      "sha256": "561381c5a90206f014e5ca6cfbdaca51c1106886161717d3c45089370a320aab",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/integrations/harnesses/oci.md",
+      "destination": "zh-CN/integrations/harnesses/oci.mdx",
+      "sha256": "13b0e7bfd7a00c303600b5cccf89aee279556c307b601ebe84dabe35d3afaf14",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/integrations/harnesses/source-package.md",
+      "destination": "zh-CN/integrations/harnesses/source-package.mdx",
+      "sha256": "f6298b78fd75c5aeef094dde1e3767ccfbe11cf6184391d6e6cfbd6467d9b4a5",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/integrations/harnesses.md",
+      "destination": "zh-CN/integrations/harnesses.mdx",
+      "sha256": "8212486a9d0c37682caee403df09267bcbc108d848946c10deca959c6b18a8ae",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/integrations/http-tools.md",
+      "destination": "zh-CN/integrations/http-tools.mdx",
+      "sha256": "eb18956a5dda2f99571a39d9f2e0f821ef7666682dcc6ea7ce56a647c5ea0ab9",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/integrations/mcp.md",
+      "destination": "zh-CN/integrations/mcp.mdx",
+      "sha256": "1669d1dc1daeb1e8658aec200848e17bfe0ea000a43a3138c37a5ebb0eaa8da7",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/integrations/model-protocols.md",
+      "destination": "zh-CN/integrations/model-protocols.mdx",
+      "sha256": "a9c3350c73bf0bf3205777ee05509f073e97dd69c9b607a65f62452795a6273f",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/integrations/models.md",
+      "destination": "zh-CN/integrations/models.mdx",
+      "sha256": "58926c88fd63bdeae79dd133829f0ce2b288a5f6cf8c84ecf3df3a415ca06e9d",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/integrations/sandboxes/agent37.md",
+      "destination": "zh-CN/integrations/sandboxes/agent37.mdx",
+      "sha256": "c08fceb61c2a50b26a0064d334b6ea03f55caf16f8aac05c4b855db16b7b6bf6",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/integrations/sandboxes/blaxel.md",
+      "destination": "zh-CN/integrations/sandboxes/blaxel.mdx",
+      "sha256": "f1788cabbd337db98bb2d465a399a2d9c0c881aec8ca9e29aca9570c9c08a48e",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/integrations/sandboxes/boat.md",
+      "destination": "zh-CN/integrations/sandboxes/boat.mdx",
+      "sha256": "e3fadd4a744b39c54e409a0d54e0bf590b14945f3c3f372d9d9b387edd721cfc",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/integrations/sandboxes/e2b.md",
+      "destination": "zh-CN/integrations/sandboxes/e2b.mdx",
+      "sha256": "6dbea2b843f286338e94d82b6596b7c2fd1030caee559c9d210b47f33e50adee",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/integrations/sandboxes/fly-machines.md",
+      "destination": "zh-CN/integrations/sandboxes/fly-machines.mdx",
+      "sha256": "02638bad8ee9f1d5d241c8ec29b4b7e2edae29caafb17cf70fc22a463ca0709b",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/integrations/sandboxes/fly-sprites.md",
+      "destination": "zh-CN/integrations/sandboxes/fly-sprites.mdx",
+      "sha256": "d1325b514f410038e59f73e0ed2b033b9fb93f5384223cc3f75a77d110e8d31b",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/integrations/sandboxes/freestyle.md",
+      "destination": "zh-CN/integrations/sandboxes/freestyle.mdx",
+      "sha256": "8cdecd5afe7934d61381e3dd7b41a37ffdf3a2d66ebb076164cab84e0015027a",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/integrations/sandboxes/instabox.md",
+      "destination": "zh-CN/integrations/sandboxes/instabox.mdx",
+      "sha256": "cd2daf3b10823997f677012987d5732240e59ccb56786ab6fb71308da1d632c5",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/integrations/sandboxes/modal.md",
+      "destination": "zh-CN/integrations/sandboxes/modal.mdx",
+      "sha256": "45166ca13bc676333cefe592a81387e2422fd8a3948520604f939ad653c3f9c4",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/integrations/sandboxes/upstash-box.md",
+      "destination": "zh-CN/integrations/sandboxes/upstash-box.mdx",
+      "sha256": "f1468b3a26c71894e24d15ec833cca9eca9d00e184de294c7709a0925d76d34a",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/integrations/sandboxes/vercel.md",
+      "destination": "zh-CN/integrations/sandboxes/vercel.mdx",
+      "sha256": "12d92ca29ae5a76d4b54ec4257ef3592bd1ed660e4959c362383bf416f62a3e9",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/integrations/sandboxes.md",
+      "destination": "zh-CN/integrations/sandboxes.mdx",
+      "sha256": "818575d02a5cd8b22f39f2cfdc2be1dba5b8daf4525093de537646f3ecd7eadc",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/integrations/verified-combinations.md",
+      "destination": "zh-CN/integrations/verified-combinations.mdx",
+      "sha256": "410fcb2af868656bafc70c2da51b7c64a6da65454786daa3c1ba1f13e8735eb5",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/operate/access-control.md",
+      "destination": "zh-CN/operate/access-control.mdx",
+      "sha256": "7d8f0c7cdf1fca3796a7e90d4c7dd1fb73749965dc857a978e87a2784525d820",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/operate/backup-restore.md",
+      "destination": "zh-CN/operate/backup-restore.mdx",
+      "sha256": "621edd090134e37639a3c9e9210ee421906d7e65abfe45fa9eb189806b9e5a7f",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/operate/capacity-and-cost.md",
+      "destination": "zh-CN/operate/capacity-and-cost.mdx",
+      "sha256": "76cbded55521750ebfe88a47c4bf61ede69c58be6e099e7e3d8dbcfbd031bfbf",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/operate/credentials.md",
+      "destination": "zh-CN/operate/credentials.mdx",
+      "sha256": "573f9b14898cce04f0e80925978ab2d930c5d7cd88e0e7fa3d361b7aff84e64f",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/operate/local-workspace.md",
+      "destination": "zh-CN/operate/local-workspace.mdx",
+      "sha256": "38918f6f325f410122a25604846f40df97bc3f533ada428c26b6d7e0772ce613",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/operate/networking.md",
+      "destination": "zh-CN/operate/networking.mdx",
+      "sha256": "fd3731ce006e6a79b0a354e069fb92c605272d41bfa9482eb276d9f57969324a",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/operate/observability.md",
+      "destination": "zh-CN/operate/observability.mdx",
+      "sha256": "1f1656fd44021d63740be57c906526c9117b0a2495ca3c12fd024c387704cb3e",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/operate/reconciliation.md",
+      "destination": "zh-CN/operate/reconciliation.mdx",
+      "sha256": "8320b65cd14db62c464c7190f82585460e9bfbd0e9b511c7afeb110fb1751ced",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/operate/self-host.md",
+      "destination": "zh-CN/operate/self-host.mdx",
+      "sha256": "9335919b920e7d3b2a99db7533a33ae5d43581d94b50321c3333d2dd300c57fa",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/operate/troubleshooting.md",
+      "destination": "zh-CN/operate/troubleshooting.mdx",
+      "sha256": "c043e4cafc5d5f74d00e048554ebbd81e4ec8c80723adf9603075d24e1097f46",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/operate/upgrades.md",
+      "destination": "zh-CN/operate/upgrades.mdx",
+      "sha256": "01c86a73af6702410bb210aa6cb8b0531f469a46c4824d7974e62c8eb6da6498",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/reference/agents.md",
+      "destination": "zh-CN/reference/agents.mdx",
+      "sha256": "5f5643f8d603c000317268955cf76dda7fd02e3444f11dad87723cf870246118",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/reference/approvals-tools.md",
+      "destination": "zh-CN/reference/approvals-tools.mdx",
+      "sha256": "db4ca8beeb3e8a2bcc03f9c0b286d9185f347b474fc28f53a949620130ca20d1",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/reference/artifacts-previews.md",
+      "destination": "zh-CN/reference/artifacts-previews.mdx",
+      "sha256": "a706fce57e5f35fb0e8fdf82f5c1de559758671971d1a55cdadb1d89292b1105",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/reference/cli.md",
+      "destination": "zh-CN/reference/cli.mdx",
+      "sha256": "9b5ce9f59bf4d6e62546335d8e0522ee22279ac4d7e69a42dc41dbb6404fac2e",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/reference/configuration.md",
+      "destination": "zh-CN/reference/configuration.mdx",
+      "sha256": "2a96c53dc1e253dde4990654bb586cc891cb5425fa5e02f011088e818f03f960",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/reference/connections.md",
+      "destination": "zh-CN/reference/connections.mdx",
+      "sha256": "d2c75d7370512486fc0246bf3988140d44c4b47bffc796507a535dc549f7f9b2",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/reference/deployment.md",
+      "destination": "zh-CN/reference/deployment.mdx",
+      "sha256": "7fbe0665bea4b1f0ae7e21baaf640f2e991ee17890fca7875967f97a8fd86c2d",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/reference/errors.md",
+      "destination": "zh-CN/reference/errors.mdx",
+      "sha256": "bdc6bc8050c52cfd9fe8d61a282a220c1fbbdedcfd1d65d1fcf0d08d831d4fc7",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/reference/events-and-states.md",
+      "destination": "zh-CN/reference/events-and-states.mdx",
+      "sha256": "5e9aa5de04ed479e118145a44cb5a469f88feaec9a52bea1644b81cd7fca0556",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/reference/glossary.md",
+      "destination": "zh-CN/reference/glossary.mdx",
+      "sha256": "7abf5db7a2fc0b7c78b43497c0359fa9298defb86d262a90bcded0dd65319769",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/reference/harness-registration.md",
+      "destination": "zh-CN/reference/harness-registration.mdx",
+      "sha256": "0c777e51dd067f61d829e43823006af79e561d6badcdd8f7680faec3b82d9d3a",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/reference/http.md",
+      "destination": "zh-CN/reference/http.mdx",
+      "sha256": "183b184928b3bfe2ae30a253d184b0aff8c87779b7c9447f9361bcdbeb0bac32",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/reference/limits.md",
+      "destination": "zh-CN/reference/limits.mdx",
+      "sha256": "c087a7f49311c379e69935f60ed7c76fa7de53b0b416df7405af417eb296ff39",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/reference/monitoring.md",
+      "destination": "zh-CN/reference/monitoring.mdx",
+      "sha256": "76ba568314b873b042b088500d66d97942ccf7591d6ae793f545fb630f1c59e3",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/reference/oauth.md",
+      "destination": "zh-CN/reference/oauth.mdx",
+      "sha256": "09af306ab86e43b0f71a66e7787d8b46eb3f9ebc4fb76307b4e4950adcfbf8bb",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/reference/python.md",
+      "destination": "zh-CN/reference/python.mdx",
+      "sha256": "102f99ef05bc3ae15eac9adc73ca632c186b711933d4438e6880db98b3844c77",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/reference/resource-operations.md",
+      "destination": "zh-CN/reference/resource-operations.mdx",
+      "sha256": "2c50cb0ac3063fc8d5546805b71be6f7b13359f23749d385e8da70631ff143cf",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/reference/runs.md",
+      "destination": "zh-CN/reference/runs.mdx",
+      "sha256": "2571b2bc3f2b621392ba4040220a9e3b9a201ea224e0c71651461eb53397988a",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/reference/secrets.md",
+      "destination": "zh-CN/reference/secrets.mdx",
+      "sha256": "13d314b82615b850b64587c8e9ce8635ad6254afbca9b08a94565a7f2628d66c",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/reference/session-access.md",
+      "destination": "zh-CN/reference/session-access.mdx",
+      "sha256": "134a1603552cdd5b93c05f1d016efe00621a5a9733c6b230f7c7ddd62415b3e8",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/reference/sessions.md",
+      "destination": "zh-CN/reference/sessions.mdx",
+      "sha256": "032b4abd324e96364ca65555fa9f30e1d1d09c08b0324f471f3eecd7fa85b59b",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/reference/tokens.md",
+      "destination": "zh-CN/reference/tokens.mdx",
+      "sha256": "bbe79427d4c0498b6a7d4dc6f5dcc934802d4c77758792bc0ce67d222127a5b9",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/reference/typescript.md",
+      "destination": "zh-CN/reference/typescript.mdx",
+      "sha256": "3fc5215faaa2140fea522ddc08cb56aa128f2f35aab4a7a966d032d576422e95",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/start/first-session.md",
+      "destination": "zh-CN/start/first-session.mdx",
+      "sha256": "339332933443d68d13778dcf883d0740614f3850d11dee5619aca3e62b118a6d",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/start/install.md",
+      "destination": "zh-CN/start/install.mdx",
+      "sha256": "d788866386547b74ff921cf592ac70d8592eaa8411a2aaed7551aab825ec62f1",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/start/overview.md",
+      "destination": "zh-CN/start/overview.mdx",
+      "sha256": "26ab179b7dd9b87b48be65fbf68ce43ad746d37cbfd4913bbebded8e0071d51b",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/start/project-task.md",
+      "destination": "zh-CN/start/project-task.mdx",
+      "sha256": "f2eb1be5a2dc8c2c59020dc755f9909748040be9164521e71ca0a0211b9ca7d2",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/start/use-cases.md",
+      "destination": "zh-CN/start/use-cases.mdx",
+      "sha256": "ee8f60d610a88f5445351f65a4ff7184242703e6774ff6b27fef347f067cfea7",
+      "status": "done"
+    },
+    {
+      "source": "docs/product/zh-CN/start/what-happened.md",
+      "destination": "zh-CN/start/what-happened.mdx",
+      "sha256": "f32c79de5eb6af7c8c48488e672bc17360da112678cd012e6930c959ce58edd9",
+      "status": "done"
+    }
+  ],
+  "resources": [
+    ".github/PULL_REQUEST_TEMPLATE.md",
+    "AGENTS.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "README.md",
+    "README.zh-CN.md",
+    "apps/console/app.js",
+    "apps/control-plane/access-server.ts",
+    "apps/control-plane/main.ts",
+    "apps/control-plane/preview-server.ts",
+    "apps/control-plane/server.ts",
+    "docs/application-connectors.md",
+    "docs/architecture.md",
+    "docs/blaxel.md",
+    "docs/console-design.md",
+    "docs/custom-harnesses.md",
+    "docs/execution-combinations.md",
+    "docs/harness-images.md",
+    "docs/harness-integration-contract.md",
+    "docs/instabox.md",
+    "docs/local-installation.md",
+    "docs/modal.md",
+    "docs/model-protocols.md",
+    "docs/oci-harness-design.md",
+    "docs/plans/2026-11-19-documentation-content-architecture.tmp.md",
+    "docs/product/coverage.json",
+    "docs/product/http-operation-coverage.json",
+    "docs/remote-mcp.md",
+    "docs/sandbox-providers.md",
+    "docs/secret-management.md",
+    "docs/serverless-sessions.md",
+    "docs/session-initialization.md",
+    "docs/tool-reconciliation.md",
+    "examples/documentation/README.md",
+    "examples/documentation/README.zh-CN.md",
+    "examples/documentation/artifact-retention.py",
+    "examples/documentation/artifact-retention.ts",
+    "examples/documentation/backend-intents.py",
+    "examples/documentation/event-checkpoint.py",
+    "examples/documentation/event-delivery-server.mjs",
+    "examples/documentation/event-delivery-viewer.html",
+    "examples/documentation/event-delivery.mjs",
+    "examples/documentation/filter-app/README.md",
+    "examples/documentation/first-session.py",
+    "examples/documentation/first-session.ts",
+    "examples/documentation/inspect-run.py",
+    "examples/documentation/inspect-run.ts",
+    "examples/documentation/project-task-prompts.json",
+    "examples/documentation/project-task.py",
+    "examples/documentation/project-task.ts",
+    "examples/documentation/template-revisions.py",
+    "examples/documentation/template-revisions.ts",
+    "examples/harnesses/oci/custom-python/Dockerfile",
+    "examples/harnesses/python-agent/main.py",
+    "examples/manual-journey/README.md",
+    "integrations/apps/productivity.ts",
+    "integrations/apps/registry.test.ts",
+    "integrations/apps/registry.ts",
+    "integrations/apps/types.ts",
+    "integrations/harnesses/opencode.ts",
+    "integrations/harnesses/pi.ts",
+    "integrations/mcp/remote.ts",
+    "integrations/models/openai-compatible.ts",
+    "integrations/models/openai-responses.ts",
+    "integrations/network/cloudflare-tunnel.ts",
+    "integrations/sandboxes/agent37.ts",
+    "integrations/sandboxes/blaxel.ts",
+    "integrations/sandboxes/boat.test.ts",
+    "integrations/sandboxes/boat.ts",
+    "integrations/sandboxes/e2b.ts",
+    "integrations/sandboxes/fly-machines-proxy.ts",
+    "integrations/sandboxes/fly-machines.ts",
+    "integrations/sandboxes/freestyle-transport.ts",
+    "integrations/sandboxes/freestyle.ts",
+    "integrations/sandboxes/instabox-transport.ts",
+    "integrations/sandboxes/instabox.ts",
+    "integrations/sandboxes/modal.ts",
+    "integrations/sandboxes/registry.ts",
+    "integrations/sandboxes/sprites-transport.ts",
+    "integrations/sandboxes/sprites.ts",
+    "integrations/sandboxes/upstash-transport.test.ts",
+    "integrations/sandboxes/upstash-transport.ts",
+    "integrations/sandboxes/upstash.ts",
+    "integrations/sandboxes/vercel-transport.ts",
+    "integrations/sandboxes/vercel.ts",
+    "integrations/tools/http-json.ts",
+    "modules/access/access.ts",
+    "modules/access/policy.ts",
+    "modules/apps/oauth.ts",
+    "modules/artifacts/artifacts.ts",
+    "modules/connections/connections.ts",
+    "modules/connections/usage.ts",
+    "modules/credentials/api-auth.ts",
+    "modules/credentials/application-tokens.ts",
+    "modules/credentials/local-access.ts",
+    "modules/credentials/managed-secrets.ts",
+    "modules/deployment/backup.ts",
+    "modules/deployment/ingress.ts",
+    "modules/deployment/local-discovery.ts",
+    "modules/deployment/mode.ts",
+    "modules/deployment/outbound.ts",
+    "modules/deployment/settings.ts",
+    "modules/diagnostics/failure.ts",
+    "modules/diagnostics/support.ts",
+    "modules/execution/compatibility.ts",
+    "modules/execution/environment.ts",
+    "modules/execution/harness-packages.test.ts",
+    "modules/execution/harness-packages.ts",
+    "modules/execution/harness.ts",
+    "modules/execution/initialization.ts",
+    "modules/execution/inputs.ts",
+    "modules/execution/queries.ts",
+    "modules/execution/runs.test.ts",
+    "modules/execution/runs.ts",
+    "modules/execution/session-configuration.ts",
+    "modules/execution/sessions.ts",
+    "modules/execution/worker-prepare.test.ts",
+    "modules/execution/worker-results.test.ts",
+    "modules/execution/worker.test.ts",
+    "modules/execution/worker.ts",
+    "modules/harnesses/activity.ts",
+    "modules/harnesses/catalog.ts",
+    "modules/harnesses/images.ts",
+    "modules/harnesses/managed-cli.test.ts",
+    "modules/harnesses/managed-cli.ts",
+    "modules/harnesses/protocols.ts",
+    "modules/harnesses/registry.ts",
+    "modules/harnesses/runtime-adapter.test.ts",
+    "modules/harnesses/runtime-adapter.ts",
+    "modules/harnesses/templates.ts",
+    "modules/harnesses/verification.ts",
+    "modules/sandboxes/checkpoints.ts",
+    "modules/sandboxes/connector.ts",
+    "modules/sandboxes/image-preparation.ts",
+    "modules/sandboxes/lifecycle.test.ts",
+    "modules/sandboxes/lifecycle.ts",
+    "modules/sandboxes/operations.test.ts",
+    "modules/sandboxes/operations.ts",
+    "modules/sandboxes/previews.ts",
+    "modules/sandboxes/runtime-client.test.ts",
+    "modules/sandboxes/runtime-client.ts",
+    "modules/storage/001-initial.sql",
+    "modules/storage/004-runtime-bindings.sql",
+    "modules/storage/006-artifact-content.sql",
+    "modules/storage/013-resource-review.sql",
+    "modules/storage/016-direct-sessions.sql",
+    "modules/storage/migrate.ts",
+    "modules/tools/applications.test.ts",
+    "modules/tools/authorization-denial.test.ts",
+    "modules/tools/broker.test.ts",
+    "modules/tools/broker.ts",
+    "modules/tools/cancellation.test.ts",
+    "modules/tools/reconciliation.ts",
+    "package.json",
+    "release-policy.json",
+    "runtime/server.py",
+    "runtime/tool_bridge.py",
+    "sdk/README.md",
+    "sdk/python/hexagon/__init__.py",
+    "sdk/python/hexagon/contracts.py",
+    "sdk/python/hexagon/local.py",
+    "sdk/python/pyproject.toml",
+    "sdk/typescript/index.ts",
+    "sdk/typescript/local.ts",
+    "sdk/typescript/package.json",
+    "testing/acceptance.md",
+    "testing/compatibility-runner.md",
+    "testing/database-setup.ts",
+    "testing/evidence/2026-11-15-agent37.md",
+    "testing/evidence/2026-11-15-blaxel.md",
+    "testing/evidence/2026-11-15-cancellation-races.md",
+    "testing/evidence/2026-11-15-connection-lifecycle-gui.md",
+    "testing/evidence/2026-11-15-connection-lifecycle.md",
+    "testing/evidence/2026-11-15-expanded-harness-matrix.md",
+    "testing/evidence/2026-11-15-network-api-journey.md",
+    "testing/evidence/2026-11-15-preview-natural-expiry.md",
+    "testing/evidence/2026-11-15-python-web-journey.md",
+    "testing/evidence/2026-11-15-tool-authorization-denial.md",
+    "testing/evidence/2026-11-15-upstash.md",
+    "testing/evidence/2026-11-15-web-preview-journey.md",
+    "testing/evidence/2026-11-16-applications.md",
+    "testing/evidence/2026-11-16-current-dual-sdk-journey.md",
+    "testing/evidence/2026-11-16-fleet-quota-audit.md",
+    "testing/evidence/2026-11-16-instabox-p0.md",
+    "testing/evidence/2026-11-17-minimal-session-console.md",
+    "testing/evidence/2026-11-18-automatic-credential-ingress.md",
+    "testing/evidence/2026-11-18-crm-authorization.md",
+    "testing/evidence/2026-11-18-harness-delivery.md",
+    "testing/evidence/2026-11-18-local-beta-delivery.md",
+    "testing/evidence/2026-11-18-mcp-lark-responses.md",
+    "testing/evidence/2026-11-18-minimax-matrix.json",
+    "testing/evidence/2026-11-18-minimax-matrix.md",
+    "testing/evidence/2026-11-18-session-initialization.md",
+    "testing/evidence/2026-11-19-e2b-oci-preparation.md",
+    "testing/evidence/2026-11-19-harness-serverless-matrix.json",
+    "testing/evidence/2026-11-19-harness-serverless-ui.md",
+    "testing/evidence/2026-11-20-artifact-http-contract-review.json",
+    "testing/evidence/2026-11-20-artifact-retention-docs-cloud.json",
+    "testing/evidence/2026-11-20-backend-artifact-delivery-review.json",
+    "testing/evidence/2026-11-20-backend-cleanup-review.json",
+    "testing/evidence/2026-11-20-backend-intents-example.json",
+    "testing/evidence/2026-11-20-capacity-troubleshooting-review.json",
+    "testing/evidence/2026-11-20-cli-reference-review.json",
+    "testing/evidence/2026-11-20-concept-diagram-render.json",
+    "testing/evidence/2026-11-20-credential-http-contract-review.json",
+    "testing/evidence/2026-11-20-current-diagram-review.json",
+    "testing/evidence/2026-11-20-doc-example-setup-syntax-review.json",
+    "testing/evidence/2026-11-20-docs-closeout-batch1.json",
+    "testing/evidence/2026-11-20-docs-credential-rotation-cloud.json",
+    "testing/evidence/2026-11-20-docs-failure-correlation.json",
+    "testing/evidence/2026-11-20-docs-harness-reuse.json",
+    "testing/evidence/2026-11-20-docs-isolated-install.json",
+    "testing/evidence/2026-11-20-docs-provider-recovery-reuse.json",
+    "testing/evidence/2026-11-20-docs-shared-contracts.json",
+    "testing/evidence/2026-11-20-errors-reference-review.json",
+    "testing/evidence/2026-11-20-first-session-answer-review.json",
+    "testing/evidence/2026-11-20-first-session-docs-cloud.json",
+    "testing/evidence/2026-11-20-limits-reference-review.json",
+    "testing/evidence/2026-11-20-mermaid-render.json",
+    "testing/evidence/2026-11-20-monitoring-http-contract-review.json",
+    "testing/evidence/2026-11-20-preview-management-http-review.json",
+    "testing/evidence/2026-11-20-project-context-editorial.json",
+    "testing/evidence/2026-11-20-project-docs-cloud.json",
+    "testing/evidence/2026-11-20-resource-review-http-contract-review.json",
+    "testing/evidence/2026-11-20-run-observation-http-contract-review.json",
+    "testing/evidence/2026-11-20-run-submission-http-review.json",
+    "testing/evidence/2026-11-20-runs-http-reference-review.json",
+    "testing/evidence/2026-11-20-state-write-sites.json",
+    "testing/evidence/2026-11-20-template-revisions-docs-cloud.json",
+    "testing/evidence/2026-11-20-test-gates-docs.json",
+    "testing/evidence/2026-11-20-typescript-installed-package.json",
+    "testing/execution-matrix.md",
+    "testing/execution-preflight.test.ts",
+    "testing/fixtures/filter-app/README.md",
+    "testing/journey-source.md",
+    "testing/runtime-supervisor-lock.test.ts",
+    "testing/runtime-workspace-persistence.test.ts",
+    "testing/sdk-interoperability.test.ts",
+    "testing/test-environment.ts",
+    "tooling/build-local.ts",
+    "tooling/cloud-matrix.ts",
+    "tooling/cloud-serverless.ts",
+    "tooling/local.ts",
+    "tooling/sdk-reference-map.json"
+  ],
+  "validation": {
+    "mint_validate": "passed",
+    "mint_broken_links": "passed",
+    "scope": "Build and link checks, not product acceptance"
+  }
+}

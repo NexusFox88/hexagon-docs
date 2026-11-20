@@ -1,0 +1,219 @@
+---
+title: "使用可复用的 Agent 配置"
+---
+
+直接创建 Session 适合显式指定每次任务的执行配置。当多个 Session 需要复用 Harness、行为和策略时，使用带修订历史的 Agent 模板。
+
+模板保存配置，不是正在运行的进程，也不共享多个 Session 的工作区。先理解[多轮工作](/zh-CN/build/multi-turn)：同一项目继续用 Session，重复使用配置才使用模板。
+
+## 创建模板并使用
+
+以下片段使用已初始化客户端和已验证连接。创建返回的 revision 可用于显式固定版本：
+
+```python
+agent = client.create_agent(
+    name='Project assistant',
+    harness={'id': 'pi', 'version': '1.5.2'},
+    env={'APP_MODE': 'review'},
+)
+session = client.create_session(
+    agent_id=agent['id'], agent_revision=agent['revision'],
+    sandbox_connection_id=sandbox_connection_id,
+    model_connection_id=model_connection_id,
+)
+```
+
+```typescript
+const agent = await client.createAgent({
+  name: 'Project assistant',
+  harness: { id: 'pi', version: '1.5.2' },
+  env: { APP_MODE: 'review' },
+});
+const session = await client.createSession({
+  agent_id: agent.id, agent_revision: agent.revision,
+  sandbox_connection_id: sandboxConnectionId,
+  model_connection_id: modelConnectionId,
+});
+```
+
+使用 `agent_id` 时不要同时提供 `harness`。模板行为与资源等配置不能在该入口任意覆盖；普通 Session env 可以按环境契约提供覆盖值。环境变量值对 Sandbox 代码可读，不要将受保护连接凭据放进去。
+
+## 修订是完整定义更新
+
+Python 使用 `revise_agent(agent_id, definition, expected_revision)`，TypeScript 使用 `reviseAgent(agentId, definition, expectedRevision)`。`definition` 是完整合法定义，不是零散 patch；应明确保留需要的 Harness、策略和行为。
+
+编辑之前读取当前 Agent 并保存 revision。服务器检查 expected revision，成功后递增；其他操作者先更新时返回 `agent_revision_changed`，应重新读取、审查差异后再提交，不自动强制覆盖。
+
+修订时未提供 `env` / `variables` 会保留旧的环境配置；显式提供则替换该环境映射，空映射会清除。不要把响应中的 `env_names` 当作可恢复的明文值。
+
+## 先准备修订，再提交已审阅的意图
+
+以下辅助函数需要已初始化的客户端（按 SDK 安装说明导入 `Hexagon`）、执行管理变更的 owner 身份，以及已保存的 Agent ID。仅定义函数不会发起调用。使用 `inspect_templates` / `inspectTemplates` 查询列表和所选模板的版本历史；列表包含已归档模板，多次独立读取不是同一快照。
+
+修改 instructions 时，将预期文本和显式 bindings 传入准备函数，例如 TypeScript 的 `{sandbox_connection_id: sandboxId, model_connection_id: modelId}` 或等价 Python 字典；模板要求的 Tool 和受保护 API 绑定也须提供。准备函数复制完整已存定义，只修改 instructions，记录观察到的 revision，并用这些绑定预检，不会保存新修订。
+
+```python
+from copy import deepcopy
+
+
+def inspect_templates(client, agent_id):
+    return {'agents': client.list_agents()['agents'],
+            'selected': client.agent(agent_id)}
+
+
+def prepare_instruction_revision(client, agent_id, instructions, bindings):
+    current = client.agent(agent_id)
+    if current['archived_at'] is not None:
+        raise ValueError('Archived templates cannot be revised')
+    definition = deepcopy(current['definition'])
+    definition['instructions'] = instructions
+    definition.pop('env', None)
+    definition.pop('variables', None)
+    intent = {'agent_id': agent_id, 'expected_revision': current['revision'],
+              'definition': definition}
+    preflight = client.preflight_agent(definition, bindings)
+    return {'intent': intent, 'preflight': preflight}
+
+
+def apply_reviewed_revision(client, intent):
+    return client.revise_agent(intent['agent_id'], intent['definition'],
+                               intent['expected_revision'])
+
+
+def copy_template(client, agent_id, new_name):
+    return client.copy_agent(agent_id, new_name)
+
+
+def archive_template(client, agent_id):
+    return client.archive_agent(agent_id)
+
+
+def read_pinned_initialization(client, session_ids):
+    return {session_id: client.session_initialization(session_id)
+            for session_id in session_ids}
+```
+
+```typescript
+import type { AgentInput, SessionInput } from '@hexagon/agent-sdk';
+
+type RevisionIntent = {
+  agent_id: string; expected_revision: number; definition: AgentInput;
+};
+type TemplateBindings = Pick<SessionInput,
+  'sandbox_connection_id' | 'model_connection_id' | 'tools' | 'connections'>;
+
+async function inspectTemplates(client: Hexagon, agentId: string) {
+  return { agents: (await client.listAgents()).agents,
+    selected: await client.agent(agentId) };
+}
+
+async function prepareInstructionRevision(
+  client: Hexagon, agentId: string, instructions: string, bindings: TemplateBindings,
+) {
+  const current = await client.agent(agentId);
+  if (current.archived_at !== null) throw new Error('Archived templates cannot be revised');
+  const definition: AgentInput = structuredClone(current.definition);
+  definition.instructions = instructions;
+  delete definition.env;
+  delete definition.variables;
+  const intent: RevisionIntent = {
+    agent_id: agentId, expected_revision: current.revision, definition,
+  };
+  const preflight = await client.preflightAgent(definition, bindings);
+  return { intent, preflight };
+}
+
+async function applyReviewedRevision(client: Hexagon, intent: RevisionIntent) {
+  return await client.reviseAgent(intent.agent_id, intent.definition, intent.expected_revision);
+}
+
+async function copyTemplate(client: Hexagon, agentId: string, newName: string) {
+  return await client.copyAgent(agentId, newName);
+}
+
+async function archiveTemplate(client: Hexagon, agentId: string) {
+  return await client.archiveAgent(agentId);
+}
+
+async function readPinnedInitialization(client: Hexagon, sessionIds: string[]) {
+  const snapshots: Record<string, Awaited<ReturnType<Hexagon['sessionInitialization']>>> = {};
+  for (const id of sessionIds) snapshots[id] = await client.sessionInitialization(id);
+  return snapshots;
+}
+```
+
+
+先审阅并私下保存返回的 `intent` 和预检结果，再单独调用提交函数。预检检查候选定义和显式绑定，不预留 revision，也不证明云执行。尤其是，它不会把旧模板的隐藏环境值加载到这个尚未保存的候选中。示例有意同时省略 `env` 和 `variables`，使修订提交时保留已存环境；它不能预览这些值，也不能证明新 instructions 与这些值配合正常。如需替换或清除环境，应明确提供完整映射，并单独审阅该变更。
+
+提交函数使用最初的 `expected_revision`，不会获取新版本后静默覆盖其他编辑者。遇到 `agent_revision_changed` 时重新读取并比较差异，再准备新意图。成功响应丢失后重试也可能出现相同冲突；应将版本历史与已保存意图比较，不直接递增预期版本号。定义内容相同本身不是幂等回执。
+
+复制和归档是分别选择的操作。复制返回新 Agent，会继承连接绑定和有效环境，应保留新 ID 并审阅默认配置后再使用。复制响应丢失后重试可能创建另一个模板。归档返回 `{id, revision, archived_at}`，重复归档保留首次归档时间；它禁止新 Session 和进一步修订，包括以旧 revision 创建 Session，但不会关闭既有 Session。
+
+用下文发布演练中保存的 A/B/C Session ID 调用 `read_pinned_initialization` / `readPinnedInitialization`，比较各自所选修订和有效定义。快照隐藏环境值，多次读取不是原子操作。查询不会执行 Harness、比较真实工作区文件或清理资源。模板不属于当前租户或不存在时返回 `agent_not_found`，已归档更新返回 `agent_archived`，预检也可能先因绑定、就绪或兼容性失败。准确返回字段与错误见 [Agent 响应契约](/zh-CN/reference/agents)。
+
+## 明确选择版本
+
+提供 `agent_revision` 会选择该已保存版本；省略时使用创建 Session 当时的当前版本。保存返回 Session 的 `agent_revision`，不要假定先前查询 Agent 到创建之间版本没有变化。需要受控发布时，为新 Session 显式选择版本，并核对初始化快照。
+
+若要让新任务使用旧定义，可以在 Agent 尚未归档时，为新 Session 指定已有旧版本。这不会降级已有 Session、撤回外部副作用或恢复旧工作区。Agent 归档后，即使指定旧版本也不能创建 Session；API 没有提供取消归档操作。
+
+修订按“读取 → 准备完整定义 → 带 expected revision 提交 → 核对返回版本”执行。构造完整替换定义时，保留仍需要的 instructions、context、tools 和资源策略；省略字段可能恢复默认值或消失。上文的环境值保留规则是明确例外。在应用或配置记录中保存目标定义，响应丢失时先调查，不直接再次编辑。
+
+## 固定与归档
+
+Session 创建时固定所选 revision 和连接配置。更新模板影响后续选择，不重写既有 Session。运行中的 Session 不会因为模板更新自动更换 Harness。
+
+`archive_agent` / `archiveAgent` 使模板不再可用于新 Session，也不能继续修订；已有 Session 和历史版本仍需按其生命周期管理。归档不是关闭云资源，也不等于删除对话和产物。
+
+## 验收
+
+用同一 revision 创建两个独立 Session，确认工作区彼此独立。修订后创建第三个 Session，比较初始化快照：旧两个仍固定旧版本，新会话使用所选新版本。再归档模板，确认新创建被拒绝，最后分别关闭全部 Session 并确认清理。
+
+管理修订 / 归档需要适当权限；不要因为 application Token 可创建模板就假设它能调用全部管理路由。参见[Token 路由](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/credentials/application-tokens.ts)。实现依据：[Agent 与 Session](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts)、[初始化](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/session-initialization.md)。
+
+## 一个可逐项检查的版本发布例子
+
+使用专用模板，revision 1 的指令为“报告修改的文件”，timeout 为 180 秒。显式选择 revision 1 创建 Session A 和 B。准备完整 revision 2 定义，将指令改为“报告修改的文件与测试结果”、timeout 改为 300 秒，并保留其他目标字段。以 expected revision 1 提交，再用返回的 revision 2 显式创建 Session C。
+
+| 记录 | 应固定的选择 |
+| --- | --- |
+| Session A | Revision 1、原指令、timeout 180 |
+| Session B | Revision 1、原指令、timeout 180；与 A 工作区独立 |
+| Session C | Revision 2、新指令、timeout 300 |
+| 归档后新建 Session | 返回 `agent_archived`，显式选择 revision 1 也被拒绝 |
+
+比较每个 Session 的初始化快照，不只看当前模板。[预检回归测试源码](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/execution-preflight.test.ts)检查 revision 递增、旧 expected revision、原 Session 配置不变及归档后拒绝，全程无云操作。该本地回归测试本身不证明工作区实际执行；下方独立云练习另有执行与清理记录。发生失败前保留 A/B/C 标识，归档不负责清理它们。
+
+## 运行 A/B/C 练习
+
+2026-11-20，下方两个完整程序分别通过了 Vercel、内置 Pi 1.5.2 与配置的 Messages 端点真实云执行。[变更验证记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-template-revisions-docs-cloud.json)覆盖六个不同云资源上的六个已完成 Run、实际成功的工作区标记命令、A/B revision 1 与 C revision 2 快照差异、归档后两个 revision 均被拒绝用于新建、历史快照不变、六个 Session 关闭且删除操作完成，以及证明产物字节留存。这是本例的限定范围证据，不是普遍安全隔离认证，也不代表其他 Provider 的行为。
+
+完成[首个 Session 教程](/zh-CN/start/first-session)中的 SDK 安装并设置已启用连接变量后，从仓库根目录运行 [Python 程序](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/template-revisions.py)或 [TypeScript 程序](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/template-revisions.ts)。每个程序创建一个专用模板和三个独立云 Session；同时运行两种语言会使范围加倍。程序使用内置 Pi 1.5.2，会消耗云与模型资源。
+
+```sh
+.local/docs-example-venv/bin/python examples/documentation/template-revisions.py
+```
+
+```sh
+npm --prefix sdk/typescript run build
+./node_modules/.bin/tsx examples/documentation/template-revisions.ts
+```
+
+程序从 revision 1 创建 A、B，再保存并提交完整 revision 2 定义，然后创建 C。每个 Session 执行命令，先检查 `.hexagon-revision-marker` 不存在，再写入自己的标记。Agent 导出包含 Session 标签的 `proof.txt`，程序核对精确字节与 hash。还应检查实际命令执行事件：只有导出的标签不足以证明文件系统隔离。
+
+任务结束后，程序比较三个初始化快照中的固定 revision、instructions 与 timeout。归档模板后，分别使用两个 revision 尝试创建，要求返回 `409 agent_archived`，并确认归档没有改变历史快照。最后显式关闭 A/B/C，再次下载证明产物。较早的 Session 可能已按固定 timeout 到期，close 仍检查同一个 Session 的最终状态；归档不能代替资源清理。
+
+私有记录位于 `.local/docs-revisions-python/journal.json` 和 `.local/docs-revisions-typescript/journal.json`。成功阶段为 `closed_and_history_checked`；还需在 Console 或资源操作接口确认删除操作完成。这项成功不证明任意 instructions 都能产生正确结果，也不证明所有 Provider 的工作区保留行为相同。
+
+| 最后记录的阶段 | 安全继续方式 |
+| --- | --- |
+| 创建 Agent 或 Session 前 | 响应可能丢失，先检查已有记录再决定是否创建 |
+| `before_revision` | 比较保存的意图与实际 revision 历史，不盲目递增 `expected_revision` |
+| `before_run_A/B/C` | 使用保存的 Session、input 和 key 对账同一次提交 |
+| `observing_A/B/C` | 查询保存的 Run 与事件；十分钟观察超时不会取消任务 |
+| `before_archive` 或之后 | 检查实际归档状态与原 Session；归档不删除历史，也不关闭资源 |
+| `closing_A/B/C` | 检查同一 Session 与删除操作，再核对留存字节 |
+
+初始日志以排他方式创建，不要删除它绕过重试保护。断言失败后保留全部 ID，调查并显式关闭已知 Session；如果归档检查意外允许创建，也要处理 `unexpected_sessions`。清理后若专用模板仍活跃，应将其归档。API 没有硬删除或取消归档操作，测试模板归档后仍作为历史可见。
+
+下一步：[后端集成](/zh-CN/build/backend-integration)、[初始化与固定配置](/zh-CN/concepts/initialization)、[HTTP API](/zh-CN/reference/http)。

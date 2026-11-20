@@ -1,0 +1,32 @@
+{
+  "scope": "Actual HTTP/PostgreSQL tenant boundary and shared provider/broker fixtures in isolated migrated schema. Mock provider/application transports; no live account or cloud.",
+  "command": "vitest run --no-file-parallelism testing/tenant-boundaries.test.ts modules/sandboxes/operations.test.ts integrations/sandboxes/boat.test.ts modules/tools/applications.test.ts modules/tools/authorization-denial.test.ts modules/tools/cancellation.test.ts",
+  "exit_code": 0,
+  "source_sha256": {
+    "testing/tenant-boundaries.test.ts": "a860474bd4cc22542634cb2f554d88ccb1e868ea21130ecaf57cd7285a555781",
+    "modules/sandboxes/operations.test.ts": "3a0fa7a83c221d10c6f524120268888cb32081664cedf0c5e3ed1f28c6c10b2d",
+    "integrations/sandboxes/boat.test.ts": "79758ddf166d499e3d274d8356da8f5a716a074e7a12d1c0ae43c27a06ef519f",
+    "modules/tools/applications.test.ts": "87749a83dab93bcf4de0e629e348b273080cf0fc41b4d4d98ddbd5c8794bd6a7",
+    "modules/tools/authorization-denial.test.ts": "ff1dbc44fee5f7d7ac4dd2014367c3df8b455b83e2ca5c9384e7f90a17e7bac7",
+    "modules/tools/cancellation.test.ts": "4cdf824a29be54a8dca61349da3a815bf1fa717b6e3d791ecd681e5c28546b93"
+  },
+  "cleanup": "isolated schema dropped",
+  "log": ".local/docs-content-checks/closeout-shared-contracts.log",
+  "tests_passed": 18,
+  "files_passed": 6,
+  "requirements": {
+    "O04": "Actual tenant-boundary HTTP test rejects foreign reads/streams/mutations and Agent/Session Sandbox/model/Tool bindings with zero remote access. Application submission and revocation/management denial reuse the matching-source November 20 records below.",
+    "D03": "Response loss, repeated zero matches, multiple matches without adopting a resource, later exact single match, and one create throughout; Boat reference checks persisted deletion receipts. No new Provider or real-account certification.",
+    "D05": "Existing application read/write broker fixtures, dual-SDK authorization refusal and cancellation verify scoped side-effect behavior; mocked external transports, real DB/HTTP. No live-account claim."
+  },
+  "reused_records": [
+    {
+      "path": "testing/evidence/2026-11-20-credential-http-contract-review.json",
+      "all_source_hashes_match": true
+    },
+    {
+      "path": "testing/evidence/2026-11-20-run-submission-http-review.json",
+      "all_source_hashes_match": true
+    }
+  ]
+}

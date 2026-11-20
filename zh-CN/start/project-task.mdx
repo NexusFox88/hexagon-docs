@@ -1,0 +1,121 @@
+---
+title: "完成一个真实项目任务"
+---
+
+上传一个小型任务看板，让 Agent 实现筛选功能，检查测试和私有预览，再在同一 Session 的第二个 Run 中加入重置按钮。最后关闭 Session，核对导出文件仍可下载。
+
+## 开始之前
+
+先完成[第一个 Session](/zh-CN/start/first-session)。本教程使用相同的本地控制平面发现方式、内置 Pi 1.5.2，以及两个已验证的连接 ID。从[执行矩阵](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/execution-matrix.md)选择支持私有 Web 访问的兼容组合。云工作区需要 Node 执行固定测试、Python 3 运行预览服务器。local / hosted 指控制平面；本教程的任务在云 Sandbox 执行。
+
+完整的 [Python 程序](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/project-task.py)和 [TypeScript 程序](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/project-task.ts)实现相同阶段，并使用[共享任务提示](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/project-task-prompts.json)。两套程序已于 2026-11-20 在 Vercel、内置 Pi 1.5.2、已配置 Messages 端点的 deepseek-ai/DeepSeek-V4-Flash 组合完成独立实云与浏览器旅程。[执行证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-project-docs-cloud.json)包含四个 completed Run、固定测试未变、真实测试执行回执、筛选与 Reset 浏览器检查、删除操作完成、关闭后预览被拒绝，以及产物字节留存。结果限于该精确组合，在你的环境仍需执行这些检查。运行会使用已配置账户的云资源和模型额度。
+
+本教程的 [fixture](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/filter-app/README.md)不需要外部 Tool 账户。原始[验收 fixture](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/fixtures/filter-app/README.md)另外覆盖读取需求与经审批写入报告的流程；本教程不能替代完整产品验收。
+
+## 1. 理解输入项目和固定测试
+
+项目包含 `index.html`、`style.css`、`app.mjs`、`filter.mjs`、`acceptance.mjs`、`serve.py` 和 README。初始筛选实现故意抛出错误。对未修改的输入执行下面的命令应当失败：
+
+```sh
+node examples/documentation/filter-app/acceptance.mjs
+```
+
+预期初始失败包含 `ACCEPTANCE-001: implement text and status filtering`，退出码非零。这说明输入实现有意未完成；不要修改固定测试来让起始版本通过。
+
+Agent 必须实现去除查询首尾空白、不区分大小写的标题匹配，并结合状态筛选，保留原顺序、不修改输入、正确处理空结果。固定测试有八条断言，必须保持逐字节不变。成功执行会输出 `8 assertions passed`，退出码为 0。单独看到这句话不能证明真实执行：还要检查 Harness 执行事件和导出的报告。
+
+第一轮要求 Agent 将六个文件导出到 Hexagon 提供的 Run 产物目录，其中包含固定测试和 `test-report.txt`。示例程序比较下载测试文件与上传版本的 SHA-256，不会在本机执行下载的模型生成代码。
+
+## 2. 上传并提交第一轮 Run
+
+从仓库根目录执行，先按[安装指南](/zh-CN/start/install)安装本地 SDK；TypeScript 还需要先构建 SDK。
+
+```sh
+export HEXAGON_EXAMPLE_SANDBOX_ID='YOUR_SANDBOX_CONNECTION_ID'
+export HEXAGON_EXAMPLE_MODEL_ID='YOUR_MODEL_CONNECTION_ID'
+```
+
+选择一种语言，并在整个旅程中使用它的记录文件：
+
+| 阶段 | Python | TypeScript |
+| --- | --- | --- |
+| 创建、上传、提交 | `.local/docs-example-venv/bin/python examples/documentation/project-task.py start` | `./node_modules/.bin/tsx examples/documentation/project-task.ts start` |
+| 观察并下载 | `.local/docs-example-venv/bin/python examples/documentation/project-task.py observe` | `./node_modules/.bin/tsx examples/documentation/project-task.ts observe` |
+| 创建私有预览 | `.local/docs-example-venv/bin/python examples/documentation/project-task.py preview` | `./node_modules/.bin/tsx examples/documentation/project-task.ts preview` |
+| 提交第二轮修改 | `.local/docs-example-venv/bin/python examples/documentation/project-task.py followup` | `./node_modules/.bin/tsx examples/documentation/project-task.ts followup` |
+| 关闭并检查留存 | `.local/docs-example-venv/bin/python examples/documentation/project-task.py close` | `./node_modules/.bin/tsx examples/documentation/project-task.ts close` |
+
+TypeScript 首次执行前运行 `npm --prefix sdk/typescript run build`。运行两种语言会创建两个独立 Session，一种语言成功不能证明另一种成功。
+
+`start` 先保存创建意图，再直接创建 Session，在任何 Run 之前上传项目，最后使用已保存的幂等键提交任务。程序输出 Session 和 Run ID，可据此在 Console 查看初始化与执行活动。不需要先创建 Agent 模板。
+
+记录文件是 `.local/docs-project-python/journal.json` 或 `.local/docs-project-typescript/journal.json`。其中包含资源 ID；创建预览后还包含带访问凭据的 URL，必须保留在私有位置。每条命令使用独占进程锁；不要并发执行，也不要删除记录来重试。
+
+## 3. 观察并检查第一轮结果
+
+运行 `observe`。程序最多轮询十分钟，保存终态结果，下载全部返回产物，要求其中包含六个指定文件，校验各文件大小和哈希，并验证导出的测试没有变化。超时只停止本地观察，不会取消 Run；再次运行 `observe` 会查询原 Run。
+
+分别核对以下结果：
+
+| 检查项 | 必须观察到的结果 |
+| --- | --- |
+| Run | 状态为 `completed`，最终回答与实际工作一致 |
+| 固定测试 | 执行记录中确实运行了 `node acceptance.mjs`，退出码为 0，八条断言通过 |
+| 测试完整性 | 下载的 `acceptance.mjs` 与上传版本哈希一致 |
+| 代码 | `filter.mjs` 实现所要求的筛选规则，没有修改测试来通过验收 |
+| 报告 | 包含真实 stdout/stderr、退出码、测试哈希，不伪造成功 |
+| 导出文件 | 六个文件都有 ID、本地文件名和哈希记录 |
+
+下载文件使用 `first-artifact-0.bin` 等本地生成名称。通过记录中的 `runs.first.artifacts` 对应原文件名，远端路径不会成为本地写入目标。Run 完成和测试哈希一致不能单独证明测试通过或 UI 可用，仍需核对真实执行和下文的浏览器交互。
+
+## 4. 打开私有预览
+
+第一轮结果就绪后运行 `preview`，在本地打开私有记录中的 `preview.url`。授权有效期为 600 秒，访问工作区的 3000 端口；创建授权不会启动服务器。任务提示已经要求 Agent 运行 `serve.py`，并在工作区验证端口响应。
+
+执行以下浏览器检查：
+
+| 操作 | 预期结果 |
+| --- | --- |
+| 查询为空、全部状态 | 显示四项任务 |
+| 查询 `  api  `、全部状态 | 显示 Launch API 和 Review API tests |
+| 查询 `API`、已完成 | 只显示 Launch API |
+| 查询 `missing` | 显示空结果提示，数量为零 |
+| 查询 `发布`、全部状态 | 只显示“发布说明” |
+
+检查数量、错误提示与任务卡片一致。如果页面无法加载，先检查服务进程、Session 休眠、授权到期和 Provider 私有传输，再决定是否修改应用代码。参见[私有预览](/zh-CN/build/private-preview)。分离启动的子进程不保证在所有 Harness 退出或 Sandbox 休眠之后继续存活。
+
+预览命令记录请求意图后会拒绝再次创建，包括响应丢失的情况。先检查已有授权或 Console；确认授权到期或撤销后，通过 Console 或预览指南中的 SDK 流程创建新授权。不能仅因为请求超时就清除意图并重建。
+
+## 5. 在同一 Session 中继续修改
+
+审阅第一轮结果后运行 `followup`，然后再次运行 `observe`。第二轮添加 Reset 按钮及其事件处理，必须保留筛选行为，并重新执行未修改的固定测试。核对两个 Run ID 不同，而 Session ID 相同。
+
+刷新预览以加载修改后的文件。选择状态并输入查询，点击 Reset：查询应清空，状态恢复全部，四张卡片和数量立即更新，不必再次提交表单。再从空结果状态重复一次。原有八条断言只测试筛选逻辑，不覆盖新增 DOM 交互；除浏览器结果外，还要审阅 `index.html` 与 `app.mjs` 的实际修改。
+
+如果第二轮提交响应丢失，重复 `followup` 使用相同的已保存输入和幂等键，对应同一次提交。该命令不会生成第三个任务的新键。恢复观察时使用 `observe`，不要重新提交来“重启”正在工作的 Agent。
+
+## 6. 关闭并核对结果留存
+
+两轮执行和浏览器检查完成后运行 `close`。程序关闭原 Session，重新下载之前导出的每个产物，核对内容哈希一致。发生异常时检查原 Session 和资源操作；响应丢失不能证明清理成功。
+
+在 Console 确认 Session 已关闭、其拥有的资源已清理。刷新旧预览，确认访问被拒绝。查询两轮历史 Run 和回答，确认记录仍可读取。保留下载的代码、报告与私有记录，直至确认清理。导出产物的留存独立于临时预览和正在运行的服务器；本检查不覆盖任意未导出的工作区文件。
+
+`closed_and_downloads_checked` 只记录关闭和下载内容留存。完整教程验收还需要固定测试、两轮任务和浏览器观察，不能因为清理命令成功就将旅程标为通过。
+
+## 中断后的恢复
+
+| 记录状态 | 下一步 |
+| --- | --- |
+| 有创建意图，没有 Session ID | 检查 Sessions 和资源操作，创建可能已经成功；不要另建记录重跑 `start` |
+| `uploading` | 检查原 Session 和上传文件，先核对丢失的上传结果，再提交任务 |
+| `submitting_first` 或 `submitting_followup` | 对原 Session 使用保存的输入和幂等键调用 SDK `submit`；保存返回的 Run ID 和当前阶段后继续观察 |
+| 已有 Run ID | 再次 `observe`，不会提交新任务 |
+| 失败、缺少产物或测试被修改 | 检查事件并保留证据，不接受该结果；调查后关闭，或另行记录并提交修正任务 |
+| `closing` | 查询原 Session 和操作记录，再次关闭以对账原资源 |
+| 遗留 `process.lock` | 检查其中的 PID，确认进程已经停止后，只移除锁文件 |
+
+Run 卡住时可以调用 SDK `cancel`，观察终态，再关闭 Session。取消不会撤销外部副作用。示例不会自动处理创建或上传的不确定结果，也不会自动改写记录；保存的状态是[恢复指南](/zh-CN/build/recovery)的调查起点。
+
+下一步：[接入业务后端](/zh-CN/build/backend-integration)、[人工审批](/zh-CN/build/approvals)或[产物留存](/zh-CN/build/artifacts)。
+
+相关流程契约：[输入文件与上下文](/zh-CN/build/project-context)、[私有预览生命周期](/zh-CN/build/private-preview)、[原始手工旅程](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/manual-journey/README.md)、[用户原始旅程](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/journey-source.md)与[验收要求](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/acceptance.md)。简化教程不取消其中外部授权／审批的要求。

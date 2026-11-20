@@ -1,0 +1,64 @@
+---
+title: "Manage identity, permissions, and application Tokens"
+---
+
+Use application Tokens for configured execution and owner identities for administration. These identities belong to control-plane tenants; they are not automatically product users or team roles.
+
+Local Console/SDK access uses protected discovery. Remote clients use explicit URLs and Tokens. Do not distribute discovery files or owner Tokens to browsers.
+
+Application Tokens can read allowed task resources, create Sessions, submit/cancel Runs, upload initial files, close Sessions, and use permitted preview/access operations. They can create Agents but cannot infer permission to revise/archive them. Connection CRUD, Secrets, Token management, approval decisions, Tool refusal/reconciliation, and other management routes require appropriate owner access. See the exact [route allowlist](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/credentials/application-tokens.ts).
+
+Applications must still authorize business ownership within a shared tenant. A Session ID is not authorization, and an application Token is not inherently scoped to a single Session.
+
+## Representative route boundaries
+
+These examples describe the application-role route gate. Passing that gate still requires resource ownership, valid inputs and the operation's state checks. IDs below are placeholders, not authority to access another user's work.
+
+| Request | Application role | Additional meaning |
+| --- | --- | --- |
+| `GET /v1/connections` | Allowed | Read metadata; not permission to change credentials |
+| `POST /v1/connections` | Denied | Owner-managed configuration |
+| `POST /v1/agents` | Allowed | Agent creation does not grant revision/archive permission |
+| `POST /v1/sessions` | Allowed | Bound resources must belong to the tenant and meet preflight rules |
+| `POST /v1/sessions/<id>/runs` | Allowed | Application still enforces its own business-user ownership |
+| `GET /v1/runs/<id>/approvals` | Allowed | Observe a pending decision |
+| `POST /v1/approvals/<id>/decision` | Denied | Observation is not decision authority |
+| `POST /v1/tokens` | Denied | Cannot mint additional application credentials |
+
+For an isolated acceptance check, issue a disposable application Token, use it for authenticated health and a permitted task, then verify that Token creation and approval decisions return 403. Revoke it and repeat an authenticated request; it must fail. Use a second test tenant to check foreign resource lookup/binding, separately from two application users sharing one tenant. Do not use an owner Token for those negative checks. This is a procedure, not a claim that those database-backed cases ran in this documentation update.
+
+## Issue a Token
+
+Through Console or an owner-authorized backend:
+
+```python
+issued = owner_client.create_token('application backend', expires_in_days=30)
+# Store issued['token'] privately; retain issued['id'] for administration.
+```
+
+```typescript
+const issued = await ownerClient.createToken('application backend', 30);
+// Store issued.token privately; retain issued.id for administration.
+```
+
+Creation returns the usable plaintext value; listing returns metadata. The database stores a digest and cannot recover an old plaintext Token. Lifetime is currently 1–365 days, default 30. Do not log the whole response.
+
+## Rotate and revoke
+
+`rotate_token` / `rotateToken` atomically revokes the old Token and returns a new ID/value with the original expiry. It does not extend lifetime. Plan the client switch because the old Token is invalid once rotation succeeds.
+
+For application-managed overlap, create a separate Token, deploy and verify it, then revoke the old one. That is different from atomic rotation, and you own the overlap window.
+
+`revoke_token` / `revokeToken` revokes an application Token. last_used_at helps investigate usage but does not prove every client has migrated.
+
+## If a rotation response is lost
+
+The transaction may have revoked the old Token even though your client did not receive the replacement plaintext. Do not assume the old value remains valid or repeatedly rotate the old ID. Use an independent owner identity to inspect Token metadata and establish which IDs remain active. The lost plaintext cannot be recovered from the list: issue a separate replacement, deploy it, and revoke any unused active replacement by its ID. Record only identifiers/status in the incident log, never plaintext values. Revoking an application Token controls subsequent authentication; it is not a command to cancel an already running Run.
+
+## Diagnose and verify
+
+For 401, inspect format, expiry/revocation, and the intended control plane. A 403 `owner_token_required` means management permission is required, not necessarily an incorrect credential.
+
+Verify allowed execution, denied administration, rejection of the old rotated Token, preserved expiry, and failed authentication after revocation. Also verify business-user isolation and cross-tenant read/binding denial.
+
+Sources: [Tokens](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/credentials/application-tokens.ts), [authentication](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/credentials/api-auth.ts). Next: [backend integration](/en/build/backend-integration), [security boundaries](/en/concepts/security-boundaries), [HTTP API](/en/reference/http).

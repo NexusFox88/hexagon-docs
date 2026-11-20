@@ -1,0 +1,137 @@
+---
+title: "产物与私有预览 HTTP 契约"
+---
+
+产物是由控制平面保留的导出文件内容；私有预览是对 Session 内实时 HTTP 端口的临时访问授权。需要在关闭 Session 后保留的结果应导出为产物，检查运行中应用使用预览。这两个接口都不提供生产网站发布服务。
+
+以下四个管理操作允许 owner 和应用 Token，仍检查租户归属。将 HEXAGON_API_URL 设置为不含 `/v1` 的控制平面 origin，并提供所需资源 ID 和可信后端 Token。只有配置 preview 服务时才注册预览路由。
+
+## 列出导出产物
+
+`GET /v1/runs/{run_id}/artifacts` 返回 **200** 和 `{ "artifacts": [...] }`。路径 ID 必须是 UUID。结果按名称排序，无分页参数。每项字段：
+
+| 字段 | 形状与含义 |
+| --- | --- |
+| `id` | 下载内容使用的产物 UUID |
+| `session_id`、`run_id` | 所属 Session 和产生该产物的 Run |
+| `name` | 导出的相对名称，不能直接信任为本地写入路径 |
+| `sha256` | 导出字节的小写 SHA-256 |
+| `size` | 整数字节数 |
+| `created_at` | 服务端时间戳 |
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/runs/$HEXAGON_RUN_ID/artifacts"
+```
+
+存在但没有导出的 Run 返回空数组，不是 404。不存在或其他租户的 Run 返回 `404 run_not_found`。列表不限于成功 Run，需另行检查状态；执行中的空数组不是最终结果。本路由族没有公开产物上传接口，产物来自 worker 捕获的 Harness manifest。
+
+## 下载一个产物
+
+`GET /v1/artifacts/{artifact_id}/content` 返回 **200** 和原始字节，不是 JSON 或 Base64。路径 ID 必须是 UUID。产物不存在、属于其他租户，或历史行没有保留内容时返回 `404 artifact_not_found`。
+
+| 响应头 | 值与行为 |
+| --- | --- |
+| `Content-Type` | `application/octet-stream` |
+| `Content-Disposition` | attachment；回退文件名 artifact，UTF-8 文件名取导出名称的最后一个路径分量 |
+| `X-Content-SHA256` | 导出内容摘要 |
+| `Cache-Control` | `no-store` |
+| `X-Content-Type-Options` | `nosniff` |
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  --dump-header artifact-headers.txt --output artifact-download.bin \
+  "$HEXAGON_API_URL/v1/artifacts/$HEXAGON_ARTIFACT_ID/content"
+```
+
+使用新的私有下载目录和自行指定的目标文件名。HTTP 失败时，`--fail-with-body` 仍可能将错误响应写入该文件，因此必须先检查 curl 退出码为 0。将文件大小和 SHA-256 与列表元数据及响应头比较。不要仅为了检查内容就执行下载的模型生成代码。此路由及其 schema 未承诺 Range 或条件下载契约，不能假定支持断点续传。
+
+捕获限制为每份 manifest 最多 64 个文件，每个解码后最多 4 MiB，总量最多 8 MiB。名称为相对路径，最长 512 字符，拒绝路径穿越、反斜线和控制字符。捕获时检查规范 Base64 和摘要完整性。同一 Run/名称重复捕获相同内容可接受，不同哈希返回 artifact_conflict。这些是 worker 捕获限制，不是向公开下载接口 POST 的字段。详见[限制](/zh-CN/reference/limits)。
+
+关闭 Session 后，导出内容和 Run 历史独立于 Sandbox 保留。仅存在于工作区的文件不会自动变成产物。应针对自己的旅程验证关闭后的下载；产物留存不能替代部署的备份策略。
+
+## 判断下载结果
+
+| 观察到的结果 | 应用应如何处理 |
+| --- | --- |
+| 200、零字节，且与空文件的摘要和大小匹配 | 接受有效空产物；响应体为空本身不代表文件不存在 |
+| 存在元数据，下载却返回 `404 artifact_not_found` | 历史记录可能没有保留的文件内容；保留 ID 供排查，有备份时从备份恢复 |
+| 未知或其他租户资源返回 404 | 核对保存的标识和授权租户；响应不会披露其他租户的资源 |
+| curl 退出码非零，或大小 / 摘要不匹配 | 不要把目标文件作为有效结果交付；保留预期元数据并调查 |
+| 携带 `Range` 的请求返回 200 和完整内容 | 按完整响应处理，不能把它追加到已有的部分文件末尾 |
+
+已配置服务的控制平面通过响应钩子为这些管理响应发送 `Cache-Control: no-store`。不能仅根据下载处理器内部设置的响应头推断客户端实际收到的值。当前 HTTP 检查也观察到携带 `If-None-Match` 时返回完整的 200 响应；此处没有受支持的基于 ETag 的条件下载流程。重新下载到新的目标文件，并核验完整字节。
+
+[产物 HTTP 检查记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-artifact-http-contract-review.json) 包含 19 项通过的检查，使用真实本机 HTTP、PostgreSQL 和已迁移的隔离 schema，覆盖二进制内容与响应头、空文件与历史内容缺失、owner / 应用访问、租户隔离、无效 ID、Range / 条件请求行为，以及受控 Session 状态变更后的保留下载。检查结束后已移除 schema。这些检查没有执行 worker 捕获、云资源删除或预览浏览器流程。独立的[产物保留示例](/zh-CN/build/artifacts) 覆盖文中指定的实云旅程。
+
+## 创建私有预览授权
+
+`POST /v1/sessions/{session_id}/previews` 接受严格 JSON 对象，返回 **201**。Session ID 必须是 UUID。
+
+| 字段 | 要求 |
+| --- | --- |
+| `port` | 必填整数 3000–8999，排除 Runtime 端口 8765 |
+| `ttl_seconds` | 可选整数 30–3600，默认 600 |
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data '{"port":3000,"ttl_seconds":600}' \
+  "$HEXAGON_API_URL/v1/sessions/$HEXAGON_SESSION_ID/previews"
+```
+
+响应包含 id（授权 UUID）、session_id、整数 port、ISO 时间戳 expires_at 和 url。URL 中有秘密 ticket，必须私有保存，仅交给有权访问的用户，不要放入共享日志。默认本地形状为 `http://<grant-id>.localhost:8788/?ticket=<ticket>`；hosted 使用配置的 scheme/domain/port。
+
+创建要求 Session 为 open、有已记录的 Sandbox ID，且未检测到控制平面管理的到期。Session 不存在或属于其他租户返回 `404 session_not_found`，其他不可用情况为 `409 preview_session_unavailable`。端口、TTL 或未知字段校验失败返回 `400 invalid_request`。
+
+创建授权不会启动服务器、唤醒休眠 Session、探测 HTTP 健康状态，也不证明 Provider 能交付预览流量。先在云工作区启动服务并检查端口；打开 URL 时底层资源或私有传输仍可能失败。本管理路由族没有幂等键，也没有公开预览列表/读取接口。创建响应丢失不能证明授权不存在；避免循环重试，调查可用的私有记录，无法恢复 ID 时可等待本次请求的授权有效期结束。
+
+## 处理授权创建与响应丢失
+
+将返回的授权 ID、有效期与已授权的应用用户和 Session 一起保存。含 ticket 的 URL 应保存在私有存储中；控制平面保存的是 ticket 摘要，不能通过数据库记录恢复原始 ticket。将返回的 URL 视为持有即可使用的凭据。
+
+| 情况 | 含义与后续动作 |
+| --- | --- |
+| 创建返回 201 | 授权已保存；仍需单独打开 URL，验证运行中的应用是否可达 |
+| 创建超时或响应丢失 | 结果未知；本接口族没有授权列表 / 查询接口来恢复 URL，避免自动重试，让无法恢复的授权到期 |
+| 使用相同 `Idempotency-Key` 重复发送同一请求 | 此接口不会按该请求头去重：每次成功请求都会创建不同授权 |
+| Session 已暂停、正在关闭、已关闭、缺少 Sandbox ID，或检测到控制平面管理的有效期已结束 | 创建返回 `409 preview_session_unavailable`；先调查生命周期，再申请授权 |
+| 撤销已有授权，包括已经撤销的授权 | 返回 204，没有 JSON 响应体；不会关闭 Session 或应用进程 |
+| 撤销结果未知 | 可以对同一个已知授权 ID 重试 DELETE；不要为验证撤销结果而创建替代授权 |
+
+创建成功不保证整个 TTL 内始终可访问：Session 可用性、资源有效期和显式撤销会分别检查。同样，撤销成功可以阻止后续授权访问，但无法清除浏览器已经收到的内容。
+
+[预览管理 HTTP 检查记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-preview-management-http-review.json) 包含 29 项检查，使用真实本机 HTTP 和 PostgreSQL 测试数据，覆盖默认 / 边界 TTL、输入校验、owner / 应用访问、租户隔离、不可用 Session 状态、受控资源到期、同键重复创建以及重复撤销的空响应。检查也确认管理调用不会调用 Provider 目标或关闭 Session。浏览器 ticket 交换、Cookie 行为和实时预览流量需要单独验证，此记录不证明这些行为已经通过验收。
+
+## 浏览器访问是独立的 HTTP 服务
+
+在有权访问的浏览器中打开 URL，不要将管理 owner Token 发给预览 origin。首次 GET 的 ticket 验证后换成 host-only 的 hexagon_preview Cookie，具有 HttpOnly、SameSite=Lax，HTTPS 时增加 Secure。响应重定向到移除 ticket 后的相同路径和查询参数。Cookie 有效期受授权到期限制，携带 ticket 的非 GET 请求会被拒绝。
+
+后续请求检查授权 ID、Token 摘要、到期/撤销状态与 Session 可用性。关闭或暂停 Session 可能使当前访问失效。提供其他 origin 的 Origin 请求头会被拒绝。代理使用可信 Provider 目标，用户路径不能指定另一个上游主机；Provider 凭据和上游 Cookie 不会转发给浏览器。
+
+当前传输支持普通 HTTP 方法和请求体，请求体上限 8 MiB，上游 fetch 超时为 30 秒，只转发选定的请求和响应头。同一上游 origin 的重定向改写为预览相对地址，外部重定向被阻止。CSP 限制外部资源和框架嵌入。不支持 WebSocket upgrade 或依赖上游应用 Cookie 的流程。上游 HTTP 错误状态可能被原样转发，所以不是每个 4xx/5xx 都是 Hexagon 授权错误。
+
+| 预览服务错误 | 含义 |
+| --- | --- |
+| 401 `preview_unauthorized` | Ticket/Cookie/host 无效、授权已撤销/到期，或 Session 不可用 |
+| 403 `preview_origin_rejected` | 请求提供的 Origin 与当前预览 origin 不同 |
+| 502 `preview_external_redirect_blocked` | 上游重定向离开可信目标 origin |
+| 502 `preview_unavailable` | 非领域代理/传输异常，需要检查目标和 Session |
+
+预览服务有自己的错误处理，不要假定所有错误都使用管理 API 的校验响应形状和状态码策略，应检查实际响应及上下文。
+
+## 撤销访问
+
+`DELETE /v1/previews/{preview_id}` 返回 **204**，无响应体；成功时不要解析 JSON。
+
+```sh
+curl --fail-with-body --silent --show-error --request DELETE \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/previews/$HEXAGON_PREVIEW_ID"
+```
+
+ID 必须是 UUID。未知或其他租户的授权返回 `404 preview_not_found`。重复撤销已存在授权也会成功：记录被标记撤销而非删除。撤销不会停止应用服务器或关闭 Session。刷新浏览器验证新请求被拒绝；已经交付到浏览器的内容无法收回。
+
+来源：[产物存储与完整性](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/artifacts/artifacts.ts)、[授权生命周期](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/previews.ts)、[预览代理](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/preview-server.ts)、[HTTP 路由](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts)。下一步：[产物工作流](/zh-CN/build/artifacts)、[预览排障](/zh-CN/build/private-preview)、[HTTP 总览](/zh-CN/reference/http)。本文经过源码审阅，没有将这些请求标记为新一轮实云或浏览器验收通过。

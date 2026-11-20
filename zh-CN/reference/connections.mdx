@@ -1,0 +1,119 @@
+---
+title: "Connections HTTP 契约"
+---
+
+连接描述租户拥有的 Sandbox、模型、Tool 或受保护 HTTP 服务。应用 Token 可列出/读取连接；创建、修改、验证、发现、断开、依赖/用量查询和删除要求 owner。示例使用不带 `/v1` 的 API origin 和合适的后端 Token。
+
+## 创建与读取
+
+`POST /v1/connections` 接受严格对象：必填 kind（sandbox/model/tool/http）、非空 provider、name（1–200 字符）；可选 config（对象，默认空）、credential（1–32,768 字符）或 secret_id（managed Secret UUID）。Credential 与 secret_id 互斥。Adapter 进一步解析 config，通用对象 schema 不证明任意 Provider 字段有效。引用的 managed Secret 必须存在且启用。
+
+按具体[集成指南](/zh-CN/integrations/choose)准备 connection-create.json，含凭据文件必须私有保存。没有适用于所有 Provider 的通用配置 JSON。
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data-binary @connection-create.json "$HEXAGON_API_URL/v1/connections"
+```
+
+成功返回 **201** 和连接投影：id、kind、provider、name、config、status、enabled、version、validation、created_at、updated_at、has_credential、secret_id。Secret_id 是 managed Secret 引用，不是内部加密封装 ID，不返回明文凭据。创建不验证或启用连接，也无幂等键。后续 OAuth 或匿名 MCP 可能允许暂不提供凭据，但这不使其他 Provider 自动 ready。
+
+`GET /v1/connections` 返回 **200**、`{connections:[...]}`，按创建时间排列，排除删除项，无分页。`GET /v1/connections/{id}` 返回 **200** 和单个投影。路径 ID 使用 UUID 校验。不存在、已删除或其他租户连接返回 `404 connection_not_found`。
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" "$HEXAGON_API_URL/v1/connections"
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" "$HEXAGON_API_URL/v1/connections/$HEXAGON_CONNECTION_ID"
+```
+
+Config 和 validation 可含账户及配置元数据，不含凭据明文不代表整个响应适合公开日志。
+
+## 修改、验证、再启用
+
+`PATCH /v1/connections/{id}` 接受严格的可选 name、config、credential、secret_id、enabled:boolean，不能更改 kind/provider。提供 config 是替换而非合并，省略保留原值。Credential/secret_id 仍互斥；提供直接 credential 会清除 managed Secret 关联。Null 不是通用清空方式。
+
+出现 config/credential/secret_id 字段即重置 status=draft、禁用并清空 validation，即使值等价。每次接受 PATCH 都递增版本，包括仅改名称和空对象；没有 expected_version 检查。同时变更上述字段并启用，或启用非 ready 连接，返回 `409 validation_required`。关联 managed Secret 禁用/删除时启用返回 `409 secret_disabled`。
+
+```sh
+curl --fail-with-body --silent --show-error --request PATCH \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data '{"enabled":false}' "$HEXAGON_API_URL/v1/connections/$HEXAGON_CONNECTION_ID"
+```
+
+`POST /v1/connections/{id}/validate` 可能访问外部 Provider，OAuth 情况可能刷新凭据。即使验证失败也返回 **200** 和更新后的连接，必须检查 status（ready/invalid）和 validation.code。成功保留 enabled 而非自动启用，失败禁用。Validation 包含 checked_at 和被检查版本。远端校验期间版本变化时返回 `409 connection_changed_during_validation`，不能用旧检查认可新配置。
+
+```sh
+curl --fail-with-body --silent --show-error --request POST \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/connections/$HEXAGON_CONNECTION_ID/validate"
+```
+
+确认 ready 后显式启用：
+
+```sh
+curl --fail-with-body --silent --show-error --request PATCH \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data '{"enabled":true}' "$HEXAGON_API_URL/v1/connections/$HEXAGON_CONNECTION_ID"
+```
+
+PATCH 返回 **200**。版本变化后检查已有 Session 授权，其固定配置不会重写。响应丢失后先读取状态，不要盲重试再次推进版本。
+
+## 发现 Remote MCP Tools
+
+`POST /v1/connections/{id}/discover-mcp` 无必需请求体，返回 **200** 和更新后的连接。只接受 kind=tool、provider=mcp-remote，否则 `400 unsupported_connection_provider`。它获取凭据并访问 MCP 服务；发现传输失败为 `422 mcp_discovery_failed`，获取凭据可独立失败。
+
+```sh
+curl --fail-with-body --silent --show-error --request POST \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/connections/$HEXAGON_CONNECTION_ID/discover-mcp"
+```
+
+发现结果成为新配置版本：递增 version、status=draft、enabled=false、清空 validation，使用前重新验证和启用。并发版本改变返回 `409 connection_changed_during_validation`，发现不会静默改写已有 grants。
+
+## 断开 Tool 凭据
+
+`POST /v1/connections/{id}/disconnect` 无必需请求体，返回 **200**、连接投影及 provider_revoked:false。非 Tool 返回 `400 connection_kind_mismatch`。
+
+```sh
+curl --fail-with-body --silent --show-error --request POST \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/connections/$HEXAGON_CONNECTION_ID/disconnect"
+```
+
+它清除本地凭据和 managed Secret 关联、禁用、设为 draft、清空 validation、递增版本、取消待处理 OAuth flow，并删除该连接 purpose 的加密封装。不删除共享 managed Secret，也不撤销 Provider 账户。重复会再次递增版本，需要时单独执行 Provider 侧撤销。
+
+## 检查依赖与使用记录
+
+`GET /v1/connections/{id}/dependencies` 返回 **200**、`{agents,sessions,limit:100}`。Agents 为保存绑定引用此 ID 的模板，包括归档项，字段 id/name/revision/archived_at。Sessions 含 id/state/agent_id，覆盖通过 Sandbox、模型、Tool、受保护 API 引用该连接的非 closed Session。两数组各最多 100 项，最新在前，无后续游标，不是完整导出。
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/connections/$HEXAGON_CONNECTION_ID/dependencies"
+```
+
+`GET /v1/connections/{id}/usage` 接受 section=agents/sessions/calls（默认 sessions），offset 为 0–100000 整数，默认 0。成功 **200** 返回 `{section,items,offset,next_offset}`，固定每页 25 项，观测到末页时 next_offset=null。与 dependencies 不同，usage 的 sessions **只跟踪 Tool 绑定**，包括 closed，不枚举 Sandbox/模型/受保护 HTTP 使用。
+
+```sh
+curl --fail-with-body --silent --show-error --get \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  --data-urlencode 'section=calls' --data-urlencode 'offset=0' \
+  "$HEXAGON_API_URL/v1/connections/$HEXAGON_CONNECTION_ID/usage"
+```
+
+Agents 项为 id/name/revision/archived_at；Session 项为 id/state/agent_id/name/agent_name/created_at；call 项含 id/run_id/session_id/session_name/operation_name/agent_id/agent_name/binding/operation/state/is_error/created_at，不含参数或结果。调用匹配使用保存的 execution_policy.connection_id，并对历史数据回退到 Tool 绑定。结果最新在前，并发变化可移动 offset。Usage 不是计费遥测。
+
+## 删除
+
+`DELETE /v1/connections/{id}` 软删除并禁用连接、设 status=deleted、递增版本后，返回 **204**，无响应体。任何非 closed Session 依赖导致 `409 connection_in_use`，此检查不受依赖列表截断影响。仅 Agent 模板引用不阻止删除，应主动更新相关模板避免后续失败。
+
+```sh
+curl --fail-with-body --silent --show-error --request DELETE \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/connections/$HEXAGON_CONNECTION_ID"
+```
+
+删除不会代为清理 Session、删除 managed Secret 或撤销 Provider 凭据。重复删除返回 `404 connection_not_found`。其他错误包括 `400 invalid_request`、`400 ambiguous_credential`、`400 unsupported_connection_provider` 及 managed Secret 错误。HTTP 200 时仍须检查 validation，不能把传输成功等同就绪。
+
+来源：[连接操作](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/connections/connections.ts)、[使用查询](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/connections/usage.ts)、[路由](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts)。本轮未使用真实凭据、验证 Provider 或修改连接。用户同意和流程状态响应见 [OAuth 契约](/zh-CN/reference/oauth)。下一步：[连接工作流](/zh-CN/build/connection-lifecycle)、[HTTP 总览](/zh-CN/reference/http)。

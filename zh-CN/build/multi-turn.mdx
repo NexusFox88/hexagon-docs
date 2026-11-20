@@ -1,0 +1,121 @@
+---
+title: "在同一个 Session 中连续工作"
+---
+
+继续已有项目时，复用 Session；每个被接受的新提交意图创建一个 Run。同一意图使用同一 key 重试时，返回已有 Run。Session 保存工作上下文，Run 保存这次执行的输入、事件和结果。
+
+准备一个尚未关闭、没有活动 Run 的 Session。首个 Session 教程会主动关闭资源，因此不能直接复用那个已关闭的 Session。
+
+## 提交第二轮
+
+可用以下固定要求完成两轮练习。每次发送前保存输入及该轮独立的 key，收到响应后立即持久化 Run ID：
+
+| 轮次 | 任务 | 保留的证据 |
+| --- | --- | --- |
+| 第一轮 | 在工作区创建 `notes.txt`，内容严格为 `Project: ORBIT` 加换行；读回文件，并复制到本轮产物目录。 | 第一轮 Run ID、completed 状态、下载的产物字节 |
+| 第二轮 | 读取工作区 `notes.txt`，保留第一行，追加 `Next steps` 加换行，并复制到本轮产物目录。 | 同一 Session 中不同的 Run ID、completed 状态、第二份下载产物 |
+
+两份下载内容应分别为 `b'Project: ORBIT\n'` 和 `b'Project: ORBIT\nNext steps\n'`，本地保存时使用不同文件名。Agent 必须实际读取工作区文件，仅在回答中重复要求的文本不能证明成功。若任务报告冲突或文件已存在且内容不同，先调查再继续。本练习使用专用 Session。
+
+以下片段假设第一轮已经在工作区创建 `notes.txt`，并已完成。`first_run_id` / `firstRunId`、`session_id` / `sessionId` 和新的提交 key 都来自应用的持久记录。
+
+```python
+first = client.run(first_run_id)
+if first['state'] != 'completed':
+    raise RuntimeError('Inspect the first Run before continuing')
+second = client.submit(
+    session_id,
+    'Read workspace notes.txt. Preserve its first line and append exactly Next steps followed by a newline. Export the updated file into your Run artifact directory.',
+    saved_second_turn_key,
+)
+print(second['id'])
+```
+
+```typescript
+const first = await client.run(firstRunId);
+if (first.state !== 'completed') throw new Error('Inspect the first Run before continuing');
+const second = await client.submit(sessionId,
+  'Read workspace notes.txt. Preserve its first line and append exactly Next steps followed by a newline. Export the updated file into your Run artifact directory.',
+  savedSecondTurnKey);
+console.log(second.id);
+```
+
+第二轮使用新的 key；第二轮自身的网络重试继续复用这个 key。不要复用第一轮的 key 发送不同内容，否则会发生幂等冲突。
+
+## 判断这是重试还是新一轮
+
+| 情况 | 提交身份 | 预期行为 |
+| --- | --- | --- |
+| 首次响应丢失 | Session、input、origin 和 key 全部保持不变 | 已接受则找回原 Run，否则提交同一意图。 |
+| 用户要求进一步修改 | 同一 Session，保存新输入和新的 key | Session 可接受任务后创建不同的 Run。 |
+| Run 已被接受后用户编辑任务 | 将编辑视为独立意图，先处理已有任务 | 修改输入或复用 key 不会替换原 Run。 |
+| 原 Run 之后 Session 已关闭 | 原 key 仍可标识留存的原 Run | 找回旧 Run 不会重新打开 Session，也不启动新任务。 |
+
+例如，`request-001/key-A` 创建 R1；超时后精确重发 `request-001/key-A` 应找回 R1，而不是 R2。R1 完成后，`request-002/key-B` 为后续任务创建 R2。保存两组关联，不要只覆盖一个“当前 Run”字段而丢失前一任务历史。
+
+## 等待与并发
+
+一个 Session 只有一个活动 Run。等待 Tool 授权或审批也属于活动状态。即便你刚查询到完成，多个客户端仍可能竞争提交，因此仍需处理 `session_busy`。
+
+应用可以串行处理用户消息，或明确提示当前任务需要处理。平台不会自动把所有忙时消息排队。不同工作区应使用不同 Session；不要通过拆 Session 来绕过本来需要同一上下文的工作。
+
+先将后续消息记录为应用中的待提交意图，再尝试提交。收到 `session_busy` 时保留原意图，不要创建第二个 Session 或更换 key 来绕过冲突。观察到活动 Run 结束后，再用已保存的 input、origin 和 key 提交。若提交响应丢失，请求可能已经被接受；重发相同意图以找回 Run ID。服务端会先查询已经接受的幂等请求，再检查活动 Run 冲突。
+
+多个浏览器标签页或后端 worker 需要共享应用队列或数据库协调。“查询 completed，再提交”不是原子的执行名额预留。保存 Run ID 后才将待提交消息标记为已接受。应用队列还需要自己的取消和顺序规则；尚无 Run 的待提交消息被取消时，不需要调用 Run 取消 API。
+
+## 从另一种 SDK 继续
+
+通过后端持久记录传递 Session ID 和上一轮 Run ID。接收进程使用自己的授权客户端配置，不把控制平面 Token 放入交接记录。接收方提交前核对关联：
+
+```python
+# Python 可以接收 TypeScript 后端保存的 ID。
+first = client.run(first_run_id)
+if first['session_id'] != session_id or first['state'] != 'completed':
+    raise RuntimeError('Handoff does not match a completed Run in this Session')
+```
+
+```typescript
+// TypeScript 可以接收 Python 后端保存的 ID。
+const first = await client.run(firstRunId);
+if (first.session_id !== sessionId || first.state !== 'completed') {
+  throw new Error('Handoff does not match a completed Run in this Session');
+}
+```
+
+然后使用上文的后续提交方式，并为第二轮持久保存新的 key。这是接收方的独立片段，不要在同一作用域重复声明变量。按[后端接入](/zh-CN/build/backend-integration)检查应用用户的归属；租户级 API 权限并不自动证明应用用户拥有该对话。不要向 SDK 提供 Harness 原生会话标识，该关联由 worker 在内部维护。
+
+## 保留什么
+
+计划内空闲后，下一次 submit 会协调唤醒。工作区与 Harness 对话的保留依赖组合和恢复机制；内存、网络连接和任意后台进程不是统一承诺。参见[Serverless Session](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/serverless-sessions.md)。
+
+新的 Run 产物是独立导出快照，后续修改不会改写之前已经下载的版本。需要在第二轮读取前一轮文件时使用工作区路径，不能把 Artifact ID 当本地文件路径。
+
+Session 可由另一语言的 SDK 继续，前提是连接同一控制平面并具有该 Session 的权限。SDK 客户端对象不是对话身份，Session ID 才是关联依据。
+
+| 需求或观察到的状态 | 是否继续使用原 Session |
+| --- | --- |
+| 使用固定配置继续同一项目 | 活动任务结束且工作区可用后，可以继续。 |
+| 切换客户端语言或重启后端 | 可以，从持久存储恢复 ID 和待提交意图。 |
+| 更换 Harness、模型、Sandbox 或固定 instructions/context | 创建新 Session。复用初始化是使用当前连接配置创建新任务，不是在线迁移。 |
+| Session 已关闭 | 新工作创建新 Session；保留的历史与产物不等于可继续执行的工作区。 |
+| Run 失败或被取消 | 先检查部分文件修改和外部副作用，终态不会回滚这些变化。 |
+| Runtime 中断或工作区需要恢复 | 调查原 invocation 和资源状态；重复提交后续任务不能修复已隔离的 Runtime。 |
+
+支持原生对话接续的 Harness 返回会话标识后，worker 会在成功 Run 标记 completed 前保存它。失败或中断的 Run 不建立新的成功对话检查点。文件连续性、对话连续性和进程未变化是三个不同性质。
+
+## 成功条件与失败处理
+
+确认两个不同 Run ID 属于同一个 Session；第二轮实际读到了第一轮文件，并保留旧内容、增加新内容。若依赖对话记忆，也要用可核对的前轮信息单独验证，不能只凭文件保留推断对话恢复成功。
+
+第一轮失败时先调查文件是否部分修改；重提完整任务可能重复操作。Runtime 中断或远程结果未知时，不承诺自动安全重放。完成最后一轮后显式 close，并确认资源清理。
+
+需要已有的两轮修改程序时，使用[项目任务教程](/zh-CN/start/project-task)：`start` → `observe` → 检查结果 → `followup` → `observe` → 检查结果 → `close`。预览与浏览器检查仍属于该教程完整旅程。本地 journal 面向对应语言的程序，不要交换 Python 与 TypeScript 的 journal 文件来模拟跨语言交接。
+
+
+## 按范围理解验证记录
+
+[11 月 20 日项目教程记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-project-docs-cloud.json)验证两种 SDK 各自 Session 中的两个不同 Run、未改变的固定测试、第一轮筛选与第二轮重置、导出留存和清理，组合为 Vercel/Pi/已配置 Messages。它是实际多轮项目证据，不是本页 `notes.txt` 说明性练习的执行记录，也不证明跨语言交接。
+
+[11 月 16 日旅程记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-16-current-dual-sdk-journey.md)单独记录 Instabox/Pi/SiliconFlow 上 Python 与 TypeScript 双向接续。它对应当时的组合与源码状态，不是所有当前组合的新一次验证。[HTTP/SDK 互操作测试](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/sdk-interoperability.test.ts)使用真实客户端和 PostgreSQL 展示交接契约，但本身不执行云 Harness。为部署决定重测范围时，应分别看待这些证据。
+
+依据：[架构](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/architecture.md)、[SDK 契约](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/README.md)、[提交与活动 Run 检查](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts)、[生命周期](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/serverless-sessions.md)。下一步：[空闲与唤醒](/zh-CN/build/idle-and-wake)、[恢复](/zh-CN/build/recovery)、[Session 与 Run 概念](/zh-CN/concepts/sessions-runs-agents)。

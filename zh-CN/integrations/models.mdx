@@ -1,0 +1,87 @@
+---
+title: "连接你自己的模型端点"
+---
+
+模型连接包含协议类型、base URL、准确模型 ID 和凭据。模型品牌名称不能代替 wire protocol；同一供应商可能提供多个协议入口。
+
+需要管理身份，以及你获准使用的端点和模型。Console Infrastructure → LLM 可以完成同样的配置、验证与启用。以下代码使用环境占位输入，实际地址按供应商接口填写。
+
+## 创建 Chat Completions 连接
+
+```python
+import os
+from hexagon import Hexagon
+client = Hexagon.local()
+model = client.create_connection(
+    kind='model', provider='openai-compatible', name='Application model',
+    credential=os.environ['MODEL_API_KEY'],
+    config={'base_url': os.environ['MODEL_BASE_URL'], 'model': os.environ['MODEL_ID']},
+)
+checked = client.validate_connection(model['id'])
+if checked['status'] != 'ready':
+    raise RuntimeError('Model validation failed; inspect connection diagnostics')
+client.update_connection(model['id'], enabled=True)
+```
+
+```typescript
+import { Hexagon } from '@hexagon/agent-sdk';
+const client = await Hexagon.local();
+const key = process.env.MODEL_API_KEY;
+const base = process.env.MODEL_BASE_URL;
+const id = process.env.MODEL_ID;
+if (!key || !base || !id) throw new Error('Set model configuration');
+const model = await client.createConnection({
+  kind: 'model', provider: 'openai-compatible', name: 'Application model',
+  credential: key, config: { base_url: base, model: id },
+});
+const checked = await client.validateConnection(model.id);
+if (checked.status !== 'ready') throw new Error('Inspect connection diagnostics');
+await client.updateConnection(model.id, { enabled: true });
+```
+
+base URL 可包含末尾 `/v1`，不要附加 `/chat/completions`。Responses 不附加 `/responses`；Messages 按对应端点根地址配置。协议 provider 值见[协议表](/zh-CN/integrations/model-protocols)。
+
+## 连接验证实际发送什么
+
+三个模型连接的 config 都只接受 `base_url` 和 `model`。URL 必须使用 HTTPS，不能包含用户名/密码、查询参数或 fragment。模型 ID 为非空字符串，最多 200 字符。凭据放在连接 credential 字段，不写入 URL 或 config。
+
+| Provider | 验证请求 | 接受的最低响应形状 |
+| --- | --- | --- |
+| `anthropic-compatible` | POST `/v1/messages`，`x-api-key`、`anthropic-version: 2023-06-01`，用户消息 `Reply OK.`，`max_tokens: 16` | `type: message` 且 `content` 为数组 |
+| `openai-compatible` | POST `/v1/chat/completions`，Bearer 授权，用户消息 `Reply OK.`，`max_tokens: 16` | `choices` 中有 assistant 角色且 content 为字符串的条目 |
+| `openai-responses` | POST `/v1/responses`，Bearer 授权，`input: Reply OK.`、`max_output_tokens: 64`、`store: false` | `object: response`、status 为 completed 或 incomplete、`output` 为数组 |
+
+每次验证请求超时为 30 秒，并拒绝重定向。它检查协议形状，不要求回答字面上等于 OK。Responses 的 incomplete 响应也可能通过，所以 ready 不证明任务完整或输出预算足够。验证请求不覆盖流式、Tool 调用或多轮对话。
+
+例如 base 为 `https://model.example/service/v1/` 时，Chat Completions 请求地址为 `https://model.example/service/v1/chat/completions`。若 base 已包含 `/chat/completions` 等操作路径，系统不会自动纠正。应配置服务实际支持的 API 根路径，不根据供应商名称猜路径；这里的示意域名不是可用端点。
+
+创建片段每次运行都会创建新连接。保存返回 ID，后续变更使用 update/validate/enable。创建响应丢失时先检查已有记录，不直接重跑创建；友好显示名称不是唯一请求键。
+
+## 用已有记录的端点完成任务
+
+作为一个具体的 Chat Completions 起点，[11 月 18 日矩阵](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-18-minimax-matrix.md)记录了 `https://api.minimaxi.com/v1`、模型 `MiniMax-M3` 与内置 Pi 1.5.2 / OpenCode 1.2.27 的 Python、TypeScript 独立任务。只有当这就是你准备使用的服务时，才将这些值与自己获准的凭据填入配置示例。这是历史证据，不是当前账户检查。
+
+保存启用后的模型连接 ID，选择精确 Harness 与已验证的 Sandbox 组合，再用[首个 Session 程序](/zh-CN/start/first-session)执行。保留其中的持久 journal、产物内容验证、关闭与留存检查，并分别运行两套客户端。11 月 20 日的首个 Session 证据使用另一个已配置的 Messages 端点，不能证明该教程重新运行过这里的 Chat 配置。
+
+| 观察到的失败 | 下一步检查 | 不能据此断言 |
+| --- | --- | --- |
+| DNS、TLS 或请求超时 | 控制平面到配置 API root 的网络 | API key 一定错误 |
+| `model_validation_failed` | 账户权限、配额、精确模型 ID 与供应商诊断 | 这个通用错误能够唯一识别 401 或模型不存在 |
+| HTTP 成功后 `model_response_invalid` | 协议响应形状与选定操作 | HTTP 200 就证明兼容 |
+| 预检 `incompatible_model` | 选定 Harness 注册和 wire protocol | 轮换凭据能够转换协议 |
+| 验证通过，但 Run 无法访问模型 | 先检查 Sandbox 到凭据入口，再检查上游网络 | 控制平面验证已经证明两段网络都正常 |
+| 文本成功，Tool 或接续失败 | 精确 Harness/模型的功能行为与任务证据 | 问候测试已经证明完整 Agent 旅程 |
+
+## 验证后的使用
+
+把返回连接 ID 作为 Session 的 model_connection_id，选择兼容 Harness。验证会发送有界模型请求，可能消耗模型额度；它不等于完整 Agent Tools / 多轮验收。
+
+模型原始 key 留在控制平面。运行时使用受保护通道，向 guest 提供限定授权或原生占位，而不是复制账户 key 到普通 env。不要为了修复网络失败把原 key 填入 Agent prompt。
+
+## 失败定位
+
+先检查精确 base URL、协议、模型 ID、账户权限与余额，再区分控制平面到上游网络和 Sandbox 到凭据入口。`model_response_invalid` 表示返回形状不符合该验证器预期；不能仅凭 200 判定兼容。配置或凭据更新后重新验证、启用，并考虑新 Session 的固定配置。
+
+完成接入需真实 Run 产生预期回答，按需要执行 Tool、连续第二轮和流式结果，最后清理。参考[历史模型记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/execution-matrix.md)选择已验证试验组合，但保留新测试独立证据。
+
+依据：[模型适配器](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/models/openai-compatible.ts)、[Responses](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/models/openai-responses.ts)。下一步：[协议兼容性](/zh-CN/integrations/model-protocols)、[选择组合](/zh-CN/integrations/choose)、[网络入口](/zh-CN/operate/networking)。

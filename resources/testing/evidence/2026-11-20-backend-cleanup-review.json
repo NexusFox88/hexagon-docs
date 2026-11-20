@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-20",
+  "scope": "Real SQLite and fake SDK; no cloud, HTTP authentication, distributed queue or concurrent scheduler acceptance",
+  "command": [
+    "python3",
+    "-B",
+    "examples/documentation/check-backend-intents.py"
+  ],
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "test_another_user_cannot_submit_or_read (__main__.DurableIntentChecks.test_another_user_cannot_submit_or_read) ... ok\ntest_bind_cannot_transfer_existing_ownership (__main__.DurableIntentChecks.test_bind_cannot_transfer_existing_ownership) ... ok\ntest_cleanup_denies_other_user_before_remote_calls (__main__.DurableIntentChecks.test_cleanup_denies_other_user_before_remote_calls) ... ok\ntest_cleanup_error_retains_intent_and_never_cancels_work (__main__.DurableIntentChecks.test_cleanup_error_retains_intent_and_never_cancels_work) ... ok\ntest_cleanup_intent_survives_restart_and_blocks_new_work (__main__.DurableIntentChecks.test_cleanup_intent_survives_restart_and_blocks_new_work) ... ok\ntest_delivery_after_restart_verifies_bytes (__main__.DurableIntentChecks.test_delivery_after_restart_verifies_bytes) ... ok\ntest_delivery_rejects_active_run_and_corrupt_bytes (__main__.DurableIntentChecks.test_delivery_rejects_active_run_and_corrupt_bytes) ... ok\ntest_delivery_rejects_other_user_and_unrelated_artifact (__main__.DurableIntentChecks.test_delivery_rejects_other_user_and_unrelated_artifact) ... ok\ntest_known_run_is_queried_without_resubmission (__main__.DurableIntentChecks.test_known_run_is_queried_without_resubmission) ... ok\ntest_lost_close_response_is_recovered_by_query (__main__.DurableIntentChecks.test_lost_close_response_is_recovered_by_query) ... ok\ntest_read_rejects_wrong_remote_session (__main__.DurableIntentChecks.test_read_rejects_wrong_remote_session) ... ok\ntest_repeated_prepare_keeps_key_and_rejects_changed_input (__main__.DurableIntentChecks.test_repeated_prepare_keeps_key_and_rejects_changed_input) ... ok\ntest_response_loss_and_restart_preserve_exact_intent (__main__.DurableIntentChecks.test_response_loss_and_restart_preserve_exact_intent) ... ok\ntest_status_without_run_does_not_submit (__main__.DurableIntentChecks.test_status_without_run_does_not_submit) ... ok\n\n----------------------------------------------------------------------\nRan 14 tests in 0.028s\n\nOK\n",
+  "passed": true,
+  "sha256": {
+    "examples/documentation/backend-intents.py": "dd82530fe00e4922098833e1296e94bcc36415092545f641a9fe1d6832d91374",
+    "examples/documentation/check-backend-intents.py": "c6e4e7f12ab49ee8df43aac2b6d4008db5055f714f35199c25c69e0d16694e01",
+    "docs/product/en/build/backend-integration.md": "ded620521caace8e3681d52c1586cc0d438ed4acb0e7915eb9d827b0e45e5132",
+    "docs/product/zh-CN/build/backend-integration.md": "8564b9f31f8e403e74d0bc75232c53a75ade2e75c285d7f5a72cba4618a35f05"
+  }
+}

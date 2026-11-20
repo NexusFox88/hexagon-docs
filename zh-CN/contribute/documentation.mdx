@@ -1,0 +1,154 @@
+---
+title: "编写、校验和翻译文档"
+---
+
+产品文档放在 docs/product/zh-CN 与 docs/product/en，内部设计决策保留在 docs/plans 等工程目录，真实结果放在 testing/evidence。不要把追加式工程日志直接当作当前使用教程。
+
+## 从用户问题开始
+
+按[内容任务书](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/plans/2026-11-19-documentation-content-architecture.tmp.md)确认页面 ID、目标路径、读者和职责。一页承担一个主要问题：教程带读者完成固定任务，操作指南解决具体目标，概念解释机制，参考精确定义契约。
+
+每页包含：一句话回答、何时使用、版本/能力前提、具体步骤或定义、成功判据、重要失败出口、来源和最多三个下一步。使用[术语表](/zh-CN/reference/glossary)，API 字段、方法名和状态值不翻译。
+
+## 写可核验的内容
+
+字段与默认值来自当前 schema/实现；能力来自注册表；已验证范围来自带时间、SDK、协议和场景的证据。代码示例必须说明依赖、客户端初始化、输入、结果和清理。局部片段明确前置变量；占位域名和测试对象不得伪装成可直接使用的公共服务。
+
+不要复制多份字段表后独立维护。可运行示例放 examples，指南链接或抽取它；生成表注明来源和快照时间。教程不因当前实现缺失而缩减验收旅程；出现冲突先记录并查证。
+
+## 小改动的完整过程
+
+以修改 E2B 模板说明为例：
+
+1. 对照 integrations/sandboxes/e2b.ts 与对应验收记录确认变化，是 schema 默认值、资源前提还是新验证范围。
+2. 修改两种语言的同一路径 integrations/sandboxes/e2b.md；必要时同步总览与 OCI 指南，保留历史证据时间。
+3. 示例若涉及参数变化，修改其真实源文件并做适当语法/类型检查；未重新执行云任务就明确说明。
+4. 更新 coverage.json 中该项的实际状态和验证范围。draft 不自动升级 complete；链接存在也不能证明内容完整。
+5. 运行结构检查并人工阅读两个版本，确认来源、限制、下一步与语义一致。
+
+```sh
+python3 tooling/check-product-docs.py --report testing/evidence/2026-11-19-product-docs-structure.json
+```
+
+该检查只覆盖规划编号、文件、内联 Markdown 文件链接、围栏配对和首页可达性，不检查外部 URL、锚点、示例正确性或云行为。--require-complete 额外检查覆盖状态，仍不代替逐篇审阅。保存报告前确认路径适合本次工作；后续日期的验收应使用对应新文件。
+
+## 检查本地章节链接与嵌入资源
+
+移动页面、修改标题或更新目录链接后，补充运行链接检查：
+
+```sh
+node tooling/check-product-doc-links.mjs --self-test
+node tooling/check-product-doc-links.mjs --report testing/evidence/2026-11-20-product-doc-links.json
+```
+
+它解析 Markdown 链接、引用式链接和图片，以及引号包围的 HTML href / src、单一来源的 srcset 属性；范围包括两份根 README。检查会解码本地路径并将片段定位到显式 HTML 锚点或规范化标题，代码围栏内的示例不会当成待验证链接。自检覆盖解析边界，不验证文章内容准确性。
+
+报告写明具体标题规范化规则，不宣称与尚未配置的文档渲染器完全一致。重要目录目标宜使用显式稳定锚点，并在翻译和重命名标题时保留。多候选 srcset 和非 Markdown 文件的片段会报告为不支持，不会静默记为通过。检查不发送外部请求；远端徽章或 URL 仍须单独验证。链接检查通过不代表视觉、翻译、示例执行或发布门禁完成。保留后续审阅时使用新的报告文件名。
+
+## 检查 Python 与 TypeScript 示例语法
+
+安装仓库依赖和 Python 3 后，可以在不执行示例的情况下检查产品文档代码块：
+
+```sh
+node tooling/check-product-doc-code.mjs --report testing/evidence/2026-11-20-product-doc-code-syntax.json
+```
+
+Markdown 解析器识别 `python`/`py`、`typescript`/`ts` 代码块，包括嵌套代码块。Python AST 和 TypeScript 解析器按页面、代码块编号、块内行号报告语法错误；报告保留页面及片段哈希和解析器版本。有语法错误时命令失败，shell、JSON 和其他语言不在范围内。当前解释器接受语法，不证明所有声明的最低 Python/运行时版本都支持。
+
+语法解析不解析变量和导入、不对 TypeScript 做类型检查，不执行安装、不请求 API，也不验证结果。缺少必要 client、ID 或凭据的上下文片段仍可能语法通过。应另外使用实际安装的 SDK，对适用示例做类型或运行检查，并区分模拟、本地包与真实云证据。
+
+## 更新生成参考，而不是手工修补表格
+
+SDK 方法导航维护在 [sdk-reference-map.json](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/tooling/sdk-reference-map.json)。每个准确方法名对应响应/错误契约与上下文示例。两套生成脚本会拒绝遗漏或过时的映射，TypeScript 还会拒绝重复映射名。新增或重命名方法时，同步映射、审阅实际示例，再生成参考页。方法名出现且链接有效，不证明示例正确或该方法通过真实旅程。
+
+
+当前仓库有三项源码索引生成器。安装仓库依赖后，在仓库根目录运行受影响的生成器；它们会更新文件，不是只读检查：
+
+```sh
+./node_modules/.bin/tsx tooling/generate-http-doc-index.ts
+python3 tooling/generate-python-doc-index.py
+node tooling/generate-typescript-doc-index.mjs
+```
+
+| 生成器 | 更新范围 | 必须人工补齐的内容 |
+| --- | --- | --- |
+| HTTP 索引 | 双语 HTTP 路由表、http-operation-coverage.json；读取 http-operation-pages.json 的归属 | 请求 / 响应 schema、状态前提、错误、副作用和示例 |
+| Python 索引 | 双语 Python SDK 标记区内的方法签名表 | 参数语义、返回投影、调用前提和可执行例子 |
+| TypeScript 索引 | 双语 TypeScript SDK 标记区内的声明与推断返回表 | 运行时校验边界、错误、使用方式及精确响应契约 |
+
+保留 `http-routes`、`python-methods`、`ts-methods` 的 begin/end 标记；运行前确认标记成对存在，运行后检查差异。不要在生成区手工添加说明，再期望下一次生成保留它。解释文字与示例放在标记外。
+
+HTTP 生成器只识别当前 `server.ts` 中直接写出的 `api.get/post/put/patch/delete` 字面量路由，并调用权限分类函数。它没有启动服务、请求真实 API，也不覆盖其他监听器或动态路由注册。新增路由应同步归属映射和双语资源契约；仅有分配到页面的记录仍是草稿，不能自动证明字段完整。
+
+## 内容修改的交付清单
+
+| 改动类型 | 同步维护 | 最低核验范围 |
+| --- | --- | --- |
+| API 字段、默认值或错误 | 资源参考、受影响 SDK 说明、操作指南与真实示例源 | 当前 schema / 分支检查及与改动相称的示例验证 |
+| SDK 方法 | 源码索引、安装 / import 前提、调用说明 | 类型或语法检查；涉及使用路径时验证安装产物 |
+| 能力或验证范围 | 能力页、组合矩阵、对应证据引用 | 精确版本和执行范围，不外推未测组合 |
+| 阅读路径或文件移动 | 两种语言导航、任务归属、全部入链 | 文件链接与首页可达性，并人工检查锚点 |
+| 代码或 UI 截图 | 可运行源文件或真实界面、相关文字 | 预期结果、失败出口与脱敏；截图另做视觉检查 |
+
+审阅记录至少写出：页面 ID、核对的源码或证据、实际改动、执行命令与结果、未验证范围。`coverage.json` 的状态不能替代这份记录。`reviewed` 与 `complete` 应对应明确的审阅结论；存在未完成的该页要求时不要升级为 complete。整套发布还需独立核对任务书和发布条件。
+
+## 逐项检查双语语义
+
+两种语言逐项比较对象归属、参数默认值、成功与失败条件、能否重试、清理完成条件、版本和证据日期。例如“可以重复提交相同幂等意图”不能翻译成“可以重新执行任务”，“调用完成”不能翻译成“业务写入成功”。API ID、十进制游标和错误码保持原样；示意输出与实际运行输出的标签在两种语言中也必须一致。
+
+结构检查不会检查这种等价性，也不会渲染 Mermaid 或实际运行所有命令。发布前单独阅读渲染结果中的表格、代码、图和窄屏布局，确认下一步链接符合读者当前任务。检查结果只对实际检查过的范围作结论。
+
+## 双语审阅实例：清理完成条件
+
+容量指南中的清理行是一个小型语义修订实例。统一要求“确认远端缺失”过于宽泛：部分 Provider 还要求删除回执完成并核对关联资源。当前[英文容量指南](/en/operate/capacity-and-cost)与[中文容量指南](/zh-CN/operate/capacity-and-cost)使用相同、范围更准确的完成条件。
+
+| 审阅项 | 需要同步的内容 |
+| --- | --- |
+| 结论 | 核对 Provider 特定的删除完成证据及关联资源，保留私有标识 |
+| 来源 | 对账指南与对应连接器的删除契约；不能从无关的 404 推断清理完成 |
+| 示例影响 | 示例没有清理代码时记录这一事实；若有删除轮询，改文字之前先核对实际判断条件 |
+| 翻译 | 保留“需要证据”和“保留标识”的含义，不能译成自动重试指令 |
+| 验证 | 链接带日期的[容量与排障审阅记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-capacity-troubleshooting-review.json)，区分结构检查与真实删除验收 |
+| 状态 | 其他要求与发布门禁未满足前保持 draft；这一处文字审阅不证明整页完成 |
+
+该实例在两种语言中修正了一个具体条件，没有修改 API 或执行新的删除。涉及可执行参数的修改，还需同步并验证共享示例源文件，不能照搬本次无代码变更的验证范围。
+
+## 代码片段改动实例：保持同一 Python 环境
+
+Python 参考页原先将 SDK 安装到已激活的 `.venv`，后面的诊断命令却使用 `.local/docs-example-venv/bin/python`。后者是独立教程选择的有效环境，但本页并未创建它。这次小改动让诊断命令使用本页安装步骤已经选择的解释器。
+
+| 审阅维度 | 实际改动与验证 |
+| --- | --- |
+| 原命令 | `.local/docs-example-venv/bin/python examples/documentation/inspect-run.py --session YOUR_SESSION_ID --run YOUR_RUN_ID --after 0 --max-pages 20` |
+| 新命令 | `python examples/documentation/inspect-run.py --session YOUR_SESSION_ID --run YOUR_RUN_ID --after 0 --max-pages 20`，前提是本页的 `.venv` 已激活 |
+| 安全入口检查 | 增加 `python examples/documentation/inspect-run.py --help`；帮助解析在发现工作区和读取 API 前退出 |
+| 规范来源 | 检查[诊断 CLI](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/inspect-run.py)与[包要求](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/python/pyproject.toml)；CLI 接口未改变，所以程序源码无需修改 |
+| 翻译 | 两份 SDK 参考页同步命令和环境前提，保留 `--session`、`--run`、`--after`、`--max-pages` 及 API/资源标识不变 |
+| 验证 | 新建临时环境安装检出版本包，仓库外隔离导入和帮助命令通过；这是包与入口验证，不是真实诊断查询或干净控制平面安装 |
+| 状态 | 此次修正时，英语与简体中文已同步；文章当时仍为草稿，等待更广的语义和运行验收 |
+
+修正后的 [Python 参考](/zh-CN/reference/python)与带日期的[安装/语法证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-doc-example-setup-syntax-review.json)让改动可以复核。证据记录实际解释器及验证范围。若以后 CLI 发生变化，应先修改实际程序，再同步两种语言的命令与验证，不能因为旧译文的代码仍能解析就保留过时内容。
+
+## 双语言与 UI
+
+两种语言使用相同 slug 与等价任务步骤。同步安全边界、错误动作、参数和完成标准，不只翻译标题。尚未同步的页面明确版本或回退状态，不挂空白译文或把旧译文标为最新。
+
+文档译文与产品 UI catalog 是两回事。改 UI 文案还要遵守[Console 契约](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/console-design.md)：完整 en/zh-CN catalog、匹配插值、可访问名称、动态错误、Intl 格式和双语言浏览器检查。截图使用实际 UI，不暴露凭据或私有资源。
+
+## Mermaid 渲染检查
+
+解析成功只证明语法可用。2026-11-20 的本地浏览器预览使用 Mermaid 12.3.0，20 幅图均生成 SVG，但默认 HTML 节点标签出现长文字裁切；设置 `htmlLabels: false`，并对 flowchart 同样禁用 HTML labels 后，抽查的首页长标签可以换行显示。正式站点应固定自己的 Mermaid 版本并重新验收，不能把临时预览的配置当作已有站点功能。
+
+复杂时序图不要只用 `max-width: 100%` 强行压缩到手机宽度。保留可读字号，在专用容器内横向滚动，或提供可放大的独立图；容器应有可理解的名称和键盘访问。检查页面本身没有被撑宽、图的右侧仍可到达，并为图提供正文解释。解析、SVG 生成、视觉抽查与完整无障碍检查分别记录。
+
+本次只抽查了中英文首页、英文代码地图与 worker 恢复时序图；窄屏检查为本地预览，未完成全部页面和正式主题验收。见[图示渲染记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-mermaid-render.json)。
+
+后续概念页审阅使用同一 Mermaid 版本，当前 26 幅概念图均成功生成 SVG。桌面抽查发现并修正了中文 Harness 标签拆词。英文 worker 恢复时序图在 390px 视口中，将 1727.5 SVG 单位压缩至 292 CSS 像素，文字无法阅读。应将它作为响应式回归案例；SVG 成功不能关闭视觉验收。见[概念图渲染审阅](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-concept-diagram-render.json)。
+
+后续[当前图表审阅](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-current-diagram-review.json)生成了 42 张产品文档图，发现并修复英文后端恢复时序图的分号解析错误，以及中文概览中 Runtime 单词被拆行的问题。概览、首个任务解释、Session 关系与 serverless 生命周期共八张图完成双语桌面审阅。390px 预览将 SVG 保持自然宽度，放入有名称且可聚焦的滚动区域；页面没有被撑宽，worker 时序图可用右方向键滚动。这验证了预览方案，不代表站点已经部署该功能，也不证明每张图的视觉与可访问性检查均已完成。
+
+## 发布审阅
+
+读者能否按步骤走通、失败能否恢复、资源能否清理、验证是否超出证据，是人工审阅重点。区分 contract、simulation、real-cloud 与 planned；不把计划写成 passed。公开文档不包含 .local、Token、备份或未经脱敏的用户内容。
+
+当前页面是写作流程，不宣称所有规划文章已完成。下一步：[提案与贡献](/zh-CN/contribute/proposals-and-prs)、[证据阅读](/zh-CN/integrations/verified-combinations)。

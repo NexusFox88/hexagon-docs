@@ -1,0 +1,57 @@
+---
+title: "Choose an execution combination"
+---
+
+Start with task requirements, select Sandbox/Harness/model/Tools, preflight structural compatibility, then verify a real journey. Product names alone do not establish compatibility.
+
+## Selection order
+
+1. Identify required tools, continuation, files, previews, network restrictions, and idle recovery.
+2. Select an exact registered Harness id/version and supported model protocol.
+3. Configure and verify the actual endpoint/model.
+4. Choose a Sandbox capable of that distribution: OCI, private images, and allowlists are separate requirements.
+5. Bind authorized Tools with explicit readiness and approval policy.
+6. Preflight, execute, inspect output, and confirm cleanup.
+
+Both SDKs expose catalog(); await it in TypeScript. Catalog entries declare capabilities, not live account health or cloud acceptance.
+
+## Start from the task, not the matrix total
+
+For the current first-Session and project tutorials, [fresh dual-SDK evidence](/en/integrations/verified-combinations) is available for Vercel, built-in Pi 1.5.2 and the configured Messages/DeepSeek-V4-Flash endpoint. Use that as a scoped reference, then verify your own connections. If you need a different model protocol, OCI distribution, external Tool approval or an enforced network allowlist, check evidence for that requirement explicitly; the tutorial pass does not supply it.
+
+Write down the required behavior before comparing alternatives: for example, “two project turns, private HTTP preview, retained exports, no external Tools.” A single row that proves those requirements is more useful than a larger count of unrelated passed combinations. If a requirement is unsupported, preserve the requirement and select another combination or report the gap.
+
+## Starting points and alternatives
+
+Historical dual-SDK journeys include E2B/Pi 1.5.2/SiliconFlow and E2B/OpenCode 1.2.27/SiliconFlow. Check [exact records](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/execution-matrix.md) for endpoint, protocol, scope, and date. These support selecting a trial starting point, not skipping verification of your current account/model.
+
+Native OCI execution uses Modal or Fly Machines. E2B also prepares public OCI images through a Session-owned Template; verify build, execution, and template cleanup separately. Check private-image support independently. Built-in OpenCode success does not prove OCI OpenCode compatibility on that Provider.
+
+For allowlists, choose an explicitly capable adapter and allow credential ingress. For idle recovery, consult the [separate lifecycle matrix](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-harness-serverless-matrix.json); normal execution does not establish recovery.
+
+| Rejection | Action |
+| --- | --- |
+| unsupported_harness | Select the exact registered version |
+| incompatible_model | Match Harness and protocol; no implicit conversion |
+| harness_tools_unsupported | Select a Tool-capable Harness |
+| sandbox_oci_image_unsupported | Select OCI-capable Provider |
+| sandbox_private_image_unsupported | Check private image capability and access |
+| missing_capability | Compare required and declared capabilities |
+| network_policy_unsupported | Preserve requirements and select an enforcing Provider |
+| connection_not_ready / tool_not_ready | Verify and enable required connections |
+
+For example, codex-v1 requires Responses; pairing it with Messages fails. Renaming a connection does not change its wire protocol.
+
+Quota, endpoint behavior, network, and initialization can still fail after preflight. Retain request/resource identity and use [recovery](/en/build/recovery). Next: [model connections](/en/integrations/models), [protocols](/en/integrations/model-protocols). Source: [resolver](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/compatibility.ts).
+
+## Compare three scoped routes
+
+| Route | Evidence-backed starting point | Constraint to preserve |
+| --- | --- | --- |
+| First task and two-turn project | [November 20 tutorials](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-project-docs-cloud.json): Vercel + built-in Pi 1.5.2 + configured Messages/DeepSeek-V4-Flash, independent Python/TypeScript | Covers the recorded project and previews; not external Tool approval, network allowlists or all model endpoints. |
+| Public OCI OpenCode | [E2B OCI increment](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-e2b-oci-preparation.md): pinned OpenCode digest, Python/Chat and TypeScript/Messages | Requires image build and owned-template cleanup; private images, Responses and the full SDK/protocol cross-product are not established. |
+| Enforced domain allowlist | [E2B API network journey](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-network-api-journey.md): TypeScript plus registered deterministic probe Harness | Establishes paired allowed/denied HTTPS probes; does not invoke a model or prove Python/full Agent journey parity. |
+
+These routes answer different needs; the network probe is evidence for an enforcement requirement, not a drop-in replacement for a coding Agent. Keep the selected Harness version/digest and model protocol in your decision record. Empty matrix cells or a missing scenario are unverified, not inferred support.
+
+Sources: [execution combinations](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/execution-combinations.md), [model protocols](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/model-protocols.md), [verified combinations](/en/integrations/verified-combinations). Next: [Sandbox capabilities](/en/integrations/sandboxes), [Harness selection](/en/integrations/harnesses), [model connections](/en/integrations/models).

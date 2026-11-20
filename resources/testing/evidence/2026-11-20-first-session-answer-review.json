@@ -1,0 +1,44 @@
+{
+  "date": "2026-11-20",
+  "scope": "Semantic review of the two existing first-session final answers, compared with current persisted Run, metadata, retained bytes and actual harness read/command event results. No new cloud execution; existing dated combination scope unchanged.",
+  "journeys": [
+    {
+      "sdk": "python",
+      "program_unchanged_since_cloud_record": true,
+      "run_state": "completed",
+      "answer_role": "assistant",
+      "answer_claims_reviewed": [
+        "hello.txt created in this Run artifact directory",
+        "Hello from Hexagon followed by a newline",
+        "actual file read or cat confirmed content"
+      ],
+      "answer_sha256": "018108907eccc0d692bc1f7877342443c3866839a58803c7072490d8fffd5d97",
+      "artifact_sha256": "ff1e45828a4a539980e0bb0a45b3cebaaeb0446649ec3aa703a7424c05039429",
+      "artifact_size": 19,
+      "answer_artifact_metadata_matches_query": true,
+      "execution_event_review": "Actual read tool returned exact bytes without error",
+      "passed": true
+    },
+    {
+      "sdk": "typescript",
+      "program_unchanged_since_cloud_record": true,
+      "run_state": "completed",
+      "answer_role": "assistant",
+      "answer_claims_reviewed": [
+        "hello.txt created in this Run artifact directory",
+        "Hello from Hexagon followed by a newline",
+        "actual file read or cat confirmed content"
+      ],
+      "answer_sha256": "3d2737c6773000c5b5472b0d8fda62c349b718928eedce210e83df0f9d7187a3",
+      "artifact_sha256": "ff1e45828a4a539980e0bb0a45b3cebaaeb0446649ec3aa703a7424c05039429",
+      "artifact_size": 19,
+      "answer_artifact_metadata_matches_query": true,
+      "execution_event_review": "Actual bash command wrote file then cat returned exact bytes, exit_code 0",
+      "passed": true
+    }
+  ],
+  "limitations": [
+    "Does not establish all possible model answers or other combinations.",
+    "No final website or clean-machine installation certification."
+  ]
+}

@@ -1,0 +1,108 @@
+{
+  "date": "2026-11-20",
+  "scope": "Real loopback HTTP and PostgreSQL with isolated migrated schema and persisted fixtures; no model, worker, provider or preview browser execution.",
+  "command": "./node_modules/.bin/tsx .local/docs-content-checks/artifact-http-contracts.ts",
+  "exit_code": 0,
+  "source_sha256": {
+    "apps/control-plane/server.ts": "90b27ace779174006be88890beb73039a273614f4f9ab378e04e819db990c4ca",
+    "modules/artifacts/artifacts.ts": "13158ab61c9f875acecc8eacf9fd48699d8eb022527c265afc87a2b279f40bb7"
+  },
+  "checks": [
+    {
+      "name": "existing failed Run empty list",
+      "status": 200
+    },
+    {
+      "name": "list retains metadata for zero and legacy content",
+      "status": 200
+    },
+    {
+      "name": "binary exact and headers",
+      "status": 200
+    },
+    {
+      "name": "empty artifact is valid 200",
+      "status": 200
+    },
+    {
+      "name": "legacy metadata does not imply retained bytes",
+      "status": 404
+    },
+    {
+      "name": "application access runs",
+      "status": 200
+    },
+    {
+      "name": "foreign tenant hidden runs",
+      "status": 404
+    },
+    {
+      "name": "invalid credentials runs",
+      "status": 401
+    },
+    {
+      "name": "application access artifacts",
+      "status": 200
+    },
+    {
+      "name": "foreign tenant hidden artifacts",
+      "status": 404
+    },
+    {
+      "name": "invalid credentials artifacts",
+      "status": 401
+    },
+    {
+      "name": "invalid Run UUID",
+      "status": 400
+    },
+    {
+      "name": "invalid artifact UUID",
+      "status": 400
+    },
+    {
+      "name": "missing Run",
+      "status": 404
+    },
+    {
+      "name": "missing artifact",
+      "status": 404
+    },
+    {
+      "name": "Range currently ignored full bytes",
+      "status": 200
+    },
+    {
+      "name": "If-None-Match not conditional contract",
+      "status": 200
+    },
+    {
+      "name": "closed Session retains bytes",
+      "status": 200
+    },
+    {
+      "name": "closed Session retains list",
+      "status": 200
+    }
+  ],
+  "passed": true,
+  "cleanup": "HTTP server closed; isolated schema dropped.",
+  "reviewed_routes": [
+    "GET /v1/runs/:id/artifacts",
+    "GET /v1/artifacts/:id/content"
+  ],
+  "limitations": [
+    "Session closure is a fixture state change, not cloud resource deletion.",
+    "Capture limits and preview grants are not exercised.",
+    "Range and conditional request observations describe current behavior, not promised support."
+  ],
+  "initial_check_failure": {
+    "assertion": "Cache-Control expected private, no-store; observed no-store",
+    "resolution": "Confirmed configured server onSend hook overrides handler header; corrected bilingual documentation and assertion, then reran successfully. No product change."
+  },
+  "script_sha256": "52571b69e8c8e93b819a06aa3011849d9dd2a925cc59140a406df24fb5584be7",
+  "reviewed_pages": {
+    "docs/product/en/reference/artifacts-previews.md": "63c2d840d8b0560b614a32de750553db4833e92d475de0c77ba012db298a734b",
+    "docs/product/zh-CN/reference/artifacts-previews.md": "ef53126ea3410e0d535a3fa262a1fb581a965b16cce71936a75d3b5034242356"
+  }
+}

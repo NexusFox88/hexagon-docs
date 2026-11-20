@@ -1,0 +1,69 @@
+---
+title: "Use cases and product boundaries"
+---
+
+Hexagon supplies common Session, Run, and cloud-resource management when an application needs observable, continuing, recoverable Agent work.
+
+## Common applications
+
+| Scenario | Input and result | Considerations |
+| --- | --- | --- |
+| In-product project changes | Code and requirements become changed files, test results, and previews | File permissions, Tools, artifact limits, preview lifecycle |
+| Multi-turn automation | Continue refining results in the same workspace | One active Run, conversation continuity, provider-specific idle recovery |
+| External business systems | Read requirements and write a report after authorization/approval | Credential scope, zero preapproval writes, unknown-outcome reconciliation |
+| Multiple execution combinations | A shared SDK chooses cloud environments and Harnesses | Preflight, model protocol, exact-combination evidence |
+
+## Decide whether to add a control plane
+
+For a one-off task in your terminal, you can run the Harness directly. If you intend to implement scheduling, durable state, credentials, and cleanup yourself, you can use a Sandbox API directly.
+
+Hexagon fits when those lifecycle capabilities should be application infrastructure. It also means operating a control plane/database, managing provider/model accounts, and monitoring unresolved cloud operations.
+
+## Three concrete application journeys
+
+### Add a feature inside your product
+
+A user uploads a small Web project and asks for a status filter. The inputs are project files, a precise change request and fixed acceptance tests. The useful output is changed source, observed test execution and an authorized preview, followed by downloadable artifacts. A statement from the model that the work is complete is not the acceptance criterion.
+
+The required capabilities are cloud file access and execution, a compatible Harness/model combination, durable observation, artifact export and private preview when your interface needs it. Your backend maps the user to the Session and retains Run IDs. Limits include one active Run per Session, bounded uploads/exports and a preview tied to a running service and authorization. To deploy the result publicly, send suitable artifacts to your own deployment system. Follow the [project tutorial](/en/start/project-task) and [private preview guide](/en/build/private-preview).
+
+### Continue a project after the user leaves
+
+The first request updates a project; a later request adjusts the same work. Inputs include the existing Session ID, a new instruction and any context already established in that Session. The output is a second independently traceable Run and a new artifact snapshot, while the original Run remains queryable.
+
+This journey needs persisted application IDs, event replay and a verified continuation strategy for the selected Harness/Sandbox. The browser may disconnect while work continues. The limitations are equally concrete: an authorization wait still occupies the active Run slot, an interrupted Runtime is not a healthy continuation point, and retained files do not guarantee retained process memory. Hexagon is not a standalone cross-Session memory product; your application still decides how to store and retrieve domain knowledge. Read [backend integration](/en/build/backend-integration), [multi-turn work](/en/build/multi-turn) and [persistence](/en/concepts/persistence).
+
+### Perform a background task involving an external account
+
+A task reads a requirement from an external service, changes project files and writes a report back. Inputs are the task, selected Tool bindings, authorized account access and operation policy. The output includes the project deliverables and a separately verifiable external report identifier or result.
+
+This requires the actual model-to-Tool execution chain, usable account authorization and approval when the policy requires it. The application presents the exact pending action and continues observing the same Run. If a report-write response is lost, the result can be unknown even when the report exists; reconcile the original call before deciding on another write. This is not a distributed transaction or a promise of globally exactly-once effects. Start with [Tools](/en/build/tools), [approval](/en/build/approvals) and [recovery](/en/build/recovery).
+
+## Compare responsibilities before choosing
+
+This comparison describes where work must be owned, not a benchmark or a claim about every third-party product.
+
+| Decision | Direct Harness use | Direct Sandbox API use | Hexagon integration |
+| --- | --- | --- | --- |
+| Agent execution | Invoke the selected Harness in your chosen environment | Install and invoke a Harness through the environment API | Select a compatible Harness; Runtime supervises it |
+| Application task identity | Use native identifiers and add your business mapping | Define your own task records and map them to cloud resources | Map business requests to durable Session/Run IDs |
+| Observation and recovery | Adapt native output and lifecycle behavior | Build persistence, process observation and reconciliation around cloud operations | Consume persisted events and follow the existing recovery contracts |
+| Credentials and Tool decisions | Configure the Harness/environment and enforce your desired boundaries | Build the credential and policy path required by your app | Configure protected connections and brokered Tool policies; retain business authorization in your backend |
+| Ongoing operation | Maintain the chosen execution setup | Maintain cloud orchestration and its failure handling | Operate the control plane/database, its key/backups and Provider/model accounts |
+
+A terminal-only workflow may not need the durable application boundary Hexagon adds. If your platform already owns equivalent task orchestration, evaluate the integration and migration effort explicitly. If you need a recurring schedule, queue across busy Sessions, public app hosting or a domain-memory layer, identify which surrounding component supplies it; do not infer those services from the existence of Sessions and Runs.
+
+## Understand the boundaries
+
+- **Model protocols:** Messages, Chat Completions, and Responses depend on Harness and endpoint support. Automatic protocol conversion/fallback is not promised.
+- **Preview:** authorized, expiring access to a Session's running Web service; not generic production deployment.
+- **State:** Run results, workspace files, Harness conversation, and process memory have different persistence boundaries.
+- **Recovery:** a disconnected client can observe the original task again; lost external-write responses require reconciliation, not unconditional retry.
+- **Identity:** your application still authorizes its business users against their tasks. Control-plane tenant checks do not replace business permissions.
+- **Compatibility:** a supported provider does not imply every OCI image, model protocol, or network policy works.
+
+Start with an evidenced combination meeting your requirements. Consult [model protocols](/en/integrations/model-protocols), [Sandbox capabilities](/en/integrations/sandboxes), and [verified combinations](/en/integrations/verified-combinations).
+
+Next: [install and start](/en/start/install).
+
+For the next decision, [run a first Session](/en/start/first-session), [choose a combination](/en/integrations/choose), or assess [self-hosting requirements](/en/operate/self-host). Product boundaries come from the [architecture](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/architecture.md) and [acceptance journey](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/acceptance.md).

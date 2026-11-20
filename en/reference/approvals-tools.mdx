@@ -1,0 +1,162 @@
+---
+title: "Approvals and Tool recovery HTTP contract"
+---
+
+These operations inspect requested actions, record an approval decision, refuse one invocation's authorization request or record an independently verified remote outcome. They are different decisions. An approval does not supply account credentials, an authorization refusal does not revoke an account, and outcome resolution does not retry a remote write.
+
+All IDs in these route paths must be UUIDs. Reads allow owner/application tokens; the three write operations require an owner token. Tenant ownership applies to the Run, approval and Tool call. Examples assume a backend token and `HEXAGON_API_URL` without `/v1`. Request files must contain real identifiers/hashes and evidence appropriate to the operation; the examples are not execution receipts.
+
+## List approvals
+
+`GET /v1/runs/{run_id}/approvals` returns **200**, `{approvals:[...]}`, ordered by creation time with no pagination contract. Each item has `id`, `run_id`, `action` (JSON), `state`, nullable `decision`, and `created_at`. States include `pending`, `approved`, `denied`, `expired`; a recorded decision contains `{approved:boolean}`. Missing/foreign Run returns `404 run_not_found`.
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/runs/$HEXAGON_RUN_ID/approvals"
+```
+
+Render the actual action and associated invocation, not just a generic “continue” button. Action structure is produced by the Tool workflow; do not treat it as a universal provider schema. Listing an old pending-looking client snapshot does not guarantee a decision will still be accepted.
+
+## Decide an approval
+
+`POST /v1/approvals/{approval_id}/decision` accepts strict `{approved:boolean}`. Success is **200** with `{id,run_id,state}`; it does not return the full approval or remote execution result.
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data '{"approved":false}' \
+  "$HEXAGON_API_URL/v1/approvals/$HEXAGON_APPROVAL_ID/decision"
+```
+
+This example denies. Use true only for the specific reviewed operation you intend to approve. A new decision requires a pending approval and Run `waiting_approval`. It records approved/denied, moves the Run to running and persists `approval.decided`; the worker then consumes the decision. HTTP success is not evidence that the external operation succeeded.
+
+Repeating the same decision returns the recorded state without another transition, even if the Run has since progressed. Reversing a recorded decision, deciding an expired item or otherwise failing the pending/waiting condition returns `409 stale_approval`. Missing/foreign approval returns `404 approval_not_found`. Cancellation locks the Run before expiring pending approvals; a stale decision must not be treated as permission to create a replacement write.
+
+## List Tool calls
+
+`GET /v1/runs/{run_id}/tool-calls` returns **200**, `{calls:[...]}`, ordered by creation time then ID, without pagination. Missing/foreign Run returns `404 run_not_found`.
+
+| Field | Meaning |
+| --- | --- |
+| `id` | Invocation identifier used in recovery paths |
+| `binding`, `operation` | Bound Tool name and requested operation |
+| `arguments` | Recorded invocation arguments; may contain user data |
+| `request_hash` | Exact request fingerprint; copy this value for recovery |
+| `state` | Invocation state, separate from Run and approval states |
+| `approval_id` | Associated approval, if any |
+| `execution_policy` | Saved dispatch policy; not permission to change it |
+| `resolution` | Caller-verified result record, when supplied |
+| `is_error` | Boolean extracted from result.isError, or null when absent; null does not prove success |
+| `updated_at` | Server timestamp |
+
+The list does not return the full Tool result. Treat `arguments`, resolution text and evidence as private application data.
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/runs/$HEXAGON_RUN_ID/tool-calls"
+```
+
+## Refuse one pending authorization
+
+`POST /v1/runs/{run_id}/tool-calls/{call_id}/deny-authorization` accepts strict `{request_hash:string}`. The hash must be 64 lowercase hexadecimal characters matching this call. Save the actual hash in `authorization-refusal.json`:
+
+```json
+{"request_hash":"0000000000000000000000000000000000000000000000000000000000000000"}
+```
+
+The zero hash is a placeholder, not a valid fingerprint of your invocation.
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data-binary @authorization-refusal.json \
+  "$HEXAGON_API_URL/v1/runs/$HEXAGON_RUN_ID/tool-calls/$HEXAGON_CALL_ID/deny-authorization"
+```
+
+Success is **200**, `{id,state:"completed",result}`. The result has `isError:true`, `code:"tool_authorization_denied"` and text content explaining refusal. Completed here means the invocation has a deliverable error result, not that its requested operation succeeded. The operation sends no further remote request and does not revoke stored account credentials.
+
+A new refusal requires call state waiting_authorization and Run state running, waiting_authorization or waiting_approval. It returns a waiting_authorization Run to running while preserving another call's approval wait. It persists `authorization.denied` and `tool.completed`. Repeating the same refusal with the matching hash returns its prior result. See errors below.
+
+## Resolve an unknown remote outcome
+
+`POST /v1/runs/{run_id}/tool-calls/{call_id}/resolve` records your independently verified outcome. It does not inspect the provider on your behalf, send another request or undo a write. Before using it, check the provider's actual record and correlate it to this invocation.
+
+| Body field | Constraint |
+| --- | --- |
+| `request_hash` | Required 64-character lowercase hexadecimal fingerprint matching the call |
+| `outcome` | Required `completed` or `failed` |
+| `text` | Required string, 1–65,536 characters; result delivered to the Harness |
+| `evidence` | Required string, 1–4000 characters; traceable account of the external verification |
+
+Unknown fields are rejected. Write `tool-resolution.json` using real evidence. The following is a shape example only and must not be submitted unchanged:
+
+```json
+{
+  "request_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "outcome": "completed",
+  "text": "Replace with the verified result of this exact invocation.",
+  "evidence": "Replace with provider record identity and how its outcome was checked."
+}
+```
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data-binary @tool-resolution.json \
+  "$HEXAGON_API_URL/v1/runs/$HEXAGON_RUN_ID/tool-calls/$HEXAGON_CALL_ID/resolve"
+```
+
+Success is **200**, `{id,state:"completed",resolution}`. Both completed and failed outcomes produce a completed Tool-call record; failed delivers `isError:true`. The original Run becomes running. The service persists `tool.outcome_resolved` with evidence and `source:"caller_verified"`, then `tool.completed`. This does not mark the Run completed.
+
+A first resolution requires call state unknown and Run state running, waiting_authorization or waiting_approval. It cannot resolve a cancelling or terminal Run into active work. Repeating the identical stored resolution returns it without another transition; changing any resolution field returns `409 tool_resolution_conflict`. Preserve the exact body if a response is lost. The matching-repeat check precedes active-state validation, so a previously recorded resolution can still be retrieved through the same request after the Run progresses.
+
+## SDK: submit a verified resolution record
+
+Use an owner client in a trusted backend. First obtain the exact Run/call identity and `request_hash` from `tool_calls` / `toolCalls`, independently verify the external operation, and privately persist all four fields of the resolution body documented above. The following helper forwards that saved body unchanged; it does not infer an outcome or contact the external service.
+
+```python
+def record_verified_tool_outcome(client, run_id, call_id, saved_resolution):
+    return client.resolve_tool_call(run_id, call_id, **saved_resolution)
+```
+
+```typescript
+type VerifiedToolResolution = {
+  request_hash: string;
+  outcome: 'completed' | 'failed';
+  text: string;
+  evidence: string;
+};
+
+async function recordVerifiedToolOutcome(
+  client: Hexagon, runId: string, callId: string, savedResolution: VerifiedToolResolution,
+) {
+  return await client.resolveToolCall(runId, callId, savedResolution);
+}
+```
+
+
+Pass `saved_resolution` / `savedResolution` as `{request_hash, outcome, text, evidence}`. `text` is the verified result to deliver to the Harness; `evidence` should describe the correlated external record and verification method, without credentials. The original request hash must come from the invocation being investigated. Do not fetch a different hash merely to make a conflict disappear. If the external outcome remains uncertain, do not call this helper with a guessed `completed` or `failed` value.
+
+Successful resolution returns `{id, state: "completed", resolution}` even when `resolution.outcome` is `failed`. This completes the Tool-call record; it does not assert the external write succeeded or the Run completed. Continue observing the original Run. An HTTP/network error is propagated, not converted into an external failure outcome.
+
+After a lost response, replay this same saved body with the same Run/call IDs when recovering the resolution. Do not regenerate evidence text or change the declared outcome during a transport retry: different fields conflict with an already stored resolution. The server checks the original hash, dispatch lock and eligible state; the helper does not bypass them. First resolution and matching replay have different state preconditions, as specified above. The local example does not provide the independent provider evidence required to resolve a real invocation.
+
+## Errors and concurrency
+
+Malformed bodies/UUIDs return `400 invalid_request`; missing identity returns 401 and an application token on a write route returns `403 owner_token_required`. Domain errors for refusal/resolution:
+
+| Code | Status | Next action |
+| --- | --- | --- |
+| `run_not_found` / `tool_call_not_found` | 404 | Recheck tenant and the Run/call association |
+| `tool_call_conflict` | 409 | Read the actual request hash; do not bypass the mismatch |
+| `tool_call_in_flight` | 409 | Another dispatch/recovery holds the invocation lock; observe before deciding again |
+| `tool_run_not_active` | 409 | Inspect Run state; do not revive a cancelled/terminal task |
+| `tool_authorization_not_pending` | 409 | Refusal is not applicable to this call state |
+| `tool_outcome_not_unknown` | 409 | First resolution is not applicable to this call state |
+| `tool_resolution_conflict` | 409 | A different outcome record already exists; investigate the discrepancy |
+
+The advisory lock prevents a resolution from racing an in-flight remote request even when a worker lease has expired. Unknown is a need for evidence, not permission to resend a side effect. See [reconciliation](/en/operate/reconciliation) and [approvals in an application](/en/build/approvals).
+
+Sources: [HTTP projection/validation](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts), [approval decision and cancellation](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts), [Tool recovery](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/reconciliation.ts). This is source-reviewed reference; no remote effect or fresh approval/recovery acceptance is claimed.

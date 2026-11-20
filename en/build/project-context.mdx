@@ -1,0 +1,159 @@
+---
+title: "Provide files and context"
+---
+
+Upload project inputs before the first Run. Uploaded files become workspace inputs; they are not automatically complete model context or exported artifacts.
+
+Create a Session with no submitted Runs first. The snippets below continue with an initialized `client` and `session` from the [first Session guide](/en/start/first-session).
+
+## Upload files
+
+Python accepts workspace-relative paths mapped to bytes:
+
+```python
+from pathlib import Path
+import hashlib
+source = Path('hello.py').read_bytes()
+uploaded = client.upload(session['id'], {'src/hello.py': source})
+assert uploaded[0]['sha256'] == hashlib.sha256(source).hexdigest()
+assert uploaded[0]['size'] == len(source)
+```
+
+TypeScript accepts base64-encoded file entries:
+
+```typescript
+import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+const source = await readFile('hello.py');
+const uploaded = await client.upload(session.id, [
+  { path: 'src/hello.py', content_base64: source.toString('base64') },
+]);
+if (uploaded[0].sha256 !== createHash('sha256').update(source).digest('hex') ||
+    uploaded[0].size !== source.length) throw new Error('Stored input mismatch');
+```
+
+Prepare a local `hello.py`, for example containing `print("hello")`. The returned hash and size verify stored control-plane input, not cloud workspace readiness. Ask the next Run to read and execute `src/hello.py` to verify actual execution.
+
+## Paths, limits, and timing
+
+A directory is represented by explicit relative file paths; this API does not clone Git repositories or unpack archives. For a small project, choose an allowlist rather than recursively uploading everything, including `.env`, `.git`, build output or installed dependencies. This example continues with the same unstarted Session:
+
+```python
+root = Path('examples/documentation/filter-app')
+paths = ['package.json', 'acceptance.mjs']
+files = {path: (root / path).read_bytes() for path in paths}
+receipts = client.upload(session['id'], files)
+expected = {path: (len(data), hashlib.sha256(data).hexdigest())
+            for path, data in files.items()}
+assert {row['path']: (row['size'], row['sha256']) for row in receipts} == expected
+```
+
+```typescript
+const paths = ['package.json', 'acceptance.mjs'];
+const files = await Promise.all(paths.map(async path => ({
+  path, bytes: await readFile(`examples/documentation/filter-app/${path}`),
+})));
+const receipts = await client.upload(session.id, files.map(file => ({
+  path: file.path, content_base64: file.bytes.toString('base64'),
+})));
+if (receipts.length !== files.length) throw new Error('Incomplete upload receipt');
+for (const file of files) {
+  const receipt = receipts.find((row: {path: string}) => row.path === file.path);
+  if (!receipt || receipt.size !== file.bytes.length ||
+      receipt.sha256 !== createHash('sha256').update(file.bytes).digest('hex')) {
+    throw new Error(`Stored input mismatch: ${file.path}`);
+  }
+}
+```
+
+This two-file selection demonstrates path preservation, not a complete runnable project. Use the [project task tutorial](/en/start/project-task) and its complete fixture for the read/modify/test/export journey. Empty directories, symlink identities and executable modes have no fields in this upload contract. Reading a local symlink with the filesystem calls above follows its target; inspect your allowlist before reading it.
+
+Paths must be relative. Absolute paths, backslashes, empty segments, `.`, `..`, and NUL are rejected. A request cannot repeat a path. Before execution starts, uploading the same path again updates its stored input.
+
+The current implementation allows 1–100 files per request, at most 2 MiB characters in each base64 field, and 8 MiB total decoded content. The encoded field limit is not a 2 MiB source-file allowance. Paths have a 500-character limit. These values come from the current [input implementation](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/inputs.ts).
+
+After any Run is submitted, or a Sandbox is bound, uploads fail with `workspace_already_started`. Make subsequent changes through Agent work. Create a new Session for a fresh input project. When initialization is configured, `SOUL.md` is reserved and cannot be overwritten through uploads.
+
+## Distinguish files from model context
+
+Uploading makes files available in the workspace. Task instructions and Harness tools determine whether they are read. Do not assume the model has read every uploaded byte.
+
+Session `context.files` references paths and expected SHA-256 values. Submission checks existence, digest, size, and UTF-8 encoding. Referenced context text is currently limited to 32768 bytes per file and rejects NUL and invalid UTF-8; ordinary upload limits are different. See the [initialization contract](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/session-initialization.md).
+
+Resolve `context_file_missing` or `context_file_changed` before submitting again. Repeating the same invalid configuration will not repair it.
+
+## Pin a reference document before Session creation
+
+Hash the exact bytes first, include that digest in the creation request, then upload those bytes to the returned Session. The following snippets require an initialized client, verified connection IDs and a Harness that supports initialization. They create a **new** Session; save its ID before uploading. Use a short UTF-8 `brief.md` you have reviewed as reference material.
+
+```python
+brief = Path('brief.md').read_bytes()
+digest = hashlib.sha256(brief).hexdigest()
+session = client.create_session(
+    harness={'id': 'pi', 'version': '1.5.2'},
+    sandbox_connection_id=sandbox_id, model_connection_id=model_id,
+    context={'files': [{'path': 'brief.md', 'sha256': digest}]},
+)
+# Persist session['id'] in your application before the next network request.
+client.upload(session['id'], {'brief.md': brief})
+```
+
+```typescript
+const brief = await readFile('brief.md');
+const digest = createHash('sha256').update(brief).digest('hex');
+const session = await client.createSession({
+  harness: {id: 'pi', version: '1.5.2'},
+  sandbox_connection_id: sandboxId, model_connection_id: modelId,
+  context: {files: [{path: 'brief.md', sha256: digest}]},
+});
+// Persist session.id in your application before the next network request.
+await client.upload(session.id, [{path: 'brief.md', content_base64: brief.toString('base64')}]);
+```
+
+These are alternative snippets, not code to append to the earlier Session example. Submit through the [durable backend flow](/en/build/backend-integration). The reference digest is pinned: uploading a changed `brief.md` does not update the Session definition. Restore the original bytes before the first accepted Run, or create a new Session with the intended new digest. There is no in-place context update in this flow. At most eight file references are allowed; combined initialization and task-input limits still apply even when every individual file fits.
+
+## Recover an upload or context failure
+
+| Observation | Next action |
+| --- | --- |
+| Upload response lost | Query `GET /v1/sessions/{id}/files` and compare the complete intended path/hash/size set. This endpoint lists stored initial-input metadata, not live workspace bytes. Resend only the same intended bytes while the Session remains unstarted; serialize this with submission in your application. |
+| `duplicate_input_path` or invalid path/base64 | Correct the request before sending it again. A request is validated before its database writes; an invalid entry is not a partial success. |
+| `upload_too_large` | Reduce or partition the selected input before execution. Multiple requests are separate transactions, so retain a manifest and verify all batches before submitting. Splitting does not waive per-file limits. |
+| `workspace_already_started` | Inspect the existing Run. Do not overwrite its workspace by retrying upload; use a subsequent Agent task or a new Session. |
+| `context_file_missing` / `context_file_changed` | Upload the missing exact bytes or restore the pinned bytes before an accepted Run. If the desired content changed, create a new definition. |
+| `context_file_too_large` / `context_file_encoding` | Keep large or binary data as ordinary workspace inputs. Use a smaller UTF-8 reference without NUL in a new Session definition. |
+| `initialization_too_large` / `input_too_large` | Reduce the combined context or task as appropriate. A pinned context change needs a new Session; shortening the task does not mutate the context. |
+
+An upload request commits its file writes together. Several upload requests do not form one atomic project upload. The file list is sorted by path; compare by path rather than relying on request order. Uploading an empty file replaces its content with zero bytes—it does not delete the path. This API exposes no initial-input deletion operation.
+
+## Work through three boundary cases
+
+| Intended upload | What happens | Correct response |
+| --- | --- | --- |
+| `src/../brief.md` | Path validation rejects it before a database transaction. The service does not normalize it into `brief.md`. | Decide the intended workspace path locally and send the canonical relative path. |
+| One 1,572,865-byte binary file | Standard base64 encoding takes 2,097,156 characters, exceeding the 2,097,152-character field limit by four. | Reduce the file or use another supported task design. Splitting the request into batches cannot make this single file fit. |
+| Six distinct 1,572,864-byte files | Each base64 field fits, but their 9,437,184 decoded bytes exceed the 8,388,608-byte request limit. | Upload smaller batches before any Run, retaining one complete manifest. Verify all stored inputs before submitting. |
+
+Batching changes request size, not the downstream Runtime or provider's capacity. This upload check is a per-request limit; it does not establish an unlimited Session workspace allowance. A partially completed multi-batch upload needs manifest reconciliation before execution.
+
+For a pinned `brief.md`, suppose creation stores digest A and a later upload contains bytes with digest B. Submission returns `context_file_changed`; it does not silently adopt B as the reference. Restore A's bytes before the first accepted Run, or create a new Session pinning B. Treat instructions found in project files and reference documents as task data to review, not as authorization to access credentials or change your application's permissions.
+
+## Use the complete project as execution evidence
+
+The [project tutorial](/en/start/project-task) supplies the complete fixture and runnable Python/TypeScript entry points. Its [dated cloud record](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-project-docs-cloud.json) covers Vercel, built-in Pi 1.5.2 and the configured Messages-compatible DeepSeek-V4-Flash endpoint: both clients modify the project across two Runs, execute the unchanged fixed tests and retain exported files after closing the Session. It provides actual read/write execution beyond an upload receipt.
+
+Keep the three checks separate: upload receipts describe stored inputs; runtime input verification describes delivery to the cloud workspace; downloaded artifacts describe exported results. The record does not mark a fresh `workspace.inputs_verified` event for every follow-up Run, nor should it: continuing a workspace is not a new upload. The record does not establish live rejection behavior for every invalid upload, every provider, or a new run of this page's short snippets.
+
+## Environment and credentials
+
+Use `env` / `variables` for ordinary configuration such as application mode. Sandbox code can read these values. Keep managed model, Provider, and Tool credentials in their dedicated connection mechanisms rather than project files or environment values.
+
+## Verify completion
+
+Check stored input hashes, prove that a real Run can read the file and execute a fixed check, then explicitly export and download required deliverables. Stored inputs, live workspace files, and final artifacts are separate verification targets.
+
+Retain the Session ID on failure. Correct invalid input paths before execution; uploads cannot overwrite a started workspace. Explicitly close unused Sessions and confirm cleanup. Next: [Continue across turns](/en/build/multi-turn), [export artifacts](/en/build/artifacts), [understand persistence](/en/concepts/persistence).
+
+Review scope: the [local review record](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-project-context-editorial.json) covers source inspection, schema rejection cases and snippet syntax/transpilation. It does not execute PostgreSQL upload transactions or prove cloud workspace delivery.
+
+Contract references: [Session files API](/en/reference/sessions), [limits](/en/reference/limits), [input storage](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/inputs.ts), [submission context validation](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts), [initialization compiler](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/initialization.ts).

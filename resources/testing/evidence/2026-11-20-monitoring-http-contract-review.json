@@ -1,0 +1,226 @@
+{
+  "date": "2026-11-20",
+  "scope": "Current-source Fastify injection and real PostgreSQL in a newly migrated isolated schema, with deterministic fixtures and explicit readiness callbacks. No worker, cloud provisioning or Provider requests.",
+  "source_sha256": {
+    "apps/control-plane/server.ts": "90b27ace779174006be88890beb73039a273614f4f9ab378e04e819db990c4ca",
+    "modules/execution/queries.ts": "51f66f55090458aa05fd56c72fa7d5b087c15a7d7032259622ec240d0e6ff4ac",
+    "modules/execution/sessions.ts": "7c573299bb53511c84e2e9ac2d0fde6ff61fcef02bf53bbef6087699264f0a0d"
+  },
+  "checks": [
+    {
+      "name": "overview counters",
+      "path": "/v1/overview",
+      "status": 200
+    },
+    {
+      "name": "pending categories",
+      "path": "/v1/pending",
+      "status": 200
+    },
+    {
+      "name": "pending next offset",
+      "path": "/v1/pending?limit=2",
+      "status": 200
+    },
+    {
+      "name": "pending last page",
+      "path": "/v1/pending?limit=2&offset=2",
+      "status": 200
+    },
+    {
+      "name": "pending ignores search/state",
+      "path": "/v1/pending?search=impossible&state=impossible",
+      "status": 200
+    },
+    {
+      "name": "Session page",
+      "path": "/v1/sessions?limit=2",
+      "status": 200
+    },
+    {
+      "name": "Session last page",
+      "path": "/v1/sessions?limit=2&offset=2",
+      "status": 200
+    },
+    {
+      "name": "case insensitive search",
+      "path": "/v1/sessions?search=ALPHA",
+      "status": 200
+    },
+    {
+      "name": "literal percent search",
+      "path": "/v1/sessions?search=%25",
+      "status": 200
+    },
+    {
+      "name": "exact Session state",
+      "path": "/v1/sessions?state=open",
+      "status": 200
+    },
+    {
+      "name": "unknown state is empty",
+      "path": "/v1/sessions?state=not-a-state",
+      "status": 200
+    },
+    {
+      "name": "activity overlap",
+      "path": "/v1/sessions/activity",
+      "status": 200
+    },
+    {
+      "name": "seven daily buckets",
+      "path": "/v1/sessions/activity?period=7d",
+      "status": 200
+    },
+    {
+      "name": "invalid activity period",
+      "path": "/v1/sessions/activity?period=30d",
+      "status": 400
+    },
+    {
+      "name": "invalid collection bounds",
+      "path": "/v1/sessions?limit=0",
+      "status": 400
+    },
+    {
+      "name": "invalid collection bounds",
+      "path": "/v1/sessions?offset=-1",
+      "status": 400
+    },
+    {
+      "name": "invalid collection bounds",
+      "path": "/v1/pending?limit=101",
+      "status": 400
+    },
+    {
+      "name": "invalid collection bounds",
+      "path": "/v1/runs?limit=1.5",
+      "status": 400
+    },
+    {
+      "name": "application role forbidden",
+      "path": "/v1/overview",
+      "status": 403
+    },
+    {
+      "name": "application role forbidden",
+      "path": "/v1/pending",
+      "status": 403
+    },
+    {
+      "name": "application role forbidden",
+      "path": "/v1/fleet",
+      "status": 403
+    },
+    {
+      "name": "application role allowed",
+      "path": "/v1/health",
+      "status": 200
+    },
+    {
+      "name": "application role allowed",
+      "path": "/v1/sessions",
+      "status": 200
+    },
+    {
+      "name": "application role allowed",
+      "path": "/v1/sessions/activity",
+      "status": 200
+    },
+    {
+      "name": "application role allowed",
+      "path": "/v1/runs",
+      "status": 200
+    },
+    {
+      "name": "foreign Sessions empty",
+      "path": "/v1/sessions",
+      "status": 200
+    },
+    {
+      "name": "foreign pending empty",
+      "path": "/v1/pending",
+      "status": 200
+    },
+    {
+      "name": "foreign overview isolated",
+      "path": "/v1/overview",
+      "status": 200
+    },
+    {
+      "name": "200 includes degraded noncredential fields",
+      "path": "/v1/health",
+      "status": 200
+    },
+    {
+      "name": "credential unavailable is 503",
+      "path": "/v1/health",
+      "status": 503
+    },
+    {
+      "name": "liveness remains 200",
+      "path": "/health/live",
+      "status": 200
+    },
+    {
+      "name": "anonymous management rejected",
+      "path": "/v1/health",
+      "status": 401
+    },
+    {
+      "name": "Fleet closed runtime projection",
+      "path": "/v1/fleet",
+      "status": 200
+    },
+    {
+      "name": "collection retains binding runtime state",
+      "path": "/v1/sessions",
+      "status": 200
+    },
+    {
+      "name": "Fleet bound 200",
+      "path": "/v1/fleet",
+      "status": 200
+    },
+    {
+      "name": "collection maximum 100",
+      "path": "/v1/sessions?limit=100",
+      "status": 200
+    }
+  ],
+  "passed": true,
+  "cleanup": "Temporary schema dropped, including fixture identities and records.",
+  "limitations": [
+    "No TCP/TLS or production monitoring exercise.",
+    "Activity window checked for bucket count and overlap; query-time anchor remains source-reviewed.",
+    "Fixtures describe recorded state; they are not cloud outcomes."
+  ],
+  "command": "./node_modules/.bin/tsx .local/docs-content-checks/monitoring-http-contracts.ts",
+  "exit_code": 0,
+  "script_sha256": "4acebe0e54f43d046785f2f4861a933b92f0863b5f0abf2e9a9ee587dc810858",
+  "reviewed_routes": [
+    "GET /v1/health",
+    "GET /v1/overview",
+    "GET /v1/pending",
+    "GET /v1/sessions",
+    "GET /v1/sessions/activity",
+    "GET /v1/fleet"
+  ],
+  "additional_checks": "GET /health/live, GET /v1/runs role/invalid-bound smoke checks; these do not constitute a complete Run collection review.",
+  "editorial_findings": [
+    "Added numeric example separating current activity, historical bucket overlap and pending/overview unknown counts.",
+    "Clarified unknown state returns empty 200, invalid period is 400, and search is literal substring.",
+    "Explained Fleet closed Runtime projection versus Session collection stored binding and bounded Fleet versus paginated list.",
+    "Documented Health 503 body exception to the generic error envelope; generic SDK http_error mapping is source-reviewed, not an SDK runtime test here."
+  ],
+  "pages": [
+    {
+      "path": "docs/product/en/reference/monitoring.md",
+      "sha256": "af096630605049296311a7ef2fd244f888694c4adb6db480e3ce66e7b074faaa"
+    },
+    {
+      "path": "docs/product/zh-CN/reference/monitoring.md",
+      "sha256": "76ba568314b873b042b088500d66d97942ccf7591d6ae793f545fb630f1c59e3"
+    }
+  ]
+}

@@ -1,0 +1,137 @@
+---
+title: "配置与环境变量"
+---
+
+配置分为控制平面进程、local 保存的部署设置、Session 行为与 guest 环境、各 Connection 的 Provider 配置。它们作用范围不同，不能把云账户密钥放进 Session env 来替代 Connection。
+
+## 控制平面进程
+
+下表依据 [main.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/main.ts)、[部署模式](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/deployment/mode.ts)、[本地发现](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/deployment/local-discovery.ts)及[隧道](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/network/cloudflare-tunnel.ts)。除内部就绪逻辑更新临时 ingress 地址外，这些启动配置变更需要重启服务。表中默认值是入口读取默认值，local 保存设置可能继续加工它们。
+
+| 名称 | 默认值 | 适用／必需性 | 敏感性 | 类型与用途 |
+| --- | --- | --- | --- | --- |
+| `HEXAGON_DEPLOYMENT_MODE` | local | local / hosted | 否 | local 或 hosted，其他值启动失败。 |
+| `DATABASE_URL` | postgres://hexagon@127.0.0.1:55432/hexagon | 两者；hosted 必填 | 是 | PostgreSQL URL，hosted 不隐式创建数据库。 |
+| `HEXAGON_DATA_DIR` | .local/control-plane | 主要 local | 私有路径 | 身份、密钥、配置与日志的数据目录。 |
+| `HOST / PORT` | 127.0.0.1 / 8787 | 两者 | 否 | 管理监听地址与数字端口，本地回环绑定允许本地身份引导。 |
+| `HEXAGON_ACCESS_HOST / HEXAGON_ACCESS_PORT` | 127.0.0.1 / 8789 | 两者 | 否 | 独立凭据访问监听，不是管理入口。 |
+| `HEXAGON_ACCESS_URL` | local 配置前未设 | 两者；hosted 必填 | 仅 origin | 委托凭据访问的公网 HTTPS origin，本地隧道可填充。 |
+| `HEXAGON_ACCESS_TUNNEL` | local 推导 | 仅 local | 否 | cloudflare 或空，其他非空值失败；hosted 拒绝非空值。 |
+| `PREVIEW_HOST / PREVIEW_PORT` | 127.0.0.1 / 8788 | 两者 | 否 | 预览监听，端口也参与生成预览地址。 |
+| `PREVIEW_SCHEME / PREVIEW_DOMAIN` | http / localhost | 两者 | 否 | 对外预览 scheme/domain，DNS、TLS 与路由需另行配置。 |
+| `HEXAGON_MASTER_KEY` | 无 | hosted 必填 | 是 | 32 字节的规范 Base64，须匹配已有加密数据。 |
+| `HEXAGON_BOOTSTRAP_TOKEN` | 无 | hosted 必填 | 是 | 必须匹配已存在 owner，不创建 hosted 身份。 |
+| `HEXAGON_LOCAL_DISCOVERY_FILE` | ~/.hexagon/local.json | local | 私有路径 | 发现描述文件路径，还会写入数据目录的 connection.json。 |
+| `CLOUDFLARED_BINARY` | cloudflared | 本地隧道 | 否 | 可执行程序路径，使用临时 ingress 时需存在。 |
+| `HEXAGON_TUNNEL_PROXY_FALLBACK` | 非 disabled 时启用 | 本地隧道 | 否 | disabled 禁止特定隧道传输失败后的去代理重试。 |
+
+hosted 启动要求明确的数据库、匹配密钥、已存在 owner Token 和不含认证信息、查询、fragment 或路径的 HTTPS 凭据 origin；不允许开发隧道。失败分别可为 `invalid_deployment_mode`、`hosted_identity_and_storage_required`、`hosted_master_key_invalid`、`hosted_https_ingress_required`、`hosted_owner_identity_required`。不存在自动 hosted 账户引导；见[自托管](/zh-CN/operate/self-host)。
+
+监听端口经 `Number(...)` 转换后传给服务器，不提供对所有非法值统一的配置错误码。端口冲突、无效主机和监听失败按底层错误处理。改 HOST 不自动配置 TLS、身份或反向代理。
+
+## local 保存的部署配置
+
+文件为所选数据目录中的 `deployment.json`，由[设置 schema](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/deployment/settings.ts)校验。local 启动读取它；直接 hosted 入口不读取这份 local 设置。托管启动器会应用保存设置，因此 hosted 部署应按自托管指南使用明确进程配置，不能混用 local 引导。
+
+| 字段 | 类型／默认 | 必需与敏感性 | 行为 |
+| --- | --- | --- | --- |
+| `outbound_proxy` | 可选 HTTP(S) origin，无默认 | 可选；不允许 URL 用户名密码 | 出站代理，不允许路径、查询、fragment |
+| `no_proxy` | 字符串数组，默认 `[]` | 可选，通常非秘密 | 最多 128 项，每项最多 253 字符，受主机格式约束 |
+| `ingress.mode` | 默认 `cloudflare` | 可选，非秘密 | `cloudflare`、`disabled` 或 `external` |
+| `ingress.url` | HTTPS origin | external 时必填；不能内嵌凭据 | 指向凭据访问入口，不是 Console 或 OAuth callback |
+
+配置示例（外部域名为占位，需先完成真实路由）：
+
+```json
+{
+  "outbound_proxy": "http://127.0.0.1:7890",
+  "no_proxy": ["localhost", "127.0.0.1"],
+  "ingress": {"mode": "external", "url": "https://credentials.example.invalid"}
+}
+```
+
+```sh
+npm run local -- configure /absolute/path/deployment.json
+```
+
+configure 整体替换配置，不做部分合并；省略字段回到默认。结果包含 revision 和 `restart_required: true`，不自动重启。无效保存文件导致 `deployment_configuration_invalid`，并发修改可能产生 `deployment_configuration_busy` 或 `deployment_configuration_changed`。先查询当前值，不能通过删除锁或覆盖 revision 绕过竞争。
+
+## 标准代理环境变量
+
+下表变量都是可选的进程环境字符串，启动时生效；修改运维输入后需要重启。local 启动器和直接 local 入口会先组装保存配置，直接 hosted 启动则不经过这一步，直接把环境传给出站 dispatcher。代理 URL 含认证信息时按敏感数据处理，不放入公开诊断；主机绕过列表通常非秘密，但可能暴露内部名称。
+
+| 变量 | 默认值与优先级 | 适用性与效果 |
+| --- | --- | --- |
+| `HTTPS_PROXY` / `https_proxy` | 大写存在时优先，即使为空。local 组装继续回退到保存的 `outbound_proxy`；直接 dispatcher 则依次回退到 `HTTP_PROXY`、`http_proxy`、空值 | 两种模式；选择访问 HTTPS 目标的 HTTP(S) 代理。local 选中非空代理时会写入两种拼写 |
+| `HTTP_PROXY` / `http_proxy` | 大写存在时优先。local 组装回退到已选的 HTTPS／保存代理；直接 dispatcher 默认空 | 两种模式；访问 HTTP 目标的代理。local 未选中 HTTPS 代理时，继承的 HTTP-only 配置仍可使用 |
+| `NO_PROXY` / `no_proxy` | 大写存在时优先。local 组装合并该列表、保存条目及 `127.0.0.1,localhost`；直接 dispatcher 仅在两种拼写均未提供时默认 `127.0.0.1,localhost,::1` | 两种模式；交给已安装 Undici dispatcher 的逗号分隔绕过列表。保存 JSON 列表有独立 schema，不保证接受环境列表的全部语法 |
+| `NODE_USE_ENV_PROXY` | local 组装始终设为 `1`。直接 dispatcher 仅在值精确为字符串 `0` 时选择不经代理的 Agent，其余值选择环境代理 dispatcher | 两种模式的启动优先级不同。不是关闭独立受保护上游代理或子进程代理的通用开关 |
+| `ALL_PROXY` / `all_proxy` | Hexagon 无默认值；控制平面出站 dispatcher 不读取这两种拼写 | 会继承到子进程环境。local 隧道重试条件在 HTTP(S) 变量之后检查大写 `ALL_PROXY`，只有小写时不触发该回退；重试会从子进程环境删除这两种拼写及 HTTP(S) 代理变量 |
+
+最后一行说明 Hexagon 包装层的行为，不保证所有 Provider SDK 或外部程序都以相同方式解释环境变量。隧道包装层仅在特定传输失败分类、且未禁用回退时尝试去代理重试，不重试所有隧道失败。
+
+依据：[local 环境组装](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/deployment/settings.ts)、[出站 dispatcher](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/deployment/outbound.ts)、[Cloudflare 包装层](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/network/cloudflare-tunnel.ts)。这些配置控制平面传输，不配置 Sandbox 网络策略，也不授予账户权限。
+
+## 代理与优先级
+
+local 的 `deploymentEnvironment` 按 `HTTPS_PROXY` → `https_proxy` → 保存的 `outbound_proxy` 选择代理。HTTP 代理优先 `HTTP_PROXY`、`http_proxy`，再回退所选代理。`NO_PROXY` 优先于 `no_proxy`，并与保存列表及 `127.0.0.1,localhost` 合并。显式环境存在时，即使是空字符串也可能遮蔽保存值。
+
+`HEXAGON_ACCESS_URL` 优先于保存的 external URL；存在有效外部地址时不启动临时隧道。没有外部地址时，显式 `HEXAGON_ACCESS_TUNNEL` 优先于 ingress mode。local 配置函数将 `NODE_USE_ENV_PROXY` 写为 `1`；因此不能承诺在该启动路径中设置 `0` 就关闭全部代理。直接 hosted 路径的[出站配置](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/deployment/outbound.ts)则会在该值为 `0` 时选择直接连接。
+
+local 存在代理且未显式设置 `HEXAGON_ACCESS_EGRESS_PROXY_URL` 时，会用所选代理填充该值；`HEXAGON_ACCESS_EGRESS_HOSTS` 缺省填入 `api.siliconflow.com,api.minimaxi.com,api.minimax.io,api.minimax.chat`。这只描述凭据访问代理路径，不授予应用账户权限，也不是 Sandbox 的网络 allowlist。高级网络参数见[网络指南](/zh-CN/operate/networking)，不要把应用级网络策略与进程代理混淆。
+
+## 冲突配置如何取值
+
+下列示例描述 local 的 `deploymentEnvironment` 函数，假定只有表中列出的输入；继承的 shell 环境变量可能改变结果。示例域名是保留地址，不代表可用的 ingress 服务。检查变量名称与 origin 时不要打印凭据。
+
+| 保存配置 | 显式进程输入 | 最终结果 |
+| --- | --- | --- |
+| `outbound_proxy=http://127.0.0.1:7890` | `HTTPS_PROXY=http://127.0.0.1:9999` | HTTPS 使用 9999；未单独配置 HTTP 时也使用它 |
+| 同一保存代理 | `HTTPS_PROXY=""`，没有其他代理变量 | 保存代理被遮蔽，不合成非空代理地址 |
+| `no_proxy=["internal.example"]` | `NO_PROXY="api.example"` | 合并为 `127.0.0.1,localhost,internal.example,api.example` |
+| `ingress.mode=external`，URL 为 `https://saved.example` | `HEXAGON_ACCESS_URL=https://explicit.example` | 显式 origin 优先，临时隧道关闭 |
+| 同一 external ingress | `HEXAGON_ACCESS_URL=""`，未显式设置隧道 | 保存 origin 被遮蔽；origin 和隧道均为空，凭据访问未配置 |
+| 默认 cloudflare ingress | `NODE_USE_ENV_PROXY=0` | local 环境组装将其替换为 `1`，不会因此关闭该代理路径 |
+
+空代理字段不是“关闭所有代理”的通用开关：继承的其他 HTTP(S) 变量和独立的受保护上游路由仍可能生效。hosted 启动不调用这个 local 组装函数；它的出站 dispatcher 直接遵循 `NODE_USE_ENV_PROXY=0`。
+
+### 独立的受保护上游路由
+
+以下可选设置适用于两种部署模式。在启动进程前设置，运维修改后重启生效。local 组装函数可能按前文规则补默认值；直接 hosted 启动没有保存配置的回退逻辑。
+
+| 名称 | 类型／未经 local 补充时的默认值 | 敏感性与行为 |
+| --- | --- | --- |
+| `HEXAGON_ACCESS_EGRESS_PROXY_URL` | HTTP(S) 代理 URL 字符串；未设置 | 作为私有配置处理，尤其是包含认证信息时。只对匹配主机选择独立上游代理，不授予账户权限，不改变 Sandbox 出站策略 |
+| `HEXAGON_ACCESS_EGRESS_HOSTS` | 逗号分隔的主机名；空 | 通常非秘密。去首尾空白并转小写后精确匹配，不实现通配符匹配 |
+
+代理选择和端点校验见[受保护传输实现](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/mcp/remote.ts)。只填写代理 URL 而没有匹配主机，不会让所有受保护请求都经该代理。主机匹配但代理 URL 使用其他 scheme 时产生 `credential_egress_proxy_invalid`；URL 格式错误可能直接产生解析器错误。选择这个可信代理意味着由它负责 DNS 约束，其策略应由运维控制。
+
+### 应用保存配置的变更
+
+准备完整的目标 JSON，包括需要保留的字段，再运行 `npm run local -- configure /absolute/path/deployment.json`。例如用仅包含 `{"ingress":{"mode":"disabled"}}` 的配置替换原有配置，会删除保存的出站代理，并将 `no_proxy` 重置为 `[]`。重启后 shell 覆盖值仍可能生效。
+
+命令以私有文件保存并返回 `restart_required: true`，不会重启运行实例。按[本地工作区指南](/zh-CN/operate/local-workspace)安排重启，再检查健康与就绪状态，并验证实际访问路径。管理监听健康不能证明凭据 ingress 可用。发生 revision 冲突时，先读取最新配置并核对自己的修改意图，不盲目重试过时的整份替换。
+
+## Session 配置与 guest 环境
+
+| 配置 | 类型／默认 | 作用与生效时间 |
+| --- | --- | --- |
+| `harness` 或 `agent_id` | 二选一；Agent revision 可选 | 创建时解析并固定，不能混合覆盖保存 Agent 配置 |
+| Sandbox／模型连接 ID | 必填 UUID | 租户所属、兼容且就绪的连接；不是凭据内容 |
+| `resources` | idle 默认 60 秒，timeout 默认 600 秒 | 创建时固定，范围及语义见限制和生命周期 |
+| `network` | 默认 unrestricted，allowed_hosts 默认空 | 创建时固定；allowlist 要求 Provider 支持并允许凭据入口 |
+| `identity`、`instructions`、`context` | 可选行为字段 | 模型指导与背景数据，不改变调用者权限 |
+| `tools`、`connections` | 名称到连接 ID 的映射，默认空 | Tool 绑定与受保护 HTTP 绑定不同，不能互换 |
+| `variables` / `env` | 字符串映射；env 默认空 | guest Agent 进程环境，不配置控制平面；可含敏感值，不打印 |
+
+variables 是 env 的替代输入；同时提供 variables 和非空 env 会产生 `ambiguous_variables`。名称匹配 `[A-Za-z_][A-Za-z0-9_]{0,127}`；拒绝 `HEXAGON_`、`OPENCODE_`、`PI_` 前缀以及 `PORT`、`NODE_OPTIONS`、`PYTHONPATH`、`PYTHONHOME`、`LD_PRELOAD`、`LD_LIBRARY_PATH`。值不含 NUL；数量和字节限制见[限制](/zh-CN/reference/limits)。不要通过 guest env 绕过控制平面凭据存储。
+
+源码：[Session schema](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts)、[环境 schema](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/environment.ts)、[初始化](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/initialization.ts)。更改定义时创建新 Session，不能假定保存配置或重启会改变已有 Session 的固定行为。
+
+## 客户端与 Provider 配置
+
+SDK 的 URL/Token 构造参数属于客户端。示例中的 `HEXAGON_API_URL`、`HEXAGON_API_TOKEN` 是示例程序主动读取的环境变量，不是控制平面自动创建身份的开关。`Hexagon.local()` 根据显式数据目录、工作区描述文件和用户发现文件定位本地身份；不要修改文件权限以绕过私有身份检查。
+
+各 Provider 配置位于 Connection 的 `config`，凭据由受管 Secret 或 OAuth 保存。字段、默认值和权限验证范围见[集成目录](/zh-CN/integrations/choose)，不能把它们作为全局部署环境变量。测试专用 `TEST_DATABASE_URL` 不选择普通服务数据库。
+
+本页核对当前读取逻辑，未更改运行实例或重新启动服务。下一步：[安装](/zh-CN/start/install)、[自托管](/zh-CN/operate/self-host)、[网络](/zh-CN/operate/networking)。

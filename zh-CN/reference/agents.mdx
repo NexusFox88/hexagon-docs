@@ -1,0 +1,116 @@
+---
+title: "Agent 模板 HTTP 契约"
+---
+
+Agent 是可选的复用配置模板，修订不会改写已有 Session。不需要模板时可以直接创建 Session。全部操作检查租户归属；应用 Token 可列出、读取、创建和预检 Agent，修订、归档、复制要求 owner。
+
+## 定义 schema
+
+创建接受严格 Agent 定义，修订和预检将相同 schema 放在 definition 下。
+
+| 字段 | 要求与默认值 |
+| --- | --- |
+| name | 必填字符串，1–200 字符 |
+| harness | 必填严格 `{id:string,version:string}`，精确匹配已注册组合 |
+| identity、instructions、context | 可选初始化，限制见 [Session 参考](/zh-CN/reference/sessions) |
+| variables、env | 与 Session 相同的环境限制；推荐 variables，非空 env 与 variables 同时提供会拒绝 |
+| resources | 默认 idle_timeout_seconds=60、timeout_seconds=600，整数范围分别为 15–3600、60–3600 |
+| network | 默认 `{mode:"unrestricted",allowed_hosts:[]}`，另可选 allowlist |
+| required_capabilities | 字符串数组，默认空 |
+| tools | 严格 `{name,required_at_start}` 对象数组，默认空；名称匹配 `^[a-z][a-z0-9_]*$`，required_at_start 默认 true |
+| bindings | 可选严格对象，必须含 Sandbox/模型连接 UUID，可选 tools/connections UUID 映射默认空 |
+
+Tool 名称必须唯一，Harness 必须支持所需初始化和 Tools。保存的绑定检查租户归属和 kind，配置有效不代表真实执行成功。Optional-at-start Tool 在创建 Session 时仍需绑定。Agent tools 是声明数组，Session tools 是名称到连接的映射。
+
+## 创建、列表和读取
+
+`POST /v1/agents` 返回 **201**，包含 id、name、definition、env_names、revision、archived_at、created_at、updated_at。环境值另行保存，不在 definition 中返回；初始 revision 同时进入历史。
+
+将以下最小定义保存为 agent-definition.json，示例不设置默认连接：
+
+```json
+{"name":"Project reviewer","harness":{"id":"pi","version":"1.5.2"},"instructions":"Report actual tests and explain limitations."}
+```
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data-binary @agent-definition.json "$HEXAGON_API_URL/v1/agents"
+```
+
+`GET /v1/agents` 返回 **200**、`{agents:[...]}`，按创建时间升序，包括归档模板，无分页。每项字段与创建相同。`GET /v1/agents/{id}` 返回 **200**，在相同字段之外增加 revisions，按 revision 倒序；历史项包含 revision、name、definition、env_names、created_at。不存在或其他租户 Agent 返回 `404 agent_not_found`。
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" "$HEXAGON_API_URL/v1/agents"
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" "$HEXAGON_API_URL/v1/agents/$HEXAGON_AGENT_ID"
+```
+
+示例假定 API origin 不含 `/v1`，并使用适当后端 Token。创建没有幂等键，重复会生成不同模板。响应丢失后先调查列表，不要直接再建一个。
+
+## 预检未保存的定义
+
+`POST /v1/agents/preflight` 接受严格 `{definition,bindings}`。顶层 bindings 要求 sandbox_connection_id 和 model_connection_id UUID，tools/connections 映射默认空。预检使用这些显式绑定，不要假定 definition.bindings 自动补齐顶层绑定。
+
+保存为 agent-preflight.json，并替换两个连接占位 ID：
+
+```json
+{
+  "definition":{"name":"Project reviewer","harness":{"id":"pi","version":"1.5.2"}},
+  "bindings":{"sandbox_connection_id":"00000000-0000-4000-8000-000000000001","model_connection_id":"00000000-0000-4000-8000-000000000002"}
+}
+```
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data-binary @agent-preflight.json "$HEXAGON_API_URL/v1/agents/preflight"
+```
+
+成功返回 **200**，形状与 Session 预检的 readiness/combination/lifecycle/连接边界对象相同，不插入 Agent 或 Session。它调用凭据入口就绪与本地兼容性检查，不执行云任务。范围与错误见 [Session 预检](/zh-CN/reference/sessions)。
+
+## 使用乐观并发修订
+
+`PUT /v1/agents/{id}` 接受严格 `{expected_revision:正整数,definition:AgentDefinition}`。提供最近读取的 revision 和完整替代定义，不是逐字段 PATCH。省略的非环境字段使用 schema 默认值，不继承上一版定义。
+
+环境是例外：同时省略 variables 和 env 保留原值；提供任一字段替换整个环境映射；显式空映射清空环境。响应只暴露名称。将完整更新保存为 agent-revision.json：
+
+```json
+{"expected_revision":1,"definition":{"name":"Project reviewer","harness":{"id":"pi","version":"1.5.2"},"instructions":"Explain each change and its actual verification."}}
+```
+
+```sh
+curl --fail-with-body --silent --show-error --request PUT \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data-binary @agent-revision.json "$HEXAGON_API_URL/v1/agents/$HEXAGON_AGENT_ID"
+```
+
+将示例 revision 1 换成实际读取值。成功返回 **200** 和新 Agent 对象，递增 revision 并保存历史。版本不匹配返回 `409 agent_revision_changed`，应重新读取并合并意图，不要盲改 expected_revision。成功响应丢失后重试也可能遇到该冲突。归档模板返回 `409 agent_archived`。既有 Session 保持其固定 revision 和有效环境。
+
+## 复制模板
+
+`POST /v1/agents/{id}/copy` 接受严格 `{name:string}`，长度 1–200。成功返回 **201** 和具有独立初始历史的新 Agent。它复制当前源定义及解密后的有效环境到新 Agent，不返回明文环境；新名称替换原名称。当前实现允许复制已归档源，但仍须通过当前定义与绑定校验。
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data '{"name":"Project reviewer experiment"}' \
+  "$HEXAGON_API_URL/v1/agents/$HEXAGON_AGENT_ID/copy"
+```
+
+复制不是空配置，也不是独立外部账户；它可能保留连接 ID 和敏感环境默认值。使用前检查绑定。接口没有请求去重保证。
+
+## 归档模板
+
+`POST /v1/agents/{id}/archive` 无必需请求体，返回 **200**、`{id,revision,archived_at}`。重复保留首次归档时间，不递增 revision。此处没有取消归档或硬删除接口。
+
+```sh
+curl --fail-with-body --silent --show-error --request POST \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/agents/$HEXAGON_AGENT_ID/archive"
+```
+
+归档模板仍可读取，不能修订或创建新 Session，即使选择旧 revision 也不行。它不会关闭已有 Session，资源关闭仍是独立生命周期操作。
+
+严格输入不合法返回 `400 invalid_request`；模板不存在或属于其他租户返回 `404 agent_not_found`。校验可能先于模板查找失败，客户端应读取实际错误码。其他兼容性、环境、初始化和绑定失败遵循共享定义/Session 规则。来源：[Agent schema 与操作](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts)、[路由和角色检查](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts)。本文是源码审阅契约，不是新一轮 HTTP/数据库验收。下一步：[模板工作流](/zh-CN/build/agent-templates)、[HTTP 总览](/zh-CN/reference/http)。

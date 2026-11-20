@@ -1,0 +1,116 @@
+---
+title: "Limits and configurable boundaries"
+---
+
+This page lists API and execution bounds from the current source, not provider account quotas. MiB means 1048576 bytes; KiB means 1024 bytes. JS code units are JavaScript string-length units, not UTF-8 bytes; non-ASCII text may hit byte limits earlier. These values describe this source snapshot; check implementation when upgrading.
+
+## Requests and execution
+
+| Item | Bound / range | Scope and behavior | Source / symbol | Configurability / rejection |
+| --- | --- | --- | --- | --- |
+| HTTP request body | 12 MiB | Fastify body limit; JSON/base64 overhead counts. | [createServer / bodyLimit](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts) | Fixed; HTTP 413 invalid_http_request |
+| Run input | 1–100000 JS code units | Also nonblank; combined input + compiled background context ≤120000 UTF-8 bytes. | [POST sessions/:id/runs](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts) | Fixed; invalid_request / input_too_large |
+| Idempotency-Key | 1–256 JS code units | Reuse the same payload/key after a lost submission response. | [Idempotency-Key schema](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts) | Fixed; invalid_request |
+| Origin identifiers | message_id/request_id ≤256; channel ≤100 | Nonempty when supplied; part of submission identity. | [runOriginInput](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) | Fixed; invalid_request |
+| Active Runs per Session | 1 | Another active Run causes session_busy (409); use application queuing. | [Runs.submit active query](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) | Fixed; session_busy |
+| Event query page | 500 events | Continue after the last ID; an empty page is not terminal-state proof. | [Runs.events LIMIT 500](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) | Fixed page cap; continue with after |
+| Resource operation page | limit 1–100; default 50; offset ≥0 | Follow returned pagination; not an account resource quota. | [GET resource-operations query](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts) | Caller chooses page size within bounds; invalid_request |
+
+Primary source: [apps/control-plane/server.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts).
+
+## Session policy and initialization
+
+| Item | Bound / range | Scope and behavior | Source / symbol | Configurability / rejection |
+| --- | --- | --- | --- | --- |
+| Session / Agent name | 1–200 JS code units | Optional Session name; required Agent name. | [agentInput / sessionInput](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts) | Fixed field bound; invalid_request |
+| Idle threshold | 15–3600 seconds; default 60 | Configurable at definition creation; effective threshold is min(idle_timeout_seconds, timeout_seconds − 10). Lifecycle support varies by provider. | [agentInput.resources / lifecycle](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts) | Definition value configurable; invalid_request outside range |
+| Resource timeout | 60–3600 seconds; default 600 | This is not a universal model-response deadline or guaranteed wall-clock deletion. | [agentInput.resources](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts) | Definition value configurable; invalid_request outside range |
+| Identity fields | name ≤200; description ≤4000; role ≤2000 | Name nonempty; behavioral text is not authorization. | [behaviorFields.identity](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/initialization.ts) | Fixed; invalid_request |
+| Instructions / context.text | each ≤32768 JS code units | NUL rejected. | [behaviorFields / text](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/initialization.ts) | Fixed; invalid_request |
+| Inline context documents | ≤8; name 1–200; text ≤16384 | Aggregate initialization byte limits also apply. | [behaviorFields.context.documents](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/initialization.ts) | Fixed; invalid_request / aggregate check |
+| Referenced context files | ≤8; path ≤500; each file ≤32768 bytes | Must match uploaded SHA-256 and valid UTF-8 without NUL. | [Runs.submit context files](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) | Fixed byte bound; context_file_too_large; schema in behaviorFields |
+| Compiled initialization | ≤65536 bytes | Both serialized behavior and compiled system + context are checked. | [compileInitialization](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/initialization.ts) | Fixed; initialization_too_large |
+| Environment entries | ≤64; JSON ≤65536 bytes | Names ≤128, values ≤16384 JS code units; reserved names/NUL rejected. | [environmentInput](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/environment.ts) | Fixed; schema rejection |
+
+Primary source: [modules/execution/sessions.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts).
+
+## Input and exported files
+
+| Item | Bound / range | Scope and behavior | Source / symbol | Configurability / rejection |
+| --- | --- | --- | --- | --- |
+| Files per upload request | 1–100 | Not a lifetime workspace file-count quota. | [uploadInput.files](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/inputs.ts) | Fixed; invalid_request |
+| Upload path | 1–500 JS code units | Relative path; no traversal, empty segments, backslash or NUL. | [uploadInput.files.path](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/inputs.ts) | Fixed; invalid_request |
+| Upload content_base64 | ≤2097152 characters per file | Base64 syntax and length checked; at most 1572864 decoded bytes (1.5 MiB) at this encoded bound. Generate canonical encoding in the client; upload does not re-encode to compare padding bits. | [uploadInput.files.content_base64](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/inputs.ts) | Fixed; invalid_request |
+| Decoded upload total | ≤8 MiB per request | HTTP body limit still applies; upload_too_large (413). | [SessionInputs.upload](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/inputs.ts) | Fixed; upload_too_large |
+| Artifact manifest | ≤64 files; ≤8 MiB decoded total | Per captured manifest; duplicate names are rejected. | [manifest / Artifacts.capture](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/artifacts/artifacts.ts) | Fixed; schema rejection / invalid_artifact_manifest |
+| Single exported artifact | ≤4 MiB decoded bytes | Base64 field ≤5592408 characters; canonical bytes and SHA-256 verified. | [file / Artifacts.capture](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/artifacts/artifacts.ts) | Fixed; schema rejection / artifact_integrity_failed |
+| Artifact name | 1–512 JS code units | Relative path without traversal, backslash or control characters. | [file.name](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/artifacts/artifacts.ts) | Fixed; capture schema rejection |
+
+Primary source: [modules/execution/inputs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/inputs.ts).
+
+## Preview and Harness distribution
+
+| Item | Bound / range | Scope and behavior | Source / symbol | Configurability / rejection |
+| --- | --- | --- | --- | --- |
+| Preview port | 3000–8999, excluding 8765 | Integer; Runtime port is reserved. | [previewInput.port](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/previews.ts) | Caller chooses allowed port; invalid_request |
+| Preview grant TTL | 30–3600 seconds; default 600 | Configurable per request; does not extend Sandbox lifetime. | [previewInput.ttl_seconds](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/previews.ts) | Caller chooses TTL within range; invalid_request |
+| OCI platform | linux/amd64 | Other architectures are not implied by a multi-platform image tag. | [resolveImage platform checks](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/registry.ts) | Fixed; image_platform_unsupported |
+| OCI image reference | 1–512 JS code units | Resolves to immutable digest; registry/provider constraints still apply. | [imageRegistration.image](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/images.ts) | Fixed field bound; invalid_request |
+| OCI command argv | 1–32 items; each 1–65536 JS code units | NUL rejected; OS/runtime limits may be tighter. | [imageRegistration.command](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/images.ts) | Configurable command, fixed bounds; invalid_request |
+| Source package | 1–32 files; total ≤512 KiB UTF-8 | Each content ≤262144 JS code units; relative path ≤240. | [harnessPackageInput](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/harness-packages.ts) | Fixed; invalid_request |
+| Native continuation identifier | ≤512 characters in hexagon-json-v1 parsing | Source package requires a nonempty value if supplied; protocol-specific adapters have their own validation. | [ociAdapter result parser](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/runtime-adapter.ts) | Fixed protocol check; failed result, then worker outcome |
+
+Primary source: [modules/sandboxes/previews.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/previews.ts).
+
+
+## Cross-check the sources
+
+The tables also use [Run input/events](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts), [initialization](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/initialization.ts), [environment](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/environment.ts), [artifacts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/artifacts/artifacts.ts), [OCI registration](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/images.ts), [image resolution](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/registry.ts) and [source packages](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/harness-packages.ts). Most schema bounds have no separate administration setting. Configurable Session timeouts do not make every implementation limit adjustable.
+
+## Registry and network restrictions
+
+[Image reference parsing](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/registry.ts) accepts Docker Hub (`docker.io`, also the default when omitted) and GHCR (`ghcr.io`), not arbitrary registry URLs. The fixed parser rejects other origins or malformed references with `invalid_image_reference` (400). Authentication token responses are bounded to 65536 bytes; fetched manifest/configuration responses to 4 MiB. Overflow produces `image_manifest_too_large` (400). These are metadata-read bounds, not a 4 MiB limit on all image layers or the installed filesystem. Blob redirects also have an explicit destination policy; adding a credential does not bypass it. Provider-specific private-image support remains separate.
+
+The [Session network schema](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts) permits `unrestricted` or `allowlist`, with unrestricted and an empty host list as defaults. Allowed-host entries are nonempty strings; this schema does not define a universal count or per-host length maximum. Do not infer unlimited provider support from that absence. The [combination resolver](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/compatibility.ts) rejects unsupported allowlists and missing credential-ingress access using `network_policy_unsupported` or `credential_proxy_not_allowed_by_network_policy`; creation reports the compatibility reason as 400. Select a capable Provider while preserving the required policy. These checks do not establish a live firewall enforcement result.
+
+## Tool, provider and account limits
+
+[Remote MCP](/en/integrations/mcp) currently bounds discovery to 100 tools, 20 pages and a 2 MiB response; see [remote.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/mcp/remote.ts). Named application response bodies are bounded to 1 MiB in [the application transport](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/apps/registry.ts). These protocol limits are not workspace file-size limits.
+
+Provider memory, CPU, creation concurrency, storage, image permissions and API quotas depend on connection configuration and the actual account. Consult the matching [Sandbox guide](/en/integrations/sandboxes); a trial account's concurrency limit is not a global Hexagon quota. Private OCI, network allowlists and pause/resume require declared connector support. Unsupported policy must not be silently weakened.
+
+Some connectors impose tighter file or command bounds. A transport queue bound limits buffered data, not necessarily the total response length. Do not substitute it for an upload request, exported artifact or provider disk limit. See [capacity and cost](/en/operate/capacity-and-cost).
+
+## Calculate the size the API checks
+
+For text, count both JavaScript UTF-16 code units and UTF-8 bytes. A task containing 41000 copies of `中` has 41000 code units but 123000 UTF-8 bytes: it fits the input field length and still exceeds the 120000-byte combined input/context limit. One `😀` occupies two code units and four UTF-8 bytes. In Python, `len(text)` counts Unicode code points, so it is not interchangeable with the schema's JavaScript length.
+
+For an upload containing `n` binary bytes, standard Base64 uses `4 × ceil(n / 3)` characters. A 1572864-byte file encodes to 2097152 characters and fits the field bound; one additional byte requires 2097156 characters and exceeds it. JSON paths, keys, quotes and separators add to the HTTP body size. Check the final serialized request as well as decoded bytes. Splitting six 1.5 MiB files into batches can address the 8 MiB request aggregate; splitting requests cannot make an oversized individual file valid.
+
+Upload batches must all finish **before the first Run or Sandbox allocation**. Later uploads fail with `workspace_already_started`; use [project context](/en/build/project-context) to plan initial input and let subsequent Agent work modify the live workspace. Repeating a path within one request gives `duplicate_input_path`; before execution starts, a later request can replace an earlier path. Confirm returned size and SHA-256 rather than assuming every upload appends a new file.
+
+Environment limits count `JSON.stringify(env)` bytes, including keys and escaping. Initialization limits likewise include serialized structure and compiled background wrappers, so adding individually valid documents can still overflow the aggregate. The schema's maximum for each field is not a promise that every field can be filled to its maximum simultaneously.
+
+## Locate the rejection
+
+| Failure stage | Observable result | Appropriate action |
+| --- | --- | --- |
+| HTTP body parser | HTTP 413 with `invalid_http_request` for an oversized body | Reduce the complete serialized request; a valid Base64 field alone does not establish body validity |
+| Public request schema | HTTP 400 `invalid_request`, with offending `fields` paths | Correct count, type, length or path; internal schema messages need not be returned as public error codes |
+| Decoded input aggregate | HTTP 413 `upload_too_large` | Batch valid individual files before execution starts |
+| Compiled initialization / Run input | HTTP 413 `initialization_too_large` / `input_too_large` | Reduce compiled context or task text; check bytes, not only character count |
+| Artifact capture | `invalid_artifact_manifest` or `artifact_integrity_failed` in the capture path | Inspect actual exports, sizes, duplicate names, encoding and hash; capture is worker activity, not a client upload endpoint |
+
+Artifact capture checks the manifest before its database transaction. A rejected manifest is not a partially accepted list; it does not erase previously committed artifacts. Do not equate a terminal Run with every intended file having been exported—query the recorded artifact list and verify the bytes you need.
+
+## Respond to a limit failure
+
+Distinguish schema rejection from domain errors. Combined input/background overflow produces `input_too_large` (413), while initialization overflow produces `initialization_too_large` (413). Aggregate artifact size or duplicate names can produce `invalid_artifact_manifest`; single-file size, encoding or hash failures can produce `artifact_integrity_failed`. Repeating an identical request does not fix these conditions.
+
+Reduce input, batch uploads, export only needed files or select a suitable execution combination. Batching does not bypass per-file bounds. Do not change a required allowlist to unrestricted merely to pass validation. Network faults and provider quota refusals are separate from Hexagon input limits; reconcile an unknown create outcome before attempting another allocation.
+
+Values were source-reviewed; focused local encoding/schema evaluations are recorded in the [limits review](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-limits-reference-review.json). This is not exhaustive boundary coverage or cloud load testing. Unlisted account capacity, total throughput or price is not unlimited and does not imply a service-level guarantee.
+
+Next: [project context](/en/build/project-context), [artifacts](/en/build/artifacts), [troubleshooting](/en/operate/troubleshooting).
+
+For combination constraints, continue to [Sandbox capabilities](/en/integrations/sandboxes); for sizing, [capacity and cost](/en/operate/capacity-and-cost); for exact responses, [error codes](/en/reference/errors).

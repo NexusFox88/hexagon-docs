@@ -1,0 +1,54 @@
+{
+  "scope": "R08 actual launcher commands in a temporary isolated data directory with no owner, PID or database calls. No service start/stop, migration, backup, restore or cloud operation. Temporary files removed afterward.",
+  "cases": [
+    {
+      "case": "status on fresh directory",
+      "command": "npm run local -- status",
+      "exit_code": 0,
+      "lock_released": true,
+      "state": "stopped"
+    },
+    {
+      "case": "configure replaces defaults without startup",
+      "command": "npm run local -- configure <temporary-file>",
+      "exit_code": 0,
+      "lock_released": true,
+      "saved_mode": "0600",
+      "service_started": false
+    },
+    {
+      "case": "diagnostics without running service",
+      "command": "npm run local -- diagnostics <temporary-file>",
+      "exit_code": 0,
+      "lock_released": true,
+      "reachable": false
+    },
+    {
+      "case": "diagnostics refuses overwrite",
+      "command": "npm run local -- diagnostics <temporary-file>",
+      "exit_code": 1,
+      "lock_released": true,
+      "existing_bytes_unchanged": true
+    },
+    {
+      "case": "unknown command fails",
+      "command": "npm run local -- not-a-command",
+      "exit_code": 1,
+      "lock_released": true
+    },
+    {
+      "case": "missing configure input fails",
+      "command": "npm run local -- configure",
+      "exit_code": 1,
+      "lock_released": true
+    },
+    {
+      "case": "invalid config preserves saved file",
+      "command": "npm run local -- configure <temporary-file>",
+      "exit_code": 1,
+      "lock_released": true,
+      "saved_bytes_unchanged": true
+    }
+  ],
+  "passed": true
+}

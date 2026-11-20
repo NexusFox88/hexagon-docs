@@ -1,0 +1,78 @@
+{
+  "scope": "Read-only current API recheck of an existing real Modal/OpenClaw OCI failed Run; no fault injection, new Run, allocation or cleanup operation. Public record omits actual identifiers; private correlation retains them.",
+  "private_record": ".local/docs-content-checks/closeout-failed-run-case.json",
+  "private_record_sha256": "a02d68cf392eabf50cd4271d0f21a022ffe0f9186274df8546e4b91a09ef3ee5",
+  "run_state": "failed",
+  "event_sequence": [
+    {
+      "type": "run.provisioning",
+      "data": {}
+    },
+    {
+      "type": "workspace.inputs_verified",
+      "data": {}
+    },
+    {
+      "type": "run.running",
+      "data": {}
+    },
+    {
+      "type": "harness.starting",
+      "data": {}
+    },
+    {
+      "type": "harness.running",
+      "data": {}
+    },
+    {
+      "type": "harness.exited",
+      "data": {
+        "state": "exited",
+        "exit_code": 1
+      }
+    },
+    {
+      "type": "run.failed",
+      "data": {
+        "code": "harness_execution_failed",
+        "exit_code": 1,
+        "runtime_state": "exited"
+      }
+    }
+  ],
+  "same_session_operations": [
+    {
+      "kind": "checkpoint",
+      "state": "deleted"
+    },
+    {
+      "kind": "delete",
+      "state": "completed"
+    },
+    {
+      "kind": "delete",
+      "state": "completed"
+    },
+    {
+      "kind": "restore",
+      "state": "completed"
+    },
+    {
+      "kind": "create",
+      "state": "completed"
+    }
+  ],
+  "all_operation_session_ids_match": true,
+  "finding": "Creation and restoration completed before Harness exited 1; run.failed code harness_execution_failed. Two delete operations completed and checkpoint deleted. A failed Run does not imply failed allocation or pending cleanup.",
+  "diagnostic_test": {
+    "command": "./node_modules/.bin/vitest run modules/diagnostics/failure.test.ts",
+    "exit_code": 0,
+    "files_passed": 1,
+    "tests_passed": 1,
+    "assertions": "Drops arbitrary error message/body/url/code/name; retains numeric status and allowlisted transport code."
+  },
+  "source_sha256": {
+    "modules/diagnostics/failure.ts": "8392390f2f3fca39464b6496ed2a46e3990d22adff6a2aa553090db9d70a35b4",
+    "modules/diagnostics/failure.test.ts": "716ce1a80a82dd3ede5e7fff8d46e5a34bb2986bd7f972df440809aed3824896"
+  }
+}

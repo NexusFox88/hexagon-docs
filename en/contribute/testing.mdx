@@ -1,0 +1,136 @@
+---
+title: "Run tests and record acceptance evidence"
+---
+
+Acceptance comes from the [user journey](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/journey-source.md), refined by the [acceptance ledger](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/acceptance.md), including the later minimal Session entry. A saved Agent is optional. Do not reduce acceptance to what the current implementation or a convenient runner already covers.
+
+## Choose the right level
+
+| Level | What it establishes | What it does not establish |
+| --- | --- | --- |
+| Unit and connector contract tests | Schema, request mapping, capabilities, failure classification | Provider availability or account permissions |
+| Deterministic API/database/Runtime scenarios | Tenant checks, durable events, approvals, retries and recovery against controlled failures | Real model decisions or provider lifecycle behavior |
+| Installed SDK tests | Built wheel/tarball imports and selected API journeys | Every SDK method or real cloud compatibility |
+| Real cloud combination tests | Exact provider, Harness/version or digest, model protocol and client scenario | Untested combinations, all UI paths, or arbitrary custom packages |
+| Browser and full user journey | Actual configuration, authorization, preview interaction and user-visible outcomes | Global resource absence without a provider audit |
+
+A green fixture is evidence for its assertions. Registration, credential verification and a successful model answer are each narrower than a completed user task.
+
+## Deterministic commands
+
+Prepare dependencies and an isolated test database using [development setup](/en/contribute/development). Export `TEST_DATABASE_URL` before both gates:
+
+```sh
+npm run verify
+npm run verify:packages
+npm run release:check
+```
+
+`verify` refuses to proceed without the database URL, then runs `check` and `test`. Running `npm test` alone without that URL can omit database-backed coverage; do not report it as the full gate. Vitest creates a random schema, applies migrations, and drops the schema during normal teardown. Test files are serialized because the global scheduler can claim another file's fixture Runs. Preserve explicit concurrency tests; do not turn file parallelism on casually.
+
+`verify:packages` requires Python packaging dependencies, builds packages, installs them in temporary consumers, verifies imports, and runs the Harness API, SDK interoperability, local SDK and authorization-denial suites against the installed artifacts. It writes `.local/evidence/sdk-packages.json`, including artifact hashes and status. Temporary consumers must remain available for cloud runners that reference this record.
+
+For a targeted iteration, use the actual test path:
+
+```sh
+npx vitest run testing/tenant-boundaries.test.ts
+```
+
+Run from the repository root with the same test database configuration. A targeted pass does not replace the broader gate. `release:check` writes a private inventory report; its pattern scan is not comprehensive secret detection, and it does not publish anything.
+
+## Startup and backup have different prerequisites
+
+| Command | Required preparation and side effects |
+| --- | --- |
+| `npm run verify:startup` | Uses `DATABASE_URL`, not `TEST_DATABASE_URL`; creates an isolated schema/data directory, starts and restarts child services, checks identity and wrong-key handling. Use a disposable database and inspect private evidence. |
+| `npm run verify:backup` | Uses `TEST_DATABASE_URL` with a local fallback; requires PostgreSQL backup tools and a role allowed to create a database. Creates a schema and restore database plus sensitive local backup bundles. It does not remove those databases/bundles automatically. |
+| `npm run build:local` | Builds a local distribution; this is not startup, backup or cloud acceptance. |
+
+Never rely on fallback database addresses when running destructive or stateful checks. Inspect the script before use and retain sensitive evidence privately. Startup/backup output identifies its evidence location. Review and remove disposable resources deliberately after investigation; do not remove a real installation's identity or encryption key.
+
+## Real cloud checks are an explicit separate step
+
+They require a running control plane, ready cloud/model connections, correct ingress, quota, pinned Harness definitions and an installed-package verification record where required. They may incur provider and model charges. Connection IDs belong in a private configuration; provider keys stay in control-plane credential storage.
+
+```sh
+npm run verify:compatibility -- /absolute/path/to/private-config.json
+```
+
+Use the complete configuration and filters in the [compatibility runner guide](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/compatibility-runner.md). This command runs installed SDKs and creates a new private journal. Selecting one client yields partial evidence; omitted cells do not pass. The narrower `npm run verify:cloud -- /absolute/path/to/private-config.json pi` uses its own configured Harness map and runs both clients; its configuration is not interchangeable with the compatibility runner's schema. Read [its implementation](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/tooling/cloud-matrix.ts) and the child journey inputs before preparing it.
+
+`npm run verify:serverless -- <provider> <harness-key>` is a separate pause/resume test. It selects ready connections from the local installation and currently expects MiniMax-M3 model connections. Inspect [the runner](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/tooling/cloud-serverless.ts) before use: its private report name is provider/Harness-specific, so preserve earlier reports before rerunning. It is not a generic benchmark or the complete Web journey.
+
+## Preserve the full journey
+
+Each of Python and TypeScript must independently create a Session, upload and verify input, submit idempotently, observe/replay events, complete a real task, handle authorization and approval, retrieve artifacts, continue the conversation, cancel and close. Also continue each language's Session from the other language.
+
+For the full Web task, use the fixed [filter application](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/fixtures/filter-app/README.md). Do not edit its acceptance test to make the task pass. Confirm real file changes, test output, authenticated interactive preview, zero report writes before approval and exactly one afterward, final response/state agreement, retained exported artifacts after close, and revoked preview access.
+
+Keep separate branches for connection rotation/disable/delete, Tool refusal/expiration, worker and Runtime failure, cancellation races, uncertain create/delete outcomes, tenant isolation, and actual allowed/denied network probes. Exercise supported pause/resume or other capabilities explicitly. A conversation-only Harness cannot be credited with Tools or previews. A successful compatibility row does not silently cover these branches.
+
+## Read test outcomes, not just exit codes
+
+The current testing/tenant-boundaries.test.ts uses `describe.skipIf(!process.env.TEST_DATABASE_URL)`. Without database configuration it can exit 0 while reporting one skipped test: no tenant-isolation assertion ran. Full gates therefore reject a missing TEST_DATABASE_URL before starting their tests.
+
+The [2026-11-20 missing-database check](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-test-gates-docs.json) observed:
+
+| Command | Observation | Valid conclusion |
+| --- | --- | --- |
+| `npm run verify` | Exit 1 requiring TEST_DATABASE_URL | Gate rejected a missing prerequisite; no full regression pass or failure was established |
+| `npm run verify:packages` | Exit 1 requiring TEST_DATABASE_URL | Installed-artifact acceptance did not start; no SDK pass |
+| `npm test -- testing/tenant-boundaries.test.ts` | Exit 0 with one skipped test | Scenario unexecuted; no isolation pass |
+
+This check deliberately removed the child process's database variable, connected to no database and produced no cloud evidence. During normal acceptance, inspect executed/skipped counts, failures and actual assertions alongside exit status. Recording zero-execution output as passed silently removes required coverage.
+
+## Schema isolation has boundaries
+
+[Database setup](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/database-setup.ts) creates a random hexagon_test_... schema in the configured database, migrates it and provides a connection with the matching search_path through test context. [Environment setup](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/test-environment.ts) supplies that connection to tests. Normal teardown deletes the corresponding schema. This does not automatically isolate every external service, extension or database-level action; use a dedicated disposable database.
+
+A forcibly terminated process may not run teardown. Identify the original process and specific schema ownership before removing leftovers. Prefix-based bulk deletion is not ownership verification. Retain private failure records so cleanup cannot accidentally affect a development workspace.
+
+## Keep installed-artifact and source checks separate
+
+verify:packages checks its database prerequisite before packaging. It then builds a TypeScript tarball and Python wheel, installs them in independent temporary directories, and uses HEXAGON_TEST_TS_MODULE and HEXAGON_TEST_PYTHON_PATH to run selected API/SDK suites against installed artifacts. The script names specific test files; it does not automatically cover every SDK method.
+
+A repository import or TypeScript compile cannot prove that a distributed package includes all required files. A successful package import cannot prove a real-model journey. Record source checks, installed-package checks and real-cloud checks separately, linking package SHA-256, version and source revision/snapshot.
+
+The script writes the fixed path .local/evidence/sdk-packages.json, so a rerun replaces the current record there. Preserve earlier records needed for investigation and keep temporary consumer directories required by subsequent cloud runners. Failure can occur before a record is written or during build, installation or tests. An absent file or an old verified record cannot substitute for the current command's outcome.
+
+## Evidence template
+
+This is an unexecuted template, not a passing report. Replace each placeholder with an observation and retain failed attempts.
+
+```yaml
+status: planned
+started_at: null
+finished_at: null
+source_revision_or_snapshot: null
+command: null
+exit_code: null
+scope:
+  level: null
+  scenario: null
+  provider: null
+  harness_id_version_digest: null
+  model_protocol_and_identifier: null
+  sdk_language_version_artifact_sha256: null
+assertions: []
+failures: []
+not_tested: []
+cleanup:
+  status: not_checked
+  completion_basis: null
+  confirmed_at: null
+  associated_resources_checked: null
+  private_provider_receipt_reference: null
+  unresolved_operation_count: null
+  private_journal_reference: null
+```
+
+Interpret `cleanup.status` independently from task success. Use `not_checked`, `pending`, `failed` or `confirmed` with the actual observations; these are report labels, not new API states. `completion_basis` names the Provider-specific condition: confirmed absence may suffice for one resource, while another requires a completed deletion receipt and associated-resource checks. `null` unresolved_operation_count means unknown, not zero. A failed model task can still have confirmed cleanup, and a successful reply can still leave cleanup pending. Keep each attempt's execution and cleanup conclusions separate.
+
+Public evidence in testing/evidence contains sanitized commands, timestamps, scope, assertions, failures and cleanup conclusions. Keep actual Session/Run/resource/operation IDs, provider receipts, endpoint identifiers and useful correlation data in access-controlled local evidence. Do not publish keys, raw prompts, request bodies or backups. Do not strip the private IDs needed to retry cleanup.
+
+A lost response is an unknown outcome. Reconcile the recorded operation and exact resource before retrying; do not create another resource or replay a write to make the report green. Successful task cleanup and global account cleanup are separate claims. Report unresolved operations even if every later task succeeds. Historical evidence remains dated and does not automatically certify changed code.
+
+Next: [verified combinations](/en/integrations/verified-combinations), [reconciliation](/en/operate/reconciliation), [contribution review](/en/contribute/proposals-and-prs).

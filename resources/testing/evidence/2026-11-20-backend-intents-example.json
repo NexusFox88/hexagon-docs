@@ -1,0 +1,34 @@
+{
+  "scope": "Real temporary SQLite with fake SDK; no HTTP, authentication system, model, cloud or concurrent production acceptance",
+  "command": [
+    "python3",
+    "-B",
+    "examples/documentation/check-backend-intents.py"
+  ],
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "test_another_user_cannot_submit_or_read (__main__.DurableIntentChecks.test_another_user_cannot_submit_or_read) ... ok\ntest_bind_cannot_transfer_existing_ownership (__main__.DurableIntentChecks.test_bind_cannot_transfer_existing_ownership) ... ok\ntest_known_run_is_queried_without_resubmission (__main__.DurableIntentChecks.test_known_run_is_queried_without_resubmission) ... ok\ntest_repeated_prepare_keeps_key_and_rejects_changed_input (__main__.DurableIntentChecks.test_repeated_prepare_keeps_key_and_rejects_changed_input) ... ok\ntest_response_loss_and_restart_preserve_exact_intent (__main__.DurableIntentChecks.test_response_loss_and_restart_preserve_exact_intent) ... ok\ntest_status_without_run_does_not_submit (__main__.DurableIntentChecks.test_status_without_run_does_not_submit) ... ok\n\n----------------------------------------------------------------------\nRan 6 tests in 0.009s\n\nOK\n",
+  "shell_syntax_checks": [
+    {
+      "file": "docs/product/en/build/backend-integration.md",
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "file": "docs/product/en/build/backend-integration.md",
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "file": "docs/product/zh-CN/build/backend-integration.md",
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "file": "docs/product/zh-CN/build/backend-integration.md",
+      "exit_code": 0,
+      "stderr": ""
+    }
+  ],
+  "passed": true
+}

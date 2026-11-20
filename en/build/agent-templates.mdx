@@ -1,0 +1,219 @@
+---
+title: "Reuse Agent configuration"
+---
+
+Create Sessions directly when each task supplies explicit execution configuration. Use revisioned Agent templates when multiple Sessions should reuse a Harness, behavior, and policy.
+
+A template is configuration, not a running process or shared workspace. Continue a project through its Session; reuse configuration through a template. See [multi-turn work](/en/build/multi-turn).
+
+## Create and use a template
+
+With initialized clients and verified connections, pin the returned revision explicitly:
+
+```python
+agent = client.create_agent(
+    name='Project assistant',
+    harness={'id': 'pi', 'version': '1.5.2'},
+    env={'APP_MODE': 'review'},
+)
+session = client.create_session(
+    agent_id=agent['id'], agent_revision=agent['revision'],
+    sandbox_connection_id=sandbox_connection_id,
+    model_connection_id=model_connection_id,
+)
+```
+
+```typescript
+const agent = await client.createAgent({
+  name: 'Project assistant',
+  harness: { id: 'pi', version: '1.5.2' },
+  env: { APP_MODE: 'review' },
+});
+const session = await client.createSession({
+  agent_id: agent.id, agent_revision: agent.revision,
+  sandbox_connection_id: sandboxConnectionId,
+  model_connection_id: modelConnectionId,
+});
+```
+
+Do not supply `harness` together with `agent_id`. This path does not accept arbitrary overrides of template behavior and resource policy. Session environment overrides follow their dedicated contract. Sandbox code can read those values; keep protected connection credentials out of them.
+
+## Revise the complete definition
+
+Use Python `revise_agent(agent_id, definition, expected_revision)` or TypeScript `reviseAgent(agentId, definition, expectedRevision)`. The definition is complete, not a partial patch: retain the intended Harness, behavior, and policy explicitly.
+
+Read the current Agent and revision before editing. Successful revision increments the version; a concurrent change produces `agent_revision_changed`. Reload and review rather than force-overwriting the other editor's changes.
+
+Omitting `env` / `variables` preserves the existing environment. Supplying one replaces that map, and an empty map clears it. Returned `env_names` do not contain recoverable plaintext values.
+
+## Prepare a revision, then apply the reviewed intent
+
+The helpers below require initialized clients (import `Hexagon` as shown in the SDK setup), an owner identity for mutation, and a saved Agent ID. They make no calls until invoked. Use `inspect_templates` / `inspectTemplates` to read the list and selected revision history; the list includes archived templates. These separate reads are not one snapshot.
+
+To change instructions, call the prepare helper with the intended text and explicit bindings, for example `{sandbox_connection_id: sandboxId, model_connection_id: modelId}` in TypeScript or the equivalent Python dict. Include the Tool/protected-API binding maps required by that template. Preparation clones the complete stored definition, changes only instructions, records the observed revision, and preflights with those bindings. It does not save a revision.
+
+```python
+from copy import deepcopy
+
+
+def inspect_templates(client, agent_id):
+    return {'agents': client.list_agents()['agents'],
+            'selected': client.agent(agent_id)}
+
+
+def prepare_instruction_revision(client, agent_id, instructions, bindings):
+    current = client.agent(agent_id)
+    if current['archived_at'] is not None:
+        raise ValueError('Archived templates cannot be revised')
+    definition = deepcopy(current['definition'])
+    definition['instructions'] = instructions
+    definition.pop('env', None)
+    definition.pop('variables', None)
+    intent = {'agent_id': agent_id, 'expected_revision': current['revision'],
+              'definition': definition}
+    preflight = client.preflight_agent(definition, bindings)
+    return {'intent': intent, 'preflight': preflight}
+
+
+def apply_reviewed_revision(client, intent):
+    return client.revise_agent(intent['agent_id'], intent['definition'],
+                               intent['expected_revision'])
+
+
+def copy_template(client, agent_id, new_name):
+    return client.copy_agent(agent_id, new_name)
+
+
+def archive_template(client, agent_id):
+    return client.archive_agent(agent_id)
+
+
+def read_pinned_initialization(client, session_ids):
+    return {session_id: client.session_initialization(session_id)
+            for session_id in session_ids}
+```
+
+```typescript
+import type { AgentInput, SessionInput } from '@hexagon/agent-sdk';
+
+type RevisionIntent = {
+  agent_id: string; expected_revision: number; definition: AgentInput;
+};
+type TemplateBindings = Pick<SessionInput,
+  'sandbox_connection_id' | 'model_connection_id' | 'tools' | 'connections'>;
+
+async function inspectTemplates(client: Hexagon, agentId: string) {
+  return { agents: (await client.listAgents()).agents,
+    selected: await client.agent(agentId) };
+}
+
+async function prepareInstructionRevision(
+  client: Hexagon, agentId: string, instructions: string, bindings: TemplateBindings,
+) {
+  const current = await client.agent(agentId);
+  if (current.archived_at !== null) throw new Error('Archived templates cannot be revised');
+  const definition: AgentInput = structuredClone(current.definition);
+  definition.instructions = instructions;
+  delete definition.env;
+  delete definition.variables;
+  const intent: RevisionIntent = {
+    agent_id: agentId, expected_revision: current.revision, definition,
+  };
+  const preflight = await client.preflightAgent(definition, bindings);
+  return { intent, preflight };
+}
+
+async function applyReviewedRevision(client: Hexagon, intent: RevisionIntent) {
+  return await client.reviseAgent(intent.agent_id, intent.definition, intent.expected_revision);
+}
+
+async function copyTemplate(client: Hexagon, agentId: string, newName: string) {
+  return await client.copyAgent(agentId, newName);
+}
+
+async function archiveTemplate(client: Hexagon, agentId: string) {
+  return await client.archiveAgent(agentId);
+}
+
+async function readPinnedInitialization(client: Hexagon, sessionIds: string[]) {
+  const snapshots: Record<string, Awaited<ReturnType<Hexagon['sessionInitialization']>>> = {};
+  for (const id of sessionIds) snapshots[id] = await client.sessionInitialization(id);
+  return snapshots;
+}
+```
+
+
+Review and privately persist the returned `intent` and preflight result before separately calling the apply helper. Preflight evaluates the proposed definition with explicit bindings; it neither reserves a revision nor proves cloud execution. In particular, it does not load the old template's hidden environment into this unsaved candidate. The omission of both `env` and `variables` is intentional: applying the revision preserves existing stored values. This example cannot preview those values or prove the new instructions work with them. To replace or clear the environment, use a deliberately supplied complete map and review that separate change.
+
+The apply helper sends the original `expected_revision` without fetching a newer revision and silently overwriting another editor. On `agent_revision_changed`, reload and compare changes before preparing a new intent. A lost successful response can produce the same conflict on retry: compare stored revision history with your saved intent, rather than incrementing the expected number. A matching definition alone is not an idempotency receipt.
+
+Copy and archive are separate deliberate actions. Copy returns a new Agent with inherited connection bindings and effective environment; retain its ID and review its defaults before use. Retrying a lost copy response can create another template. Archive returns `{id, revision, archived_at}` and keeps the first archive timestamp on repetition. It prevents new Sessions and further revisions, including attempts to create a Session from an older revision; it does not close existing Sessions.
+
+Use `read_pinned_initialization` / `readPinnedInitialization` with the saved A/B/C Session IDs in the rollout below to compare their chosen revisions and effective definitions. Snapshots redact environment values and separate reads are not atomic. Inspection does not run the Harness, compare actual workspace files or clean up resources. Templates missing from the tenant return `agent_not_found`; archived updates return `agent_archived`; preflight can fail on binding/readiness/compatibility before a revision is attempted. See [Agent response contracts](/en/reference/agents) for exact return fields and errors.
+
+## Choose a revision deliberately
+
+Supplying `agent_revision` selects that stored revision; omitting it selects the Agent's current revision when the Session is created. Save the returned Session's `agent_revision` instead of assuming it stayed unchanged between a prior Agent query and creation. For a controlled rollout, explicitly select one revision for new Sessions and inspect their initialization snapshots.
+
+To return new work to an earlier definition, select an existing older revision on new Session creation while the Agent remains unarchived. This does not downgrade an existing Session, revert external side effects or restore a previous workspace. An archived Agent cannot be used to create Sessions even with an older revision; the API does not provide an unarchive operation.
+
+Treat revision edits as read → prepare complete definition → submit with expected revision → inspect the returned revision. Preserve desired fields such as instructions, context, tools and resource policy when constructing the complete definition; fields omitted from that replacement can revert to defaults or disappear. Environment preservation is the explicit exception described above. Keep the intended definition in your application/configuration records so a lost revision response can be investigated before another edit.
+
+## Pinning and archival
+
+A Session pins its chosen revision and connection configuration. Template changes do not rewrite existing Sessions or switch their running Harness.
+
+`archive_agent` / `archiveAgent` prevents new Sessions from using the template and prevents further revision. Existing Sessions and historical records retain their own lifecycle. Archiving does not close cloud resources or delete conversations/artifacts.
+
+## Verify
+
+Create two independent Sessions from one revision and confirm separate workspaces. Revise, create a third, and compare initialization snapshots: the original Sessions retain their revisions and the new one uses the selected update. Archive, verify new creation is rejected, then close all Sessions and confirm cleanup.
+
+Revision and archival require appropriate permissions. Permission to create a template does not imply all management routes are available to application Tokens. See [Token routes](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/credentials/application-tokens.ts). Sources: [Agent/Session implementation](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts), [initialization](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/session-initialization.md).
+
+## A revision rollout to inspect
+
+Use a dedicated template with revision 1 instructions “Report changed files” and timeout 180 seconds. Create Sessions A and B explicitly from revision 1. Prepare a complete revision 2 definition with instructions “Report changed files and test results” and timeout 300 seconds; preserve all other intended fields. Submit it with expected revision 1, then create Session C explicitly from returned revision 2.
+
+| Record | Expected immutable selection |
+| --- | --- |
+| Session A | Revision 1, original instructions, timeout 180 |
+| Session B | Revision 1, original instructions, timeout 180; separate workspace from A |
+| Session C | Revision 2, updated instructions, timeout 300 |
+| New Session after archive | Rejected with `agent_archived`, including attempts to select revision 1 |
+
+Compare each Session's initialization snapshot, not just the current template. A source-level [preflight regression](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/execution-preflight.test.ts) checks revision increments, stale expected revisions, unchanged old Session configuration and archived creation rejection with no cloud operations. That local regression alone does not prove workspace execution; the independent cloud exercise below supplies its own execution and cleanup record. Keep A/B/C identifiers before any failure; archive is not their cleanup operation.
+
+## Run the A/B/C exercise
+
+Both complete programs below passed independent real-cloud execution on 2026-11-20 with Vercel, built-in Pi 1.5.2 and the configured Messages endpoint. The [rollout record](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-template-revisions-docs-cloud.json) covers six completed Runs on six distinct cloud resources, actual successful marker commands, A/B revision 1 versus C revision 2 snapshots, rejection of both revisions after archive, unchanged historical snapshots, six closed Sessions with completed delete operations, and retained proof bytes. This is scoped evidence for the documented example, not a general security/isolation certification or a promise about other Providers.
+
+Use the [Python program](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/template-revisions.py) or [TypeScript program](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/template-revisions.ts) from the repository root, after the SDK setup and enabled connection variables in the [first Session tutorial](/en/start/first-session). Each program creates one dedicated template and three independent cloud Sessions; running both doubles that scope. It uses built-in Pi 1.5.2 and consumes cloud/model resources.
+
+```sh
+.local/docs-example-venv/bin/python examples/documentation/template-revisions.py
+```
+
+```sh
+npm --prefix sdk/typescript run build
+./node_modules/.bin/tsx examples/documentation/template-revisions.ts
+```
+
+The program creates A and B from revision 1, then saves and applies a complete revision 2 definition before creating C. Each Session runs a command that checks for the absence of `.hexagon-revision-marker` and writes its own marker. The Agent exports `proof.txt` with the Session label; the program checks exact bytes and hash. Inspect the actual command execution events as well: an exported label alone does not establish filesystem isolation.
+
+After the tasks, the program compares pinned revision, instructions and timeout in all three initialization snapshots. It archives the template, requires `409 agent_archived` for attempted creation from both revisions, and checks that archival has not changed historical snapshots. It explicitly closes A/B/C and downloads their proof artifacts again. An earlier Session can already have expired under its pinned timeout; close still verifies the same Session's final state. Archive itself never substitutes for resource cleanup.
+
+Private records are `.local/docs-revisions-python/journal.json` and `.local/docs-revisions-typescript/journal.json`. Successful execution ends at `closed_and_history_checked`; verify completed delete operations separately in Console/resource operations. This success does not prove that arbitrary instructions produce correct work or that all Providers preserve workspaces identically.
+
+| Last recorded phase | Continue safely |
+| --- | --- |
+| Before Agent or Session creation | A response may have been lost; inspect existing records before creating another resource |
+| `before_revision` | Compare saved intent and actual revision history; do not increase `expected_revision` blindly |
+| `before_run_A/B/C` | Use the recorded Session, input and key to reconcile the same submission |
+| `observing_A/B/C` | Query the recorded Run and events; ten-minute observation timeout does not cancel it |
+| `before_archive` or a later phase | Inspect actual archive state and original Sessions; archiving does not erase history or close resources |
+| `closing_A/B/C` | Inspect the same Session and delete operations, then verify retained bytes |
+
+The initial journal is created exclusively. Do not delete it to bypass retry protection. On a failed assertion, preserve all IDs, investigate, and explicitly close any known Sessions, including `unexpected_sessions` if an archive check unexpectedly succeeded. Archive the dedicated template if it remains active after cleanup. The API has no hard-delete/unarchive operation; an archived test template remains visible as history.
+
+Next: [backend integration](/en/build/backend-integration), [initialization and pinned configuration](/en/concepts/initialization), [HTTP API](/en/reference/http).

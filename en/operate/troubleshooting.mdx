@@ -1,0 +1,97 @@
+---
+title: "Troubleshoot by symptom"
+---
+
+Retain Session, Run, operation IDs, and the last cursor before investigating. Before retrying, determine whether an operation may already have taken effect. Do not attribute every failure to user credentials or recreate work by default.
+
+| Symptom | Inspect first | Action / completion signal |
+| --- | --- | --- |
+| Startup fails | Doctor, database identity/port, private service.log | Repair the specific prerequisite; authenticated status works |
+| Local SDK cannot discover | Data directory, current directory, descriptor permissions/loopback | Select correct workspace; read the original Session |
+| 401 / 403 | Originating service, expiry/revocation, required role | Correct identity without giving owner Tokens to frontend |
+| Connection cannot enable | Revalidation after edits, disabled Secret | Validate ready, then explicitly enable |
+| Preflight rejects | Harness/model, Tool readiness, OCI/network capabilities | Resolve the reason without silently weakening policy |
+| Creation remains unknown | Original operation and Provider handle | Reconcile; empty listing alone does not justify recreation |
+| No Run output | Durable state, waits, provisioning stage | Act on the original Run, not another submission |
+| Waiting for authorization | Required Tool call and account authorization state, distinct from an approval decision | Complete the intended account authorization; observe the original call resume or its recorded terminal failure |
+| Waiting for approval | Pending approval, exact Tool arguments and authorized decision maker | Explicitly approve or reject that call; inspect the recorded decision and resulting call/Run state, not just the disappearance of the dialog |
+| Model request fails | Selected protocol, model identifier, credential ingress and sanitized upstream error | Fix the identified boundary; distinguish transport/authentication from unsupported protocol or model; verify an intended model response on a safe subsequent task |
+| Tool write has no confirmed result | Call ID, business reference and external operation record | Reconcile the original side effect; confirm its outcome before any retry, even if the Run failed |
+| Streaming UI stops | Saved cursor, transport, durable Run | Reconnect/deduplicate; match final query |
+| Upload rejected | Path, size/encoding, whether first Run exists | Correct pre-execution inputs; use Agent work afterward |
+| Empty artifacts | Run state, output directory, export failure | Verify actual export rather than assistant claims |
+| Preview fails | Process/port, grant expiry, Session, origin/TLS | Working HTTP interaction and rejected invalid grants |
+| Wake loses context | Managed path, Provider strategy, exact Harness | Verify files/conversation separately; do not replay unknown invocation |
+| Closing persists | Original deletion, resource/endpoints | Verify Provider-specific deletion completion and associated resources; acknowledgement is not completion |
+
+## Example: no new events
+
+Query the Run. For waiting_approval, inspect the approval and Tool call, then submit an authorized explicit decision. For completed, investigate cursor handling and read output. For unreachable Runtime, retain the binding/stage and observe recovery without launching another Harness.
+
+All three can look like “no new text,” but need different actions. Recovered connectivity does not verify an external write; unknown Tool outcomes need [reconciliation](/en/operate/reconciliation).
+
+## Start with a bounded read-only check
+
+When you have the original Session / Run IDs, use the repository diagnostic program. Install the appropriate SDK using the [example setup](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/README.md), then choose one client from the repository root:
+
+```sh
+python examples/documentation/inspect-run.py --session YOUR_SESSION_ID --run YOUR_RUN_ID --after 0 --max-pages 20
+```
+
+```sh
+npm --prefix sdk/typescript run build
+./node_modules/.bin/tsx examples/documentation/inspect-run.ts --session YOUR_SESSION_ID --run YOUR_RUN_ID --after 0 --max-pages 20
+```
+
+Replace the placeholders with the original IDs. These CLIs discover a local workspace; they are not hosted Token configuration examples. The program checks Run/Session association, then reads state, bounded event pages and artifact metadata. It does not submit, cancel, approve or close work. Output still contains private resource IDs and belongs in local diagnostic records.
+
+- `run_state` and `error_code` help select a branch; an absent error code does not establish healthy dependencies.
+- `event_type_counts` covers only this read window, not necessarily the full history.
+- `reached_empty_event_page` does not mean task completion; `last_observed_cursor` is not a durable application-consumer checkpoint.
+- Reads are not an atomic snapshot. State can change between queries; investigate using the same identifiers rather than recreating work because observations differ.
+
+## Recorded real case: recovering a stopped credential ingress
+
+The [2026-11-18 automatic credential-ingress acceptance](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-18-automatic-credential-ingress.md) records a real cloud scenario: the control plane remained running while the ingress for protected model requests was deliberately stopped. API reachability and the Sandbox's ability to make protected upstream requests are separate paths.
+
+| Stage | Observation and response in that historical record |
+| --- | --- |
+| Failure injection | Python stopped ingress before Session creation; TypeScript stopped it after creation but before Run submission |
+| Diagnosis | Inspect dedicated credential-ingress readiness rather than replacing model or Provider keys first |
+| Recovery | Python create_session and the TypeScript worker execution path independently triggered platform-managed ingress recovery without manual network settings |
+| Execution confirmation | The Vercel / Pi / SiliconFlow tasks returned the expected Python and TypeScript markers |
+| Cleanup confirmation | Both Sessions closed, Provider deletions completed and the test application Token was revoked |
+| Scope | Evidence for that date, combination and deployment policy, not automatic recovery from every network failure |
+
+The record also preserves an implementation defect: an overly broad recovery guard treated idle Runtimes as active work that must block origin replacement. It was narrowed to persisted nonterminal invocations without deleting original task resources to bypass the guard. Distinguish an incorrect guard from genuinely active work; terminating original tasks is not evidence that recovery is correct.
+
+For `credential_ingress_recovery_blocked`, inspect whether a persisted active invocation still needs the original origin. Explicitly disabled or external/hosted ingress retains its deployment policy; the platform does not silently open a development tunnel. Follow the [networking guide](/en/operate/networking) for that deployment, and confirm the original task state, actual request outcome and cleanup.
+
+## Locate the responsible layer
+
+| Observation | Primary investigation | Avoid this inference |
+| --- | --- | --- |
+| Local discovery fails before HTTP | SDK, directory and local identity | Model or cloud account must be broken |
+| Accepted Run stays queued | Worker readiness and scheduling | HTTP 200 means execution started |
+| Provisioning with unknown resource outcome | Provider operation, original handle and reconciliation | Timeout proves no allocation |
+| Runtime unreachable / interrupted | Original Runtime binding and invocation | Launch another Harness to replay uncertain work |
+| Harness exits or produces invalid output | Harness version, invocation exit/error and adapter event contract | A reachable Runtime proves Harness execution succeeded |
+| Model transport succeeds but response is rejected | Exact model protocol, sanitized response error and selected model | HTTP reachability proves protocol compatibility |
+| waiting_authorization / waiting_approval | Tool call, account authorization or specific approval | The model has stopped responding |
+| Run completed but UI does not update | Client cursor and output retrieval | Submit another task to repair UI history |
+| Preview fails while artifacts download | Service process, port and preview authorization | Preview lifetime equals artifact persistence |
+
+## Report useful evidence
+
+Include code/SDK version, Provider/Harness version, model protocol, stage, sanitized error, reproduction, expected/actual results, evidence location, and cleanup status. Keep real resource IDs privately for cleanup; use redacted references publicly. Exclude Tokens, database passwords, preview tickets, raw headers, and upstream bodies.
+
+Record failed and later successful attempts separately. Distinguish simulation from real cloud reproduction. Do not erase failures to make the history appear uniformly successful.
+
+## Relevant procedures
+
+- [Identity](/en/operate/access-control), [credentials](/en/operate/credentials)
+- [Networking](/en/operate/networking), [diagnostics](/en/operate/observability)
+- [Application recovery](/en/build/recovery), [resource reconciliation](/en/operate/reconciliation)
+- [Files](/en/build/project-context), [artifacts](/en/build/artifacts), [previews](/en/build/private-preview)
+
+Use original states and sanitized diagnostics to select the procedure. Completion requires observed recovery and confirmed resource outcomes, not merely disappearance of an error message.

@@ -1,0 +1,108 @@
+{
+  "date": "2026-11-20",
+  "scope": "Independent real Vercel/Pi cloud execution of exact two-file artifact exercise in Python and TypeScript. Exact names/bytes, size/hash, completed Run, closed Session, completed delete operations, and every artifact downloaded again after closure. No Tools, approvals, other providers or protocols certified.",
+  "program_sha256": {
+    "examples/documentation/artifact-retention.py": "5838d227f1ddf29c4871f736e031e9c13c660d5021e45df612730de7ce978427",
+    "examples/documentation/artifact-retention.ts": "a00854d976c20fa9c864b890ddffba2f9d6a9d3de6269a0b9b923d497531ec0f"
+  },
+  "journeys": [
+    {
+      "sdk": "python",
+      "exit_code": 0,
+      "journal_phase": "closed_and_retention_checked",
+      "session_state": "closed",
+      "run_state": "completed",
+      "nonempty_final_answer": true,
+      "combination": {
+        "sandbox": "vercel",
+        "model_provider": "anthropic-compatible",
+        "model": "deepseek-ai/DeepSeek-V4-Flash",
+        "harness": {
+          "id": "pi",
+          "version": "1.5.2"
+        }
+      },
+      "artifacts": [
+        {
+          "name": "message.txt",
+          "size": 19,
+          "sha256": "ff1e45828a4a539980e0bb0a45b3cebaaeb0446649ec3aa703a7424c05039429",
+          "metadata_matches": true,
+          "same_as_preclose_download": true,
+          "required_content_matches": true
+        },
+        {
+          "name": "status.json",
+          "size": 12,
+          "sha256": "e5f1eb4d806641698a35efe20e098efd20d7d57a9b90ee69079d5bb650920726",
+          "metadata_matches": true,
+          "same_as_preclose_download": true,
+          "required_content_matches": true
+        }
+      ],
+      "resource_operations": [
+        {
+          "kind": "delete",
+          "state": "completed"
+        },
+        {
+          "kind": "create",
+          "state": "completed"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "sdk": "typescript",
+      "exit_code": 0,
+      "journal_phase": "closed_and_retention_checked",
+      "session_state": "closed",
+      "run_state": "completed",
+      "nonempty_final_answer": true,
+      "combination": {
+        "sandbox": "vercel",
+        "model_provider": "anthropic-compatible",
+        "model": "deepseek-ai/DeepSeek-V4-Flash",
+        "harness": {
+          "id": "pi",
+          "version": "1.5.2"
+        }
+      },
+      "artifacts": [
+        {
+          "name": "message.txt",
+          "size": 19,
+          "sha256": "ff1e45828a4a539980e0bb0a45b3cebaaeb0446649ec3aa703a7424c05039429",
+          "metadata_matches": true,
+          "same_as_preclose_download": true,
+          "required_content_matches": true
+        },
+        {
+          "name": "status.json",
+          "size": 12,
+          "sha256": "e5f1eb4d806641698a35efe20e098efd20d7d57a9b90ee69079d5bb650920726",
+          "metadata_matches": true,
+          "same_as_preclose_download": true,
+          "required_content_matches": true
+        }
+      ],
+      "resource_operations": [
+        {
+          "kind": "delete",
+          "state": "completed"
+        },
+        {
+          "kind": "create",
+          "state": "completed"
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "private_resource_records": ".local/docs-content-checks/artifact-retention-verified-private.json",
+  "limits_scope": "No new limit violation cloud run. Existing source-reviewed Runtime and artifact validation limits remain separate evidence.",
+  "verification_notes": [
+    "Initial read-only verifier incorrectly assumed Run.output was a string; corrected against reference/runs.md to require assistant role and nonempty text on the output object. Re-ran read-only verification without creating another Session or Run.",
+    "Python AST parsing and strict standalone TypeScript checking passed before cloud execution."
+  ]
+}

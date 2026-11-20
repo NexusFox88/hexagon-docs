@@ -1,0 +1,92 @@
+---
+title: "接入 Upstash Box"
+---
+
+当前 Hexagon 使用持久 Box：保留磁盘，通过 pause/resume 管理空闲计算。任务由 Hexagon Runtime 与选定 Harness 执行，不调用供应商内置 Agent runner。旧工程记录中的 Ephemeral Box、原生 TTL 探测和早期传输实验不是当前接入步骤。
+
+## 配置连接
+
+准备有 Box 访问、创建和删除权限的 API key。config 只有 `size`，接受 `small`、`medium`、`large`，默认 `small`；不要添加其他 Provider 的 CPU、内存或镜像字段。具体规格、额度和账户可用性另行核对，本页不推断固定价格。
+
+以下本地管理客户端示例从私有环境读取 API key，不将它传入 Sandbox。hosted 初始化见[自托管](/zh-CN/operate/self-host)。保存返回的连接 ID，重复运行创建示例会得到额外连接。
+
+```python
+import os
+from hexagon import Hexagon
+client = Hexagon.local()
+connection = client.create_connection(
+    kind="sandbox", provider="upstash", name="Upstash workspace",
+    credential=os.environ["UPSTASH_BOX_API_KEY"], config={"size": "small"},
+)
+checked = client.validate_connection(connection["id"])
+if checked["status"] != "ready":
+    raise RuntimeError("Inspect Upstash connection diagnostics")
+client.update_connection(connection["id"], enabled=True)
+```
+
+```typescript
+import { Hexagon } from '@hexagon/agent-sdk';
+const client = await Hexagon.local();
+const credential = process.env.UPSTASH_BOX_API_KEY;
+if (!credential) throw new Error('Set UPSTASH_BOX_API_KEY');
+const connection = await client.createConnection({
+  kind: 'sandbox', provider: 'upstash', name: 'Upstash workspace',
+  credential, config: { size: 'small' },
+});
+const checked = await client.validateConnection(connection.id);
+if (checked.status !== 'ready') throw new Error('Inspect Upstash connection diagnostics');
+await client.updateConnection(connection.id, { enabled: true });
+```
+
+验证操作是 list_boxes，返回的期限说明为 control_plane，且不请求 Provider TTL。列表成功不能证明资源分配或 Harness 可执行。验证后明确启用，修改凭据或 size 后重新验证与启用；现有 Session 保持固定配置。
+
+## 执行第一项任务
+
+将连接 ID 作为[首个 Session](/zh-CN/start/first-session)的 sandbox_connection_id，并选择兼容模型和 Harness。连接器创建 runtime=node、keepAlive=false 的持久 Box，但 Harness 仍由 Hexagon 选择与安装。分别用 Python 和 TypeScript 核对 Run 完成、文件字节、产物导出与关闭。
+
+当前声明包括 files、commands、preview、pause_resume、filesystem_resume；不包含 OCI 或 network_allowlist。需要受限出站域名的任务应选择支持的 Provider，不能静默降级为 allow-all。
+
+命令通过有远程期限的执行包装运行；后台启动只证明进程启动受理，还要观察 Runtime 健康或应用端口。不要以命令提交成功代替任务完成，也不要在完成状态未知时重复外部副作用。
+
+## 私有 HTTP 与传输限制
+
+[私有预览](/zh-CN/build/private-preview)通过已鉴权 exec session 的 stdin/stdout 转发到 Sandbox 内端口，不依赖公开端口 URL。账户 API key 留在控制平面，Runtime 和预览授权仍独立检查。预览服务必须在目标端口实际运行。
+
+当前 Upstash relay 的限制是：
+
+| 限制 | 含义 |
+| --- | --- |
+| 8 MiB 输出排队上限 | stdout / stderr 各自的待消费缓冲检查；慢消费者可能触发 upstash_tunnel_buffer_limit |
+| 16 MiB 输入累计上限 | 单个传输会话送入远程进程的字节总量，包含 HTTP 编码，不等同纯上传文件大小 |
+
+**8 MiB 不是总响应体大小上限。** 持续消费的流可以分批通过，但不能由此承诺任意大小传输。更上层 API、产物或代理可能有独立限制；大文件应分别验证完整性、总量、慢读和中断行为。超过限制时传输失败，不能把截断内容当成功结果。
+
+## 暂停与下一轮
+
+平台空闲策略调用 pause，下一轮 submit 自动 resume 并恢复 Runtime。受管理文件与对话数据按文件系统策略保留；进程内存、打开的网络连接和任意服务不在保证内。不要把 inspect 映射出的 running 状态理解成此刻一定有活跃 CPU：连接器将 Provider idle 规范化为 running，以表示资源存在。
+
+验证时先写入已知文件并记录对话测试值，等待目标空闲条件，再向同一 Session 提交第二轮，检查真实读取与对话继续。Python 与 TypeScript 独立完成；需要预览时复核服务是否需重新启动。参见[空闲与唤醒](/zh-CN/build/idle-and-wake)。
+
+## 期限与关闭
+
+控制平面负责持久期限和最终删除。暂停保留 Box，不释放全部资源；本地控制平面停止也不保证远程 Box 到期删除。关闭之后必须确认 Box 不存在，不能以 pause、idle 或删除请求被接受代替确认。
+
+创建使用持久 operation ID 派生的名字与 hexagon label；响应丢失后查找原名字。删除后仍能 inspect 到资源时返回 upstash_deletion_unconfirmed。只有供应商 404 被当作不存在，鉴权或网络错误保留不确定结果。按[对账指南](/zh-CN/operate/reconciliation)处理原资源，不新建一批来验证上一批是否成功。
+
+## 故障与验收范围
+
+鉴权错误检查 key 与账户权限；分配错误检查 size 和额度；后台启动未知检查原进程与 Runtime；隧道断开检查服务、exec 通道和输出消费；buffer_limit 与 request_limit 分别对应输出排队与输入累计。报告中不要包含原始 API key 或未经脱敏的任务内容。
+
+成功条件包含实际任务、二进制文件完整性、私有访问、两轮文件与对话连续性、关闭后资源不存在和产物仍可读。历史[扩展矩阵](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-expanded-harness-matrix.md)可能包含早期路线，当前恢复策略应结合[serverless 矩阵](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-harness-serverless-matrix.json)逐项看范围。本页是源码核对，没有新执行实云任务。
+
+依据：[Box 连接器](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/sandboxes/upstash.ts)、[传输实现](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/sandboxes/upstash-transport.ts)。下一步：[Sandbox 总览](/zh-CN/integrations/sandboxes)、[产物](/zh-CN/build/artifacts)。
+
+## 区分慢消费者与过大的请求
+
+消费者尚未读走 7 MiB 排队输出，又收到 2 MiB 时，可能因缓冲压力失败。这不表示每个 9 MiB 响应都被禁止。相反，一条 relay 中累计 17 MiB 的请求，即使按小块发送，也超过 16 MiB 输入预算。这些限制都不会覆盖 Hexagon 其他层更小的初始上传、产物或代理限制。
+
+遇到 `upstash_tunnel_buffer_limit` 或异常退出，不能将已收到的前缀当作完整文件。保留操作身份，重试前核对底层请求是否有副作用。纯下载应按预期大小和 hash 拒绝不完整内容。[Relay 测试](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/sandboxes/upstash-transport.test.ts)使用模拟 exec session 检查精确字节与 EOF、慢读取时的过大输出及异常远端退出，不是大型文件的真实 Box 传输验收。
+
+历史 [Box 记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-upstash.md)包含早期 EphemeralBox 调查。当前接入以连接器为准，persistent Box 下一轮证据见 [serverless 记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-harness-serverless-ui.md)。不要将早期原生 TTL 或不支持 pause 的描述复制到当前配置步骤。
+
+依据：[当前生命周期契约](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/serverless-sessions.md)。下一步：[私有预览](/zh-CN/build/private-preview)、[空闲唤醒](/zh-CN/build/idle-and-wake)、[限制](/zh-CN/reference/limits)。

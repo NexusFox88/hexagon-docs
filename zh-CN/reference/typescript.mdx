@@ -1,0 +1,493 @@
+---
+title: "TypeScript SDK 参考"
+---
+
+`@hexagon/agent-sdk` 是 ESM 包，当前版本 `0.1.0`，package manifest 要求 Node.js >=20；控制平面仓库单独要求 Node.js >=22.19.0。不能从 Node 包要求推断浏览器或 edge runtime 兼容。本地发现会导入 Node filesystem、path、OS 模块，应在可信后端运行。
+
+从当前 checkout 构建，再安装到自己的 Node 应用：
+
+```sh
+# Hexagon 仓库根目录
+npm --prefix sdk/typescript run build
+# 在独立应用目录中，替换成真实 checkout 路径：
+npm install /absolute/path/to/Hexagon/sdk/typescript
+```
+
+绝对路径为占位，不代表已公开发布到 npm。参见 [package.json](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/typescript/package.json)，记录版本之外的安装产物与源码 revision。
+
+## 安装打包快照
+
+若要检查独立应用实际收到的文件，可先构建，再生成本地 tarball。在 Hexagon 仓库根目录执行以下命令；将产物目录和应用目录替换为自己的真实路径：
+
+```sh
+npm --prefix sdk/typescript run build
+mkdir -p /absolute/path/to/sdk-artifacts
+npm pack ./sdk/typescript --ignore-scripts --pack-destination /absolute/path/to/sdk-artifacts
+cd /absolute/path/to/your-node-application
+npm install /absolute/path/to/sdk-artifacts/hexagon-agent-sdk-0.1.0.tgz
+node --input-type=module -e 'import { Hexagon } from "@hexagon/agent-sdk"; console.log(typeof Hexagon.local)'
+```
+
+最后一条命令应输出 `function`。版本变化时，使用 `npm pack` 实际输出的文件名。`--ignore-scripts` 跳过包的 prepack 构建，因此前面的显式构建必须成功。打包只写入本地归档，不会发布到 npm。保留归档及其对应源码 revision，以便复现。包从 `dist` 导出 ESM 和 TypeScript 声明，没有声明 CommonJS `require` 入口。
+
+这条 tarball 安装路径已在仓库外的临时应用中检查。回环模拟 HTTP 服务验证了携带鉴权头的 Run 查询、超过 JavaScript 安全整数范围的十进制事件游标，以及 `HexagonError` 的状态码和错误码转换。它证明包的使用路径与这些客户端行为，不证明真实服务端授权或云端执行。见[安装检查记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-typescript-installed-package.json)。
+
+## 初始化客户端
+
+```typescript
+import { Hexagon, HexagonError } from '@hexagon/agent-sdk';
+
+const client = await Hexagon.local();
+// 或在可信后端进程中：
+// const client = new Hexagon(apiOrigin, applicationToken);
+```
+
+显式 URL 不包含 `/v1`，SDK 会追加它。构造不发验证请求。`local({dataDirectory, baseUrl})` 返回 Promise，验证私有工作区文件与回环身份；可选 baseUrl 核对发现端点，不切换为 hosted 认证。见 [local.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/typescript/local.ts)。
+
+不要把控制平面 Token 打包到前端。由后端认证业务用户并转发有权访问的结果。没有客户端级 dispose 方法；`close(session)` 请求关闭 Session。退出事件迭代会释放 reader，不取消执行。
+
+## 公共方法与实际返回类型
+
+清单使用已安装 TypeScript 编译器，从源码声明及推断返回类型生成。初始化值体现真实默认参数，保留 `Promise<any>`，不编造响应模型。类型不会在运行时校验 JSON。通用 request 遇到 HTTP 204 返回 undefined，即使调用者给出了不兼容的泛型也如此。
+
+
+
+| 声明 | 推断返回类型 | 调用上下文 |
+| --- | --- | --- |
+| &lt;code>static async local(options:import('./local.js').LocalOptions=&#123;&#125;)&lt;/code> | &lt;code>Promise&lt;Hexagon&gt;&lt;/code> | [契约与错误](/zh-CN/operate/local-workspace) · [示例](/zh-CN/reference/typescript#初始化客户端) |
+| &lt;code>constructor(base: string, private token: string)&lt;/code> | &lt;code>Hexagon&lt;/code> | [契约与错误](/zh-CN/operate/local-workspace) · [示例](/zh-CN/reference/typescript#初始化客户端) |
+| &lt;code>async request&lt;T = any&gt;(method: string, path: string, body?: unknown, headers: Record&lt;string, string&gt; = &#123;&#125;, signal?: AbortSignal): Promise&lt;T&gt;&lt;/code> | &lt;code>Promise&lt;T&gt;&lt;/code> | [契约与错误](/zh-CN/reference/http) · [示例](/zh-CN/reference/monitoring) |
+| &lt;code>createPreview(session: string, port: number, ttlSeconds = 600)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/artifacts-previews) · [示例](/zh-CN/build/private-preview) |
+| &lt;code>revokePreview(id: string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/artifacts-previews) · [示例](/zh-CN/build/private-preview) |
+| &lt;code>registerHarness(input: HarnessImageInput)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/harness-registration) · [示例](/zh-CN/integrations/harnesses/oci) |
+| &lt;code>registerHarnessPackage(input: unknown)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/harness-registration) · [示例](/zh-CN/integrations/harnesses/source-package) |
+| &lt;code>applications()&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/oauth) · [示例](/zh-CN/reference/typescript#目录与-oauth-用户同意调用) |
+| &lt;code>configureApplicationOAuth(provider:string,input:&#123;client_id:string;client_secret:string;redirect_uri:string&#125;)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/oauth) · [示例](/zh-CN/reference/typescript#目录与-oauth-用户同意调用) |
+| &lt;code>authorizeConnection(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/oauth) · [示例](/zh-CN/reference/typescript#目录与-oauth-用户同意调用) |
+| &lt;code>authorizationFlow(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/oauth) · [示例](/zh-CN/reference/typescript#目录与-oauth-用户同意调用) |
+| &lt;code>cancelAuthorization(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/oauth) · [示例](/zh-CN/reference/typescript#目录与-oauth-用户同意调用) |
+| &lt;code>overview()&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/monitoring) · [示例](/zh-CN/reference/monitoring) |
+| &lt;code>listSessions(query:&#123;limit?:number;offset?:number;search?:string;state?:string&#125;=&#123;&#125;)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/monitoring) · [示例](/zh-CN/reference/monitoring) |
+| &lt;code>listRuns(query:&#123;limit?:number;offset?:number;search?:string;state?:string&#125;=&#123;&#125;)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/runs) · [示例](/zh-CN/reference/typescript#有界读取-run-摘要分页) |
+| &lt;code>pending(limit=25,offset=0)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/monitoring) · [示例](/zh-CN/reference/monitoring) |
+| &lt;code>approvals(run:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/approvals-tools) · [示例](/zh-CN/build/approvals) |
+| &lt;code>connectionDependencies(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/connections) · [示例](/zh-CN/reference/typescript#连接生命周期调用) |
+| &lt;code>listTokens()&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/tokens) · [示例](/zh-CN/reference/typescript#managed-secret-与应用-token-调用) |
+| &lt;code>createToken(label:string,expiresInDays=30)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/tokens) · [示例](/zh-CN/reference/typescript#managed-secret-与应用-token-调用) |
+| &lt;code>rotateToken(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/tokens) · [示例](/zh-CN/reference/typescript#managed-secret-与应用-token-调用) |
+| &lt;code>revokeToken(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/tokens) · [示例](/zh-CN/reference/typescript#managed-secret-与应用-token-调用) |
+| &lt;code>deployment()&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/deployment) · [示例](/zh-CN/reference/deployment) |
+| &lt;code>updateDeployment(config:unknown,expectedRevision:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/deployment) · [示例](/zh-CN/reference/deployment) |
+| &lt;code>retryIngress()&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/deployment) · [示例](/zh-CN/reference/deployment) |
+| &lt;code>resourceOperations(limit=50,offset=0)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/resource-operations) · [示例](/zh-CN/operate/reconciliation) |
+| &lt;code>resourceOperation(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/resource-operations) · [示例](/zh-CN/operate/reconciliation) |
+| &lt;code>reviewResourceOperation(id:string,action:'acknowledge'&#124;'reopen'&#124;'reconcile',note='')&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/resource-operations) · [示例](/zh-CN/operate/reconciliation) |
+| &lt;code>catalog()&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/harness-registration) · [示例](/zh-CN/reference/typescript#目录与-oauth-用户同意调用) |
+| &lt;code>createSecret(input: &#123;name:string;value:string&#125;)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/secrets) · [示例](/zh-CN/reference/typescript#managed-secret-与应用-token-调用) |
+| &lt;code>sessionEnvironment(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/session-access) · [示例](/zh-CN/reference/session-access) |
+| &lt;code>sessionAuthorization(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/session-access) · [示例](/zh-CN/reference/session-access) |
+| &lt;code>revokeSessionConnection(id:string,connection:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/session-access) · [示例](/zh-CN/reference/session-access) |
+| &lt;code>listSecrets()&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/secrets) · [示例](/zh-CN/reference/typescript#managed-secret-与应用-token-调用) |
+| &lt;code>secret(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/secrets) · [示例](/zh-CN/reference/typescript#managed-secret-与应用-token-调用) |
+| &lt;code>updateSecret(id:string,input:&#123;name?:string;value?:string;enabled?:boolean&#125;)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/secrets) · [示例](/zh-CN/reference/typescript#managed-secret-与应用-token-调用) |
+| &lt;code>deleteSecret(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/secrets) · [示例](/zh-CN/reference/typescript#managed-secret-与应用-token-调用) |
+| &lt;code>preflightSession(input:SessionInput)&lt;/code> | &lt;code>Promise&lt;SessionPreflight&gt;&lt;/code> | [契约与错误](/zh-CN/reference/sessions) · [示例](/zh-CN/build/sandbox-policy) |
+| &lt;code>createAccess(session:string,connectionId:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/session-access) · [示例](/zh-CN/reference/session-access) |
+| &lt;code>listAccess(session:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/session-access) · [示例](/zh-CN/reference/session-access) |
+| &lt;code>revokeAccess(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/session-access) · [示例](/zh-CN/reference/session-access) |
+| &lt;code>listConnections()&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/connections) · [示例](/zh-CN/reference/typescript#连接生命周期调用) |
+| &lt;code>connection(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/connections) · [示例](/zh-CN/reference/typescript#连接生命周期调用) |
+| &lt;code>createConnection(input: unknown)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/connections) · [示例](/zh-CN/reference/typescript#连接生命周期调用) |
+| &lt;code>discoverMcpTools(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/connections) · [示例](/zh-CN/reference/typescript#连接生命周期调用) |
+| &lt;code>connectionAuthorization(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/oauth) · [示例](/zh-CN/reference/typescript#目录与-oauth-用户同意调用) |
+| &lt;code>disconnectConnection(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/connections) · [示例](/zh-CN/reference/typescript#连接生命周期调用) |
+| &lt;code>validateConnection(id: string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/connections) · [示例](/zh-CN/reference/typescript#连接生命周期调用) |
+| &lt;code>updateConnection(id: string, input: unknown)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/connections) · [示例](/zh-CN/reference/typescript#连接生命周期调用) |
+| &lt;code>deleteConnection(id: string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/connections) · [示例](/zh-CN/reference/typescript#连接生命周期调用) |
+| &lt;code>listAgents()&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/agents) · [示例](/zh-CN/build/agent-templates) |
+| &lt;code>agent(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/agents) · [示例](/zh-CN/build/agent-templates) |
+| &lt;code>reviseAgent(id:string,definition:AgentInput,expectedRevision:number)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/agents) · [示例](/zh-CN/build/agent-templates) |
+| &lt;code>archiveAgent(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/agents) · [示例](/zh-CN/build/agent-templates) |
+| &lt;code>copyAgent(id:string,name:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/agents) · [示例](/zh-CN/build/agent-templates) |
+| &lt;code>preflightAgent(definition:AgentInput,bindings:Omit&lt;SessionInput,'agent_id'&gt;)&lt;/code> | &lt;code>Promise&lt;SessionPreflight&gt;&lt;/code> | [契约与错误](/zh-CN/reference/agents) · [示例](/zh-CN/build/agent-templates) |
+| &lt;code>createAgent(input: AgentInput)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/agents) · [示例](/zh-CN/build/agent-templates) |
+| &lt;code>createSession(input: SessionInput)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/sessions) · [示例](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/first-session.ts) |
+| &lt;code>sessionInitialization(id:string)&lt;/code> | &lt;code>Promise&lt;SessionInitialization&gt;&lt;/code> | [契约与错误](/zh-CN/reference/sessions) · [示例](/zh-CN/build/agent-templates) |
+| &lt;code>session(id: string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/sessions) · [示例](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/inspect-run.ts) |
+| &lt;code>upload(session: string, files: &#123; path: string; content_base64: string &#125;[])&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/sessions) · [示例](/zh-CN/build/project-context) |
+| &lt;code>submit(session: string, input: string, idempotencyKey: string, origin?:RunOrigin)&lt;/code> | &lt;code>Promise&lt;Run&gt;&lt;/code> | [契约与错误](/zh-CN/reference/runs) · [示例](/zh-CN/build/backend-integration) |
+| &lt;code>run(id: string)&lt;/code> | &lt;code>Promise&lt;Run&gt;&lt;/code> | [契约与错误](/zh-CN/reference/runs) · [示例](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/inspect-run.ts) |
+| &lt;code>toolCalls(run: string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/approvals-tools) · [示例](/zh-CN/build/tool-authorization) |
+| &lt;code>denyToolAuthorization(run: string, call: string, requestHash: string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/approvals-tools) · [示例](/zh-CN/build/tool-authorization) |
+| &lt;code>resolveToolCall(run: string, call: string, resolution: &#123; request_hash: string; outcome: 'completed' &#124; 'failed'; text: string; evidence: string &#125;)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/approvals-tools) · [示例](/zh-CN/reference/approvals-tools) |
+| &lt;code>cancel(id: string)&lt;/code> | &lt;code>Promise&lt;Run&gt;&lt;/code> | [契约与错误](/zh-CN/reference/runs) · [示例](/zh-CN/build/recovery) |
+| &lt;code>pause(session:string,scope:'session'&#124;'sandbox'='session')&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/sessions) · [示例](/zh-CN/build/idle-and-wake) |
+| &lt;code>resume(session:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/sessions) · [示例](/zh-CN/build/idle-and-wake) |
+| &lt;code>sessionActivity(period:'24h'&#124;'7d'='24h')&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/monitoring) · [示例](/zh-CN/reference/monitoring) |
+| &lt;code>close(session: string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/sessions) · [示例](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/first-session.ts) |
+| &lt;code>decide(approval: string, approved: boolean)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/approvals-tools) · [示例](/zh-CN/build/approvals) |
+| &lt;code>events(run: string, after = '0')&lt;/code> | &lt;code>Promise&lt;&#123; events: RunEvent[]; &#125;&gt;&lt;/code> | [契约与错误](/zh-CN/reference/runs) · [示例](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/inspect-run.ts) |
+| &lt;code>artifacts(run: string)&lt;/code> | &lt;code>Promise&lt;&#123; artifacts: Artifact[]; &#125;&gt;&lt;/code> | [契约与错误](/zh-CN/reference/artifacts-previews) · [示例](/zh-CN/build/artifacts) |
+| &lt;code>async downloadArtifact(id: string): Promise&lt;Uint8Array&gt;&lt;/code> | &lt;code>Promise&lt;Uint8Array&lt;ArrayBufferLike&gt;&gt;&lt;/code> | [契约与错误](/zh-CN/reference/artifacts-previews) · [示例](/zh-CN/build/artifacts) |
+| &lt;code>async *stream(run: string, after = '0', signal?: AbortSignal): AsyncGenerator&lt;RunEvent&gt;&lt;/code> | &lt;code>AsyncGenerator&lt;RunEvent, any, any&gt;&lt;/code> | [契约与错误](/zh-CN/reference/runs) · [示例](/zh-CN/build/stream-events) |
+
+
+
+运行 `node tooling/generate-typescript-doc-index.mjs` 重新生成。unknown、输入对象与查询值仍由服务端 schema 验证。可选查询字段应省略，不显式传 undefined，因为列表方法会字符串化已提供的键值。分页显式处理；events、artifacts 保留 collection envelope。
+
+## 导出类型
+
+| 类型 | 含义与限制 |
+| --- | --- |
+| SessionInput／AgentInput | 配置输入，可选字段不能约束全部跨字段规则，例如 harness 与 agent_id 必须二选一 |
+| AgentBehavior／AgentEnvironment | 初始化和 guest 环境；guest 可读环境变量，它不是受管凭据存储 |
+| HarnessImageInput | OCI 注册字段与协议 union；服务端解析固定 digest 并检查兼容 |
+| SessionPreflight | 就绪、组合、生命周期与凭据边界；结构支持与真实证据分开 |
+| SessionInitialization | 历史固定快照、环境名称与脱敏元数据，不是含秘密的重放数据 |
+| Run／RunOrigin | Run 状态、输出、错误与可选关联信息；state 是 string，不是完整状态机枚举 |
+| RunEvent | 可选字符串 id、type 与 unknown payload；根据 type 缩小 payload 类型 |
+| Artifact | 产物元数据；downloadArtifact 单独返回字节 |
+| HexagonError | 包含数字 status 与字符串 code 的异常 |
+
+定义见 [index.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/typescript/index.ts)。LocalOptions 在 local.ts 声明，package exports 暴露根入口，不承诺提供公开 local 子路径导入。
+
+### 类型声明与 HTTP 契约的宽窄差异
+
+| 声明 | 必须保留的运行时契约 |
+| --- | --- |
+| `preflightAgent(definition, bindings)` | 当前 `Omit<SessionInput, 'agent_id'>` 标注还允许 Session 专用字段。`bindings` 只传 `sandbox_connection_id`、`model_connection_id`、`tools` 和 `connections`；服务端拒绝其他字段，行为配置应放在 `definition` |
+| `Run` | HTTP 投影还包含此接口未声明的 `input`、`created_at`、`updated_at`。客户端原样返回 JSON；访问额外字段时依据 [Run 契约](/zh-CN/reference/runs)并使用应用自行验证的形状 |
+| `RunEvent` | JSON 事件列表含 `created_at`，SSE 事件不含。共享接口省略时间戳且将 `data` 保持为 unknown；使用负载字段前先验证 |
+| 推断为 `Promise<any>` 的方法 | 不代表可以依赖任意字段；响应以链接的 HTTP 契约为准，`request<T>` 不会验证它 |
+
+即使 TypeScript 接受对象，服务端校验仍然生效；声明省略响应字段也不代表服务端丢弃了该字段。运行时验证与类型断言应分开，两者都不会改变权限或重试语义。
+
+## 带上下文的常见调用
+
+片段需要已初始化客户端、就绪连接 ID、已保存提交意图及应用持久化函数，不含完整恢复与清理；完整流程见[首个 Session 程序](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/first-session.ts)。
+
+```typescript
+const session = await client.createSession({
+  harness: {id: 'pi', version: '1.5.2'},
+  sandbox_connection_id: sandboxId,
+  model_connection_id: modelId,
+});
+await saveSessionId(session.id);
+await client.upload(session.id, [{
+  path: 'README.txt',
+  content_base64: Buffer.from('Project context\n').toString('base64'),
+}]);
+const run = await client.submit(session.id, savedInput, savedKey,
+  {request_id: businessRequestId});
+await saveRunId(run.id);
+for await (const event of client.stream(run.id, savedCursor ?? '0')) {
+  if (event.id) await storeEventAndCursorAtomically(run.id, event);
+}
+const result = await client.run(run.id);
+```
+
+与 Python upload 不同，TypeScript 接收含已编码 Base64 字符串的数组。在应用 journal 保存 Session、Run ID 与精确 input/origin/key。提交响应丢失可用相同意图恢复，Session 创建没有同等 Run 提交幂等保证。参见[后端集成](/zh-CN/build/backend-integration)与[项目上下文](/zh-CN/build/project-context)。
+
+## 事件流、取消与错误
+
+`stream(run, after='0', signal?)` 是 AsyncGenerator，使用 for await 迭代，只持久化有 ID 的事件，从最后提交的游标重连原 Run。ID 保持字符串。stream.end 没有持久 ID，结束后仍查询 Run。意外 EOF 或截断抛普通 Error，不自动重连。
+
+传入 stream 的 AbortSignal 只停止本地观察，不取消 Run。cancel(run) 请求取消执行，close(session) 单独处理资源清理。并非所有便捷方法都接受 signal；通用 request 在第五个参数接受它，不提供统一默认请求超时。支持处可传 signal，但必须正确处理操作结果未知。
+
+普通 JSON 错误转为 HexagonError，使用服务端 code 或 http_error；流打开错误为 event_stream_failed，下载缺省错误为 artifact_download_failed。Fetch、abort、JSON 错误可能保持原生异常。通用 request 拒绝重定向，而 stream、download 使用 fetch 缺省重定向行为，应配置实际可信 API origin，不依赖跳转。详见[错误](/zh-CN/reference/errors)。
+
+## 管理流程与缺口
+
+连接 CRUD 和验证见[连接生命周期](/zh-CN/build/connection-lifecycle)，操作选择见[应用](/zh-CN/integrations/apps)、[MCP](/zh-CN/integrations/mcp)，revision 见[Agent 模板](/zh-CN/build/agent-templates)，决定流程见[审批](/zh-CN/build/approvals)与[对账](/zh-CN/operate/reconciliation)。Secret、Token、OAuth、部署方法要求相应管理角色，类中存在方法不等于调用者获得授权。grant 和返回凭据不能进入日志。
+
+通用 `request<T>(method, path, ...)` 可访问已实现但没有便捷方法的 JSON 端点，例如某 Session 的 Run 列表，不能创造端点、替代浏览器 OAuth 或代理任意二进制响应。泛型是编译期断言，不是 schema 校验。SDK 没有内置持久 journal、统一自动分页或副作用安全重试机制。
+
+已逐个审阅公开方法的源码清单、所链接示例的调用点及返回/错误契约映射。示例复用初始化上下文和 HTTP 规范；存在调用点不等于所有操作均已执行。安装包检查和实云旅程保持原有证据范围与日期；源码、类型、确定性与实云证据的区别见[测试指南](/zh-CN/contribute/testing)。
+
+## Managed Secret 与应用 Token 调用
+
+以下是彼此独立的辅助函数，需要已初始化的 **owner** 客户端。定义函数不会发送请求；只调用你实际需要的操作。同租户资源 ID 来自私有管理记录，凭据值来自你的凭据存储。示例向调用方传播错误，不自动重试写入。TypeScript 片段使用前文的 `Hexagon` 导入。
+
+### 保存和检查 Provider 凭据
+
+```typescript
+async function inspectSecrets(client: Hexagon, secretId: string) {
+  const metadata = (await client.listSecrets()).secrets;
+  const detail = await client.secret(secretId);
+  return { metadata, detail };
+}
+
+async function createManagedSecret(client: Hexagon, name: string, value: string) {
+  const created = await client.createSecret({ name, value });
+  return { id: created.id, version: created.version };
+}
+
+async function replaceManagedSecretValue(client: Hexagon, secretId: string, newValue: string) {
+  const changed = await client.updateSecret(secretId, { value: newValue });
+  return { id: changed.id, version: changed.version };
+}
+
+async function deleteUnusedManagedSecret(client: Hexagon, secretId: string) {
+  // Server rechecks dependencies; a preceding GET cannot reserve deletion.
+  await client.deleteSecret(secretId); // HTTP 204 -> undefined
+}
+```
+
+`inspect_secrets` / `inspectSecrets` 返回元数据和依赖信息，不返回已保存的值。其中 Session 依赖数组有数量上限，不是完整历史审计。创建返回的 ID/version 应持久化；名称不是去重键。
+
+替换值会使引用连接失效：连接变为 disabled、draft，需要重新验证后再显式启用。返回的 Secret version 是状态观察，不是乐观锁条件。超时后不要自动重复调用此函数，应先检查原 Secret 和连接状态。删除可能返回 `secret_in_use`；停用连接不会解除引用。成功删除没有 JSON 响应。这些操作都不会撤销外部 Provider 的凭据。完整定义见 [Secret 契约](/zh-CN/reference/secrets)。
+
+### 签发、轮换和撤销后端凭据
+
+```typescript
+async function applicationTokenMetadata(client: Hexagon) {
+  const { tokens } = await client.listTokens();
+  return tokens.filter((row: { role: string }) => row.role === 'application');
+}
+
+async function issueApplicationToken(client: Hexagon, label: string) {
+  return await client.createToken(label, 30);
+}
+
+async function rotateApplicationToken(client: Hexagon, oldTokenId: string) {
+  return await client.rotateToken(oldTokenId);
+}
+
+async function revokeApplicationToken(client: Hexagon, tokenId: string) {
+  const receipt = await client.revokeToken(tokenId);
+  return { id: receipt.id, revoked_at: receipt.revoked_at };
+}
+```
+
+创建和轮换辅助函数返回**包含明文的对象**，字段为 `id`、`token`、`label`、`role`、`expires_at`、`created_at`。应立即将 `token` 转存至后端的凭据存储，并在私有管理记录中保留 ID。不要打印整个对象、返回给浏览器，或放入异常诊断。如果写入凭据存储失败，私下保留回执并对账该凭据；重新执行辅助函数会发起另一项操作，不能找回第一次的明文。
+
+元数据列表包含已到期和已撤销的应用 Token；按 role 过滤不表示结果都是有效凭据。轮换返回**新的 ID**，立即使旧 Token 失效，并保留原到期时间。没有重叠有效窗口，重放旧轮换也无法取回替代凭据。撤销返回包含 `revoked_at` 的 JSON，与 Secret 删除的空响应不同；同一应用 Token 可以重复撤销，但不会取消已接受的 Run。
+
+写入前私下记录操作意图和目标。创建或轮换响应丢失时需要通过元数据调查，名称和 label 本身不足以唯一确认结果。响应丢失处理见 [Token 契约](/zh-CN/reference/tokens)，部署和凭据验证见[身份运维指南](/zh-CN/operate/access-control)。这些示例说明 SDK 调用方式；语法或类型检查不证明真实凭据签发、外部 Provider 撤销或完整轮换上线成功。
+
+## 连接生命周期调用
+
+以下辅助函数彼此独立，需要已初始化的 owner 客户端；定义函数不会创建或修改连接。Vercel 创建示例需要真实的 project/team 配对，以及来自私有凭据存储的 Token。调用前记录创建意图，取得连接 ID 后先持久化，再进入验证步骤。[Vercel 配置指南](/zh-CN/integrations/sandboxes/vercel)说明 Provider 专属要求；使用其他 Provider 时，先阅读对应指南再替换完整定义。
+
+```typescript
+async function inspectConnection(client: Hexagon, connectionId: string) {
+  return {
+    catalog: (await client.listConnections()).connections,
+    connection: await client.connection(connectionId),
+    dependencies: await client.connectionDependencies(connectionId),
+  };
+}
+
+async function createVercelConnection(
+  client: Hexagon, projectId: string, teamId: string, token: string,
+) {
+  const created = await client.createConnection({
+    kind: 'sandbox', provider: 'vercel', name: 'Vercel workspace',
+    credential: token,
+    config: { project_id: projectId, team_id: teamId, vcpus: 2 },
+  });
+  return created.id;
+}
+
+async function validateAndEnableConnection(client: Hexagon, connectionId: string) {
+  const checked = await client.validateConnection(connectionId);
+  if (checked.status !== 'ready') {
+    return { enabled: false, stage: 'validation', code: checked.validation?.code };
+  }
+  const enabled = await client.updateConnection(connectionId, { enabled: true });
+  return { enabled: enabled.enabled, stage: 'enable',
+    status: enabled.status, version: enabled.version };
+}
+
+async function disableConnection(client: Hexagon, connectionId: string) {
+  const changed = await client.updateConnection(connectionId, { enabled: false });
+  return { id: changed.id, enabled: changed.enabled };
+}
+
+async function deleteUnusedConnection(client: Hexagon, connectionId: string) {
+  await client.deleteConnection(connectionId); // HTTP 204 -> undefined
+}
+
+async function discoverRemoteMcp(client: Hexagon, connectionId: string) {
+  const discovered = await client.discoverMcpTools(connectionId);
+  return { id: discovered.id, version: discovered.version,
+    status: discovered.status, enabled: discovered.enabled };
+}
+
+async function disconnectToolCredentials(client: Hexagon, connectionId: string) {
+  const disconnected = await client.disconnectConnection(connectionId);
+  return { id: disconnected.id, enabled: disconnected.enabled,
+    provider_revoked: disconnected.provider_revoked };
+}
+```
+
+按当前阶段选择函数，不要把整个代码块当作创建、发现、断开、删除的连续流程运行：
+
+| 阶段 | 检查的结果与下一步 |
+| --- | --- |
+| 检查 | 返回连接元数据和依赖样本。多次读取是独立观察，不是事务或删除预约。每个依赖数组最多 100 项；空列表不构成客户端删除授权。 |
+| 创建 | 返回一个连接 ID，此时尚未验证或启用。同名重复创建也可能产生新记录。 |
+| 验证并启用 | HTTP 成功但 `status: invalid` 时，函数返回 `enabled: false`，不尝试启用。只有验证 ready 才进入单独的启用 PATCH；还要检查最终返回状态。 |
+| 停用 | 阻止符合边界的新工作，不会取消所有已派发调用、改写已固定的 Session 定义或删除云资源。 |
+| 删除 | 先处理活动工作并确认依赖 Session 已关闭。服务端独立检查依赖；`connection_in_use` 是错误，不是手动删除数据库记录的理由。成功无 JSON 响应。 |
+| 发现 MCP | 仅适用于 `tool` / `mcp-remote` 连接。发现会更新工具配置，使连接回到 draft、disabled；私下检查新配置，再验证并显式启用。 |
+| 断开 Tool | 仅适用于 Tool 连接。清除本地凭据关联并取消待处理 OAuth 流程。`provider_revoked: false` 表示没有撤销外部账户；也不会删除共享 Secret。 |
+
+验证可能访问 Provider、刷新 OAuth 凭据，模型验证也可能产生用量。并发配置变更可能返回 `connection_changed_during_validation`；再次尝试前重新读取连接，核对预期配置。验证和启用不是一个原子请求，也没有客户端比较并交换保护，应在应用中协调管理变更。
+
+更新 `config` 会替换整个配置对象。凭据或配置变更会重置就绪状态，不应与 `enabled: true` 合并发送。即使重复停用、断开或发送空 PATCH，也可能推进版本。示例向调用方传播 HTTP 和网络错误，不自动重试；响应丢失后检查原 ID 和状态。检查函数可能返回私有账户元数据，不能直接作为日志输出。
+
+准确字段与错误见[连接响应契约](/zh-CN/reference/connections)，既有 Session 的处理见[连接变更指南](/zh-CN/build/connection-lifecycle)，用户同意见 [OAuth](/zh-CN/reference/oauth)。这些示例经过本地语法和类型检查，不代表本轮完成真实 Provider 验证或云任务执行。
+
+## 目录与 OAuth 用户同意调用
+
+这些辅助函数需要已初始化的 owner 客户端。目录查询用于检查已声明的集成和应用操作要求，不会验证你的账户，也不能证明执行组合可用。先选择支持 OAuth 的应用，按预期操作创建 Tool 连接，再使用 Provider 已注册的 client ID/secret 和匹配的回调 URL。回调路径必须为 `/oauth/callback`，详见 [OAuth 配置约束](/zh-CN/reference/oauth)。
+
+```typescript
+async function readIntegrationCatalogs(client: Hexagon) {
+  return { execution: await client.catalog(), applications: await client.applications() };
+}
+
+async function configureOAuthClient(
+  client: Hexagon, provider: string, clientId: string,
+  clientSecret: string, redirectUri: string,
+) {
+  return await client.configureApplicationOAuth(provider, {
+    client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri,
+  });
+}
+
+async function beginConsent(client: Hexagon, connectionId: string) {
+  const flow = await client.authorizeConnection(connectionId);
+  return { id: flow.id, authorization_url: flow.authorization_url,
+    expires_in: flow.expires_in };
+}
+
+async function inspectConsent(client: Hexagon, connectionId: string, flowId: string) {
+  const flow = await client.authorizationFlow(flowId);
+  if (flow.connection_id !== connectionId) {
+    throw new Error('Authorization flow belongs to a different connection');
+  }
+  const authorization = flow.status === 'completed'
+    ? await client.connectionAuthorization(connectionId) : undefined;
+  return { flow, authorization };
+}
+
+async function cancelPendingConsent(client: Hexagon, flowId: string) {
+  return await client.cancelAuthorization(flowId);
+}
+```
+
+将这些函数作为后端用户同意流程的独立阶段调用：
+
+1. 初始化集成或明确变更配置时，配置 OAuth 客户端。不要在每次状态轮询时重复配置，否则可能使正在进行的流程失效。返回的 `{configured, provider, client_id, redirect_uri}` 只确认配置，不代表用户同意。
+2. 发起一次用户同意流程，私下持久化返回的 flow ID 及其连接、业务用户关联，再仅向预期用户展示 `authorization_url`。URL 包含流程 state，不应写入日志，也不要向浏览器传 owner Token。用户在 Provider 页面完成同意，SDK 不自动操作该页面。
+3. 用保存的 flow ID 调用 `inspect_consent` / `inspectConsent`。每次只读取一次流程，完成后再读取一次连接授权状态。应用自行安排有上限的轮询；函数不休眠、不循环，也不发起第二次流程。浏览器跳转本身不能证明成功。
+4. 用户放弃时，针对保存的 flow 调用取消函数。返回的是流程对象，不是空响应。取消只改变 pending 流程；若回调先完成，返回状态仍可能是 completed。
+
+| 流程结果 | 应用动作 |
+| --- | --- |
+| `pending` | 在截止时间内继续观察同一流程，不反复发起用户同意。 |
+| `completed` | 检查返回的授权状态和当前连接就绪情况。完成是历史事实，后续撤销或配置变更可能已要求重新授权。 |
+| `failed` | 读取 `error_code`，说明失败原因并处理问题，再明确发起新的用户同意流程。 |
+| `cancelled` / `expired` | 停止轮询本次流程；只有用户确实希望再次授权时才创建新流程。 |
+| 未知状态或连接不匹配 | 不判为成功，保留原 ID 并调查；辅助函数会在查询授权前拒绝连接不匹配的流程。 |
+
+连接授权有独立的 `state` 值：`oauth`、`manual`、`disconnected`、`reauthorization_required`、`refreshing`、`refresh_unknown`，与流程 `status` 不同。`oauth` 和 `refresh_available` 描述已存储的生命周期信息；读取不会刷新 Token，也不实时检查 Provider 撤销。刷新结果不确定时需要调查或明确重新授权，不能重放可能已轮换的 refresh token。
+
+再次发起同意会取消该连接的 pending 流程。因此发起响应丢失后，不能盲目再次调用来恢复；保留结果不确定的事实，在适当时明确替换原尝试。取消流程不会撤销既有 Provider 凭据、取消 Run 或决定 Tool 审批。`app_oauth_setup_required`、`app_oauth_unsupported`、`app_oauth_flow_not_found` 和鉴权错误通过 SDK 传播，网络错误另行处理。详见 [OAuth 响应与错误](/zh-CN/reference/oauth)和[应用集成指南](/zh-CN/integrations/apps)。
+
+这些函数是由调用方提供凭据和 ID 的 SDK 上下文示例。本地代码检查不证明浏览器用户同意、Token 交换或 Provider 账户验证成功。
+
+Agent 列表、详情、预检、修订、复制、归档和固定初始化查询示例见[准备并提交模板修订](/zh-CN/build/agent-templates)。示例保留最初观察的 revision，并说明环境保留和响应丢失处理。
+
+六个 Session 环境、授权和 access grant 方法的上下文示例见 [SDK 访问示例](/zh-CN/reference/session-access)，区分明文读取、Token 签发、单 grant 撤销和 Session 绑定撤销。
+
+运维 SDK 示例覆盖[概览、Session/pending 分页、活动与 health](/zh-CN/reference/monitoring)，以及[部署 revision 更新和入口重试/停止](/zh-CN/reference/deployment)，区分状态观察、保存配置与运行中进程操作。
+
+显式[暂停/恢复示例](/zh-CN/build/idle-and-wake)与[已验证 Tool 结果登记](/zh-CN/reference/approvals-tools)说明生命周期意图、部分响应丢失，以及保持请求体不变的对账重放。
+
+## 按资源查阅响应契约
+
+生成的签名说明客户端如何调用；精确响应投影、状态码、角色、状态前提和副作用应查看对应 HTTP 契约。大部分管理方法直接返回解码后的 JSON；调用没有抛异常，仍可能包含 invalid 的连接验证结果或 reconciliation_error，不能据此认定业务成功。
+
+| 资源 | 契约 |
+| --- | --- |
+| Runs、事件与取消 | [Runs、事件与取消](/zh-CN/reference/runs) |
+| Session 创建、文件和生命周期 | [Session 创建、文件和生命周期](/zh-CN/reference/sessions) |
+| Session 环境、授权与访问凭据 | [Session 环境、授权与访问凭据](/zh-CN/reference/session-access) |
+| 产物内容与私有预览 | [产物内容与私有预览](/zh-CN/reference/artifacts-previews) |
+| 审批与 Tool 恢复 | [审批与 Tool 恢复](/zh-CN/reference/approvals-tools) |
+| 连接、验证与使用记录 | [连接、验证与使用记录](/zh-CN/reference/connections) |
+| 应用与 OAuth | [应用与 OAuth](/zh-CN/reference/oauth) |
+| Managed Secrets | [Managed Secrets](/zh-CN/reference/secrets) |
+| 应用 Token | [应用 Token](/zh-CN/reference/tokens) |
+| Agent 模板与修订 | [Agent 模板与修订](/zh-CN/reference/agents) |
+| 目录与 Harness 注册 | [目录与 Harness 注册](/zh-CN/reference/harness-registration) |
+| 资源操作对账 | [资源操作对账](/zh-CN/reference/resource-operations) |
+| 监控与集合查询 | [监控与集合查询](/zh-CN/reference/monitoring) |
+| 本地部署配置 | [本地部署配置](/zh-CN/reference/deployment) |
+
+产物二进制下载和事件流使用上文说明的特殊返回路径。DELETE 并非统一空响应：Token 撤销返回 JSON，预览/access/Secret/连接删除使用 204，OAuth flow 取消返回 flow 对象。构建通用应用封装时必须保留这些差异。
+
+## 查询已有 Run，不提交新工作
+
+从仓库根目录运行[完整诊断示例](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/inspect-run.ts)。Python 先安装本地 SDK；TypeScript 先执行 `npm --prefix sdk/typescript run build`。
+
+```sh
+npm --prefix sdk/typescript run build
+./node_modules/.bin/tsx examples/documentation/inspect-run.ts --session YOUR_SESSION_ID --run YOUR_RUN_ID --after 0 --max-pages 20
+```
+
+程序核对 Run/Session 关联，读取 Session 状态和有页数上限的事件，重新查询 Run 并列出产物 ID/大小/摘要。报告不包含任务文本、事件 payload、最终输出或产物名称，资源 ID 仍需私有保存。它不会提交、审批、取消或关闭任务。事件 ID 保持十进制字符串，比较使用任意精度整数，不转换成有精度损失的数字。
+
+Last_observed_cursor 是诊断观察位置，不是应用消费者检查点：程序只计数，没有持久保存事件内容。Reached_empty_event_page 只说明该次查询暂时没有后续页，不表示 Run 完成。状态、事件和产物是分开的读取，不是原子快照。达到页数上限可使用返回游标继续诊断，但不能据此跳过应用尚未处理的事件。
+
+本地语法/类型与假客户端检查不证明真实 API 或云行为。解释结果请结合 [Run 契约](/zh-CN/reference/runs)与[恢复指南](/zh-CN/build/recovery)。
+
+[示例安装、阶段与恢复说明](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/README.zh-CN.md)。
+
+## 在两套 SDK 之间迁移
+
+| 事项 | Python | TypeScript |
+| --- | --- | --- |
+| 创建客户端 | `Hexagon.local()` 同步返回客户端 | `await Hexagon.local()` |
+| HTTP 调用 | 阻塞调用，不直接放入异步服务的事件循环 | 返回 Promise；依赖前一步的操作需要 await |
+| 上传输入 | `{相对路径: bytes}`，SDK 编码 Base64 | `{path, content_base64}` 数组，调用方编码字节 |
+| 事件流 | 同步生成器，用 `for`；保留但不再消费的生成器应关闭 | AsyncGenerator，用 `for await`；可选 AbortSignal 结束观察 |
+| 下载结果 | `bytes` | `Uint8Array` |
+| HTTP 204 | `None` | `undefined` |
+| 事件游标 | 数字字符串；可用 `int` 无损比较 | 数字字符串；用 `BigInt`，不用 `Number` |
+| 可选查询字段 | 省略未用关键字参数；`None` 可能被序列化为文本 | 省略未用属性；显式 `undefined` 可能变成文本 |
+| 分页 | 调用方读取响应 envelope 并翻页 | 调用方读取响应 envelope 并翻页 |
+
+两套 SDK 都不会自动重试写入或保存恢复状态。更换语言不会改变租户权限、资源归属或已有 Session 的身份。跨客户端恢复同一提交时，保持 input、origin 和幂等键不变。
+
+## 有界读取 Run 摘要分页
+
+以下辅助函数要求已有可信后端客户端，读取的是租户级摘要端点，不是单 Session 的 Run 列表。返回 `next_offset` 非空表示达到页数预算，在观察到末尾之前停止。错误向调用方抛出；函数不发起写请求。
+
+```typescript
+async function readRunSummaryPages(client: Hexagon, maxPages = 10) {
+  if (!Number.isInteger(maxPages) || maxPages < 1) {
+    throw new Error('maxPages must be a positive integer');
+  }
+  const rows: unknown[] = [];
+  let offset = 0;
+  for (let pageIndex = 0; pageIndex < maxPages; pageIndex++) {
+    const page = await client.listRuns({ limit: 100, offset });
+    rows.push(...page.runs);
+    const nextOffset = page.next_offset;
+    if (nextOffset === null) return { runs: rows, next_offset: null };
+    if (!Number.isInteger(nextOffset) || nextOffset <= offset) {
+      throw new Error('invalid pagination progress');
+    }
+    offset = nextOffset;
+  }
+  return { runs: rows, next_offset: offset };
+}
+```
+
+这里的 `runs` 是摘要，需要完整 input/output 时再调用 `client.run(id)`（TypeScript 加 `await`）。并发插入会移动 offset，因此本函数不是稳定导出，也不证明读取了每个 Run。返回的 next offset 是继续分页的提示，不是持久事件游标。事件重放应使用原 Run ID 和事件 `after` 契约。见[列表语义](/zh-CN/reference/runs)与[有界诊断示例](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/README.md)。
+
+接下来可阅读[完整首个 Session](/zh-CN/start/first-session)、[后端集成](/zh-CN/build/backend-integration)或[事件与状态参考](/zh-CN/reference/events-and-states)。

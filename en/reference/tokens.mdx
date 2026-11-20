@@ -1,0 +1,94 @@
+---
+title: "Application Token HTTP contract"
+---
+
+Use application tokens in trusted application backends to execute configured work. Token administration requires an owner identity. These endpoints do not create tenants, rotate owner credentials or grant arbitrary per-token scopes. The application role uses the server's route allowlist; your application must still authorize its own users and business resources.
+
+All routes below are under `/v1`. Missing, expired or revoked authentication returns `401 unauthorized`; an application identity attempting token administration returns `403 owner_token_required`. Examples use an owner token in `HEXAGON_API_TOKEN` and an origin without `/v1` in `HEXAGON_API_URL`. Do not enable shell tracing or record token-bearing responses in public logs.
+
+## List metadata
+
+`GET /v1/tokens` returns **200** and `{tokens:[...]}`, ordered by creation time descending, without pagination parameters. Each row has `id`, `label`, `role`, `expires_at`, `last_used_at`, `revoked_at` and `created_at`; optional historical timestamps may be null. The query includes the tenant's owner and application rows, including expired/revoked entries. Listing does not return plaintext token values or digests.
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/tokens"
+```
+
+Authentication updates last_used_at when accepting an API key. This timestamp is not a per-request audit log or proof that a particular downstream action completed.
+
+## Create an application token
+
+`POST /v1/tokens` accepts a strict JSON object:
+
+| Field | Constraint |
+| --- | --- |
+| `label` | Required string, trimmed before checking 1–200 characters |
+| `expires_in_days` | Optional integer 1–365, default 30 |
+
+Success returns **201**, with `id`, `label`, `role:"application"`, `expires_at`, `created_at` and `token`. The response has `Cache-Control: no-store`. The generated token begins `hx_app_`; the server stores its SHA-256 digest. This response is the retrieval opportunity for its plaintext value; the list endpoint cannot recover it.
+
+Run in a new private directory. These commands create a credential and save its full response to a private file:
+
+```sh
+umask 077
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data '{"label":"Project backend","expires_in_days":30}' \
+  --output application-token-created.json \
+  "$HEXAGON_API_URL/v1/tokens"
+```
+
+Require exit status 0 before reading the response as a credential; an error body can also be written to the output file. Transfer the token to your backend's secret storage. Neither labels nor repeated creation requests deduplicate credentials. If a response is lost, inspect the list for the newly created entry, revoke an identified unused token and deliberately create a replacement; do not use an automatic POST retry loop.
+
+## Rotate an application token
+
+`POST /v1/tokens/{id}/rotate` takes no required body and returns **200** with the same fields as creation and `Cache-Control: no-store`.
+
+```sh
+umask 077
+curl --fail-with-body --silent --show-error --request POST \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  --output application-token-rotated.json \
+  "$HEXAGON_API_URL/v1/tokens/$HEXAGON_TOKEN_ID/rotate"
+```
+
+The transaction requires an unrevoked, unexpired application token belonging to this tenant. It revokes that row and inserts a new ID/token, preserving the label and **original expiry**, not extending its lifetime. There is no overlap window: the old token becomes invalid for new authentication when rotation commits. Plan the backend secret update accordingly.
+
+Repeating rotation with the old ID returns `404 application_token_not_found`; it cannot recover a lost replacement plaintext. The same error covers missing/foreign, owner-role, expired and already revoked targets. On a lost response, use the owner list to inspect/revoke an identified unusable replacement before deliberately issuing another token. Never assume the old token still works because the response was lost. Revocation does not retract a request that has already passed authentication or cancel its Run.
+
+## Revoke an application token
+
+`DELETE /v1/tokens/{id}` returns **200**, `{id,revoked_at}`. This is a JSON response, not 204.
+
+```sh
+curl --fail-with-body --silent --show-error --request DELETE \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/tokens/$HEXAGON_TOKEN_ID"
+```
+
+Repeated revocation of the same application row succeeds and preserves its first revoked_at timestamp. Expired application rows can be revoked too. Missing/foreign or owner-role targets return `404 application_token_not_found`. The row remains available in the metadata list. An authenticated owner cannot use this endpoint to revoke an owner key.
+
+Path IDs are parsed as strings in these routes, not UUID-validated by the route schema; generated application IDs are UUIDs. Malformed creation bodies and unknown properties return `400 invalid_request`. Do not rely on the same idempotency behavior for create, rotate and revoke: only revoke naturally tolerates the repeated action here.
+
+## Role boundary and verification
+
+Application tokens can use the allowed task routes, including Session creation, Run submission/observation/cancel, artifact download, preview/access creation and revocation, and selected Agent/catalog/connection reads. They cannot administer credentials, decide approvals or reconcile unknown Tool outcomes. The exact route classification is generated in the [HTTP inventory](/en/reference/http); a matching route still enforces ownership, validation and state checks.
+
+After installing a replacement credential, verify an allowed read using it, and check that the old credential receives 401 on a new request. Keep owner credentials separate from the application backend's runtime token and browser clients. Rotation is a credential operation, not an application deployment or a guarantee of zero downtime.
+
+Sources: [token operations and role allowlist](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/credentials/application-tokens.ts), [authentication](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/credentials/api-auth.ts), [route status and headers](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts). The [credential contract review](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-credential-http-contract-review.json) exercised current handlers with real PostgreSQL and isolated test identities: creation status and no-store headers, metadata redaction, rotation preserving expiry, old-token rejection, replacement-token acceptance, repeated revoke, invalid input and foreign-tenant denial. Test credentials were removed afterward. This used Fastify injection, not a network proxy/TLS test or a cloud task. 
+
+## Choose recovery by operation
+
+| Operation | Successful response | If the response is lost |
+| --- | --- | --- |
+| List | `200`, metadata only | Repeat the read; it cannot recover plaintext |
+| Create | `201`, new ID and plaintext token | Inspect owner metadata, identify and revoke the unused entry before deliberately creating another; labels are not unique request identifiers |
+| Rotate | `200`, replacement ID/token, original expiry | The old credential may already be invalid. Inspect metadata and reconcile replacement delivery; do not retry old-ID rotation expecting the token back |
+| Revoke | `200`, ID and first revoked timestamp | Repeating revocation of the same application ID preserves that timestamp; already authenticated work is not rolled back |
+
+A client should classify creation as successful at `201`; it must not treat that status as an unexpected response and create another token. Rotation and revocation retain their `200` responses. Check the exact endpoint contract rather than applying one status to all Token mutations.
+
+Next: [identity operations guide](/en/operate/access-control), [HTTP overview](/en/reference/http).

@@ -1,0 +1,81 @@
+---
+title: "术语表"
+---
+
+本文统一产品文档中的概念用法。API 标识、错误码和代码字段保持英文；中文解释不改变协议名称。状态值必须按对象区分，不能将 Session、Run、Runtime 和云资源的状态混用。
+
+| 英文术语 | 中文用法 | 含义与边界 |
+| --- | --- | --- |
+| [Session](/zh-CN/concepts/sessions-runs-agents) | 会话工作上下文 | 持久的工作上下文标识，关联配置、工作区、对话与云资源。不是某台机器；恢复时资源可变化。 |
+| [Run](/zh-CN/concepts/sessions-runs-agents) | 一次任务执行 | 一次提交的持久执行记录。同一 Session 当前只允许一个活动 Run；等待授权或审批仍属活动。 |
+| [Agent template](/zh-CN/build/agent-templates) | Agent 模板 | 可选的可复用配置，按不可变 revision 使用。直接创建 Session 不要求模板。 |
+| [Control plane](/zh-CN/concepts/execution-architecture) | 控制平面 | 拥有 Session/Run、租户检查、凭据、事件持久化和云资源操作的服务。 |
+| [Sandbox](/zh-CN/integrations/sandboxes) | 云执行环境 | 运行任务代码的远端隔离环境，其资源由 Provider 提供，生命周期由平台协调。不是 Console 页面。 |
+| [Sandbox Runtime](/zh-CN/concepts/execution-architecture) | Sandbox 内运行服务 | Sandbox 内的执行监督服务，管理 Harness 进程、工具邮箱与运行通信；不拥有云账户操作。 |
+| [Harness](/zh-CN/integrations/harnesses) | Agent 执行引擎 | 执行模型驱动循环的引擎，例如 Pi/OpenCode；与 Sandbox Provider、模型协议分别选择。 |
+| [Provider](/zh-CN/integrations/choose) | 服务提供方 | 某类连接的适配目标。Fly Sprites 与 Fly Machines 是不同目标，供应商名称不等于统一能力。 |
+| [Connection](/zh-CN/build/connection-lifecycle) | 连接 | 租户所属的账户配置、端点和访问策略，拥有验证、启用及版本状态；不是一次网络 socket。 |
+| [Binding](/zh-CN/build/tools) | 绑定 | Session 中的命名关联，例如 tools 或 connections 中 alias 到连接 ID 的映射。绑定不自动扩大权限。 |
+| [ToolBroker](/zh-CN/build/tools) | 工具调用管理服务 | 在控制平面处理工具授权、审批、派发、持久调用记录和未知结果。 |
+| [Agent Tool](/zh-CN/build/tools) | Agent 可调用工具 | Harness 可发现并通过平台调用的命名能力。HTTP Tool、应用连接器和 Remote MCP 都可提供此能力。 |
+| [Protected HTTP connection](/zh-CN/integrations/http-tools) | 受保护 HTTP 连接 | guest 通过委托地址直接访问受路径/方法限制的 API；不自动经过 ToolBroker 审批。 |
+| [Authorization](/zh-CN/build/tool-authorization) | 授权 | 取得并维持可访问账户或工具的资格。凭据存在不证明每个资源权限都足够。 |
+| [Approval](/zh-CN/build/approvals) | 调用审批 | 对某一次具体操作及参数的执行决定；不是账户登录，也不替代第三方权限。 |
+| [Secret](/zh-CN/operate/credentials) | 受管理密钥 | 加密保存、值不回显的凭据资源。可轮换或禁用，引用关系影响删除。 |
+| [Variable](/zh-CN/concepts/security-boundaries) | 变量 | 普通 guest 可读配置，不是 Secret。把密钥放入变量不能获得凭据保护。 |
+| [Delegated grant](/zh-CN/concepts/security-boundaries) | 委托访问授权 | 限定范围、生命周期和可撤销的访问权限，其 token 仍需保密；不是原始上游账户密钥。 |
+| [Preflight](/zh-CN/integrations/choose) | 预检 | 分配资源前核对配置、引用、能力和凭据入口等条件，不证明真实网络、额度或任务成功。 |
+| [Validation](/zh-CN/build/connection-lifecycle) | 连接验证 | 适配器特定的验证操作，可能只是结构或列表检查；范围需查看具体返回与文档。 |
+| [Pinned configuration](/zh-CN/concepts/initialization) | 固定配置 | Session 保存的配置版本与策略。连接或模板后续变化不会静默改写它。 |
+| [Idempotency key](/zh-CN/build/recovery) | 幂等键 | 标识同一逻辑提交。恢复丢失响应时保留原键与输入；新一轮工作使用新键。 |
+| [Durable event](/zh-CN/concepts/events-and-recovery) | 持久事件 | 先保存再流式发送的状态或活动记录。连接断开不取消 Run，游标用于继续观察。 |
+| [Artifact](/zh-CN/build/artifacts) | 产物 | 由平台导出并可下载的交付文件，可在关闭后留存；工作区任意文件不自动成为产物。 |
+| [Private preview](/zh-CN/build/private-preview) | 私有预览 | 受授权与有效期限制的运行服务访问入口，不是公开部署或永久链接。 |
+| [Pause / suspend](/zh-CN/build/idle-and-wake) | 暂停 | 保留恢复条件的空闲状态，不等于资源删除。保留内存还是文件取决于 Provider 策略。 |
+| [Provider-managed standby](/zh-CN/concepts/serverless-lifecycle) | 供应商自动待机 | Provider 决定的待机行为，平台未必能观测实际计算或计费状态。 |
+| [Resume / wake](/zh-CN/build/idle-and-wake) | 恢复 / 唤醒 | 在同一 Session 继续工作的生命周期过程，可能涉及原 VM 恢复或从文件快照重建。 |
+| [Close](/zh-CN/operate/reconciliation) | 关闭 Session | 终结 Session 并协调清理云资源。关闭请求受理不等于远端删除已经确认。 |
+| [Cancellation](/zh-CN/build/recovery) | 取消 Run | 停止该 Run 后续执行；不能撤销已经发生的外部写入，也不自动等于关闭 Session。 |
+| [Unknown outcome](/zh-CN/operate/reconciliation) | 结果未知 | 远程操作可能发生但缺乏确定回执。不是 failed，也不能作为盲重试依据。 |
+| [Reconciliation](/zh-CN/operate/reconciliation) | 对账 | 对原操作、资源或外部记录进行核查并记录结论，不是重复执行一次来猜测结果。 |
+| [OCI digest](/zh-CN/integrations/harnesses/oci) | OCI 内容摘要 | 固定镜像内容身份的摘要，与可变 tag 不同；准备过程中还可能安装依赖改变执行文件系统。 |
+| [Native session ID](/zh-CN/build/multi-turn) | Harness 原生会话标识 | Harness 所管理历史的标识，不是 Hexagon Session ID，也不是云资源 ID。 |
+| [Local / hosted](/zh-CN/operate/self-host) | 本地 / 托管控制平面 | 描述控制平面的部署位置，不表示任务在用户电脑本地执行；真实任务使用云 Sandbox。 |
+| [Verified combination](/zh-CN/integrations/verified-combinations) | 已验证组合 | 带精确版本、协议、SDK、场景和日期的证据范围，不是目录中全部能力的保证。 |
+| [Agent revision](/zh-CN/build/agent-templates) | Agent 修订版本 | 一个 Agent 模板定义的不可变版本，在创建 Session 时选定。不是 Harness 软件版本；修订不会迁移已有 Session。 |
+| [Workspace](/zh-CN/concepts/persistence) | 工作区 | Sandbox 中供任务执行使用的文件。不是持久产物存储；保留方式取决于生命周期策略。 |
+| [Model protocol](/zh-CN/integrations/model-protocols) | 模型协议 | 请求与响应的传输契约，例如 Messages、Chat Completions 或 Responses。模型或供应商名称不证明协议兼容，也不表示平台会转换协议。 |
+| [Event cursor](/zh-CN/build/stream-events) | 事件游标 | 读取持久 Run 事件的位置，以数字字符串表示。不是事件数量，也不是内部 Runtime cursor；不连续是合法情况。 |
+| [Runtime invocation](/zh-CN/concepts/events-and-recovery) | Runtime 调用 | 由 Runtime 管理的 Harness 进程执行对应的持久调用指令。重新连接已有调用不等于提交新 Run。 |
+| [Resource operation](/zh-CN/operate/reconciliation) | 资源操作 | 创建、删除等云资源生命周期操作的持久记录。其完成只针对该操作，不表示 Run 成功或账户级清理完成。 |
+| [Lease / generation](/zh-CN/concepts/events-and-recovery) | 租约／代次 | 带期限的 worker 执行权及拒绝过期控制平面写入的代次。它不能回滚已发生的上游副作用。 |
+| [Tenant](/zh-CN/concepts/security-boundaries) | 租户 | 控制平面查询资源和建立绑定时使用的归属边界。多个终端用户共用一个租户时，不会自动获得应用用户级隔离。 |
+
+## 三个容易混淆的表达
+
+- “任务完成”应指 Run 的真实终态与交付检查，不能仅凭模型说“完成了”。“资源清理完成”另需远端确认。
+- “连接可用”必须说明是结构验证、账户验证、启用还是实际调用成功；ready 不意味着全部操作均有权限。
+- “支持恢复”必须说清保留的是工作区文件、对话、进程还是内存，以及对应 Provider/Harness 的证据。
+
+写作时优先使用“向同一 Session 提交新 Run”“继续观察原 Run”“关闭并确认资源清理”这类明确动作，不用“重启一下”同时指代恢复、重放、新建和删除。
+
+## 明确操作以及保留的身份
+
+| 用户意图 | 准确表述 | 保持不变的内容 |
+| --- | --- | --- |
+| 网络断开后浏览器重连 | 继续观察原 Run | Run ID 与已提交事件游标；不产生新提交 |
+| 恢复丢失响应的提交 | 恢复原提交 | Session、input、origin 和幂等键 |
+| 要求同一项目再做一个修改 | 提交下一轮 Run | Session；新一轮使用自己的幂等键 |
+| 使用相同配置开始另一个项目 | 从选定 Agent revision 创建 Session | 模板 ID／revision；工作区和历史相互独立 |
+| 空闲暂停后继续工作 | 唤醒同一 Session | Session 身份；云资源身份可能改变 |
+| 结束工作并释放资源 | 关闭 Session 并确认删除 | 历史记录按其留存契约继续可查询 |
+
+“重放”必须说明对象：重放持久事件是观察，重放外部写入可能再次产生副作用。“重试”同样需要原请求身份和明确策略。见[恢复指南](/zh-CN/build/recovery)。
+
+## 写作与翻译约定
+
+两种语言都保持 `Session`、`Run`、`Harness`、`Runtime` 及 API 字段、状态值原样。中文正文可先用本表释义介绍概念，再使用 API 名称保持精确。讨论可复用配置时使用“Agent 模板”，讨论选定版本时使用“Agent revision”；单写“Agent”容易与执行模型循环的引擎混淆。
+
+不要将 `waiting_authorization` 或 `waiting_approval` 翻译成另一套协议值。界面标签可以解释含义，但实际动作应依据关联连接、审批和 Tool call 记录。同样，`unknown` 表示已记录的不确定性，不是 `failed` 的另一种中文表达。精确状态定义由[状态参考](/zh-CN/reference/events-and-states)维护，本页承担术语入口。
+
+本页依据已链接的对象契约和实现说明整理，不新增接口或状态值。下一步：[对象关系](/zh-CN/concepts/sessions-runs-agents)、[能力与证据](/zh-CN/concepts/capabilities-and-evidence)。

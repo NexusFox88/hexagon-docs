@@ -1,0 +1,62 @@
+---
+title: "Understand model protocol compatibility"
+---
+
+The connection provider identifies a wire protocol, not a vendor. The proxy forwards allowed paths without converting Messages, Chat Completions, and Responses or guessing a fallback protocol.
+
+| Connection provider | Request interface |
+| --- | --- |
+| anthropic-compatible | /v1/messages |
+| openai-compatible | /v1/chat/completions |
+| openai-responses | /v1/responses |
+
+## Current Harness contracts
+
+| Harness / Runtime protocol | Messages | Chat Completions | Responses |
+| --- | --- | --- | --- |
+| Built-in Pi 1.5.2 / OpenCode 1.2.27 | Declared | Declared | Declared |
+| pi-v1 / opencode-v1 / openclaw-v1 | Declared | Declared | Declared |
+| codex-v1 | Unsupported | Unsupported | Declared |
+| hermes-v1 | Unsupported | Declared | Unsupported |
+| claude-code-v1 / deepseek-v1 / aider-v1 / hexagon-json-v1 | Declared | Unsupported | Unsupported |
+
+This describes Hexagon adapters, not all upstream project functionality or live acceptance for every image/endpoint. OCI registrations pin versions and compatibility metadata. Existing registrations do not automatically expand when adapters change; inspect the actual registration and create a new version where required.
+
+## Dated endpoint examples
+
+These are repository acceptance observations from November 18, 2026, not a current availability check or a recommendation to change providers. Model ID is `MiniMax-M3` in all three rows. Each row was tested separately; the same brand does not make their interfaces interchangeable.
+
+| Exact built-in Harness versions | Protocol | Tested API base | Evidence and limit |
+| --- | --- | --- | --- |
+| Pi 1.5.2 / OpenCode 1.2.27 | Messages | `https://api.minimaxi.com/anthropic` | Independent Python/TypeScript tasks; operation path appended as `/v1/messages` |
+| Pi 1.5.2 / OpenCode 1.2.27 | Chat Completions | `https://api.minimaxi.com/v1` | Independent Python/TypeScript tasks; no inference about Responses from this result |
+| Pi 1.5.2 / OpenCode 1.2.27 | Responses | `https://api.minimaxi.com/v1` | Independent Python/TypeScript tasks; no promise of background or WebSocket extensions |
+
+The [dated matrix](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-18-minimax-matrix.md) specifies two-turn tasks, actual assigned MCP calls, inputs, environment, artifacts and cleanup for the tool-capable combinations. It also retains early unknown creation attempts: successful task rows do not establish global resource cleanup. These records supplement rather than replace preview, approval and failure-recovery journeys. Inspect the exact row for the chosen Sandbox. OCI variants additionally require the image digest and command; a built-in result is not an OCI result.
+
+## A shared protocol is only one requirement
+
+Tasks depend on streaming, tool calls/results, continuation, errors, and actual model capability. A greeting response does not establish functioning Tools. An endpoint's compatibility claim does not establish every optional field or mode.
+
+Responses validation currently uses store:false. It does not promise server-hosted built-in tools, background polling, WebSocket mode, or other protocol extensions. Harness Tools continue through the platform mailbox and approval system.
+
+Some OpenCode/Pi Responses tests use actual binaries with a deterministic endpoint. That validates those protocol branches, not every live account. Cloud evidence must identify endpoint, model ID, Harness version, SDK, and task scope.
+
+## Locate a failure in the request path
+
+| Evidence | What it narrows down | What remains unproven |
+| --- | --- | --- |
+| Connection validation succeeds | Control plane reached this endpoint using the configured credential and accepted a bounded response shape | Sandbox ingress, Harness streaming, tool calls and continuation |
+| Session preflight is ready | Registered Harness and selected model protocol pass structural compatibility checks | Live execution and account quota at Run time |
+| First plain-text Run succeeds | This Harness/endpoint combination executed that task | Tool schema handling, tool result continuation, long output and a second turn |
+| Tool task and second turn succeed | The observed operations and continuation worked for this precise combination | Every operation or future model/version change |
+
+A validation error can occur before Sandbox allocation; a later Run can fail because the Sandbox cannot reach credential ingress even while the model endpoint remains reachable from the control plane. Diagnose the two network legs separately. Do not replace a protocol-mismatch problem with credential rotation, or a blocked ingress problem with embedding an upstream key in guest configuration.
+
+## Select and diagnose
+
+Intersect the endpoint's actual protocol with Harness support. codex-v1 requires a real Responses endpoint; renaming a Messages connection cannot convert it. Do not append the final operation path to the base URL.
+
+For incompatible_model, inspect protocol selection before credentials. For validation failure, check network, permissions, exact model ID, and response shape. Revalidate/re-enable after correction, then execute the required real journey.
+
+Sources: [Runtime protocols](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/protocols.ts), [Pi](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/harnesses/pi.ts), [OpenCode](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/harnesses/opencode.ts). Next: [model configuration](/en/integrations/models), [verified combinations](/en/integrations/verified-combinations), [errors](/en/reference/errors).

@@ -1,0 +1,386 @@
+{
+  "scope": "42 current product Mermaid diagrams rendered with Mermaid 12.3.0 in local ego-browser preview; eight diagrams visually reviewed, nine narrow layouts measured. Not final-site certification.",
+  "page_sha256": {
+    "docs/product/en/build/backend-integration.md": "0ae832e6794dd0fd5310913f6de2a052287bcf07dfeead57da63b9faed4ca391",
+    "docs/product/en/concepts/events-and-recovery.md": "603ea1d3a3d78a2a08b3dbc1d3c00c03fc5fe062c1824880aae82ccb9a4228fb",
+    "docs/product/en/concepts/execution-architecture.md": "9d05cff27367b0ed150105347b1fc806e48c2be3392a21d5b1f85ae9f78de580",
+    "docs/product/en/concepts/initialization.md": "94b8fe902eed136e1b01fb59c752705265212a5ae39887231cb0b0abacc4e711",
+    "docs/product/en/concepts/security-boundaries.md": "5b8cff0779a768ea38658bb1df06acfcccb149f33954ced27988fe60d630fd1d",
+    "docs/product/en/concepts/serverless-lifecycle.md": "20fd2229d47af7227337c1df19c4f89f0cf26e50e55030e65cd33dfbec3b280e",
+    "docs/product/en/concepts/sessions-runs-agents.md": "327b5d53166f773d58fa82031678fc3bfbf2ec0457ee54d227f65ce4ca1f1d64",
+    "docs/product/en/contribute/codebase.md": "c7fe24609f3c2f33294df35f04e9ce4dcfd7b67d32c0ff649424fd3274dd35cf",
+    "docs/product/en/contribute/documentation.md": "0b8a65d2264af3b8a65bd9ddeb40e4e8641fbc64403f071b1a387c9ed742313c",
+    "docs/product/en/index.md": "a8a049d4d5a08856b54d2ccffd5db5036f2f971e0dd3ba7ad0bce61131baf950",
+    "docs/product/en/operate/networking.md": "155288989c8e571d52bf775ef6bd9c9181dd978d96bd0046ef7fa25aa94a171d",
+    "docs/product/en/start/overview.md": "e81fbe752d0ac88c378c616303db1fda08efea482c68765678228cd94b4d978b",
+    "docs/product/en/start/what-happened.md": "bccf90e6ddef9f074e75c41f323f3d800222a2b84de9ebe58178b485a7658cc8",
+    "docs/product/zh-CN/build/backend-integration.md": "771dfe38ccc23d790a3631b639d6bc5d987f96358f0250b8f790ce30e9b6036c",
+    "docs/product/zh-CN/concepts/events-and-recovery.md": "b7b89dce4dd7768b7b58d5b52f5350797d87fe64e97d0365ab6e2a929952f01e",
+    "docs/product/zh-CN/concepts/execution-architecture.md": "c77559aa1f654a4f5201dde89a1049d1504c656e5b72ead98b04db50deaf088e",
+    "docs/product/zh-CN/concepts/initialization.md": "67667bc02964c71d934978d12670984bf99575572647f1921836cc1aa7931b9a",
+    "docs/product/zh-CN/concepts/security-boundaries.md": "b1f0ca0070e552ffa926d10d8b069acf1389c6e8b807f450ab9644aca34dc520",
+    "docs/product/zh-CN/concepts/serverless-lifecycle.md": "e3ca738e0a32e687f081999d7c2813518aabb0dee47aa8189471df87274add0d",
+    "docs/product/zh-CN/concepts/sessions-runs-agents.md": "c8d9359d83b4c20f41ae2572f3bfac0e5aa3ea22a419399164dc64efbb484737",
+    "docs/product/zh-CN/contribute/codebase.md": "c3595e20505bb8663094c556b08712ca806347cdb96aaaed8c6157b017fd814b",
+    "docs/product/zh-CN/contribute/documentation.md": "97d003e4e280926647521b19185089c27893e4809f2e9c8042a47e877c42ac01",
+    "docs/product/zh-CN/index.md": "e38f14cd7a94bc7008300c014743f38b15b63e23cf77f88000f3253612fced78",
+    "docs/product/zh-CN/operate/networking.md": "fd3731ce006e6a79b0a354e069fb92c605272d41bfa9482eb276d9f57969324a",
+    "docs/product/zh-CN/start/overview.md": "26ab179b7dd9b87b48be65fbf68ce43ad746d37cbfd4913bbebded8e0071d51b",
+    "docs/product/zh-CN/start/what-happened.md": "f32c79de5eb6af7c8c48488e672bc17360da112678cd012e6930c959ce58edd9"
+  },
+  "results": [
+    {
+      "path": "docs/product/en/build/backend-integration.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/build/backend-integration.md",
+      "index": 2,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/build/backend-integration.md",
+      "index": 3,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/events-and-recovery.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/events-and-recovery.md",
+      "index": 2,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/events-and-recovery.md",
+      "index": 3,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/execution-architecture.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/execution-architecture.md",
+      "index": 2,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/execution-architecture.md",
+      "index": 3,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/execution-architecture.md",
+      "index": 4,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/initialization.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/initialization.md",
+      "index": 2,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/initialization.md",
+      "index": 3,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/security-boundaries.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/serverless-lifecycle.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/sessions-runs-agents.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/contribute/codebase.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/index.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/operate/networking.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/start/overview.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/start/what-happened.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/build/backend-integration.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/build/backend-integration.md",
+      "index": 2,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/build/backend-integration.md",
+      "index": 3,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/events-and-recovery.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/events-and-recovery.md",
+      "index": 2,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/events-and-recovery.md",
+      "index": 3,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/execution-architecture.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/execution-architecture.md",
+      "index": 2,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/execution-architecture.md",
+      "index": 3,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/execution-architecture.md",
+      "index": 4,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/initialization.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/initialization.md",
+      "index": 2,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/initialization.md",
+      "index": 3,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/security-boundaries.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/serverless-lifecycle.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/sessions-runs-agents.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/contribute/codebase.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/index.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/operate/networking.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/start/overview.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/start/what-happened.md",
+      "index": 1,
+      "passed": true
+    }
+  ],
+  "narrow_measures": [
+    {
+      "id": 15,
+      "pageOverflow": false,
+      "containerWidth": 367,
+      "contentWidth": 552,
+      "scrollEnd": 185,
+      "svgWidth": 551.99658203125,
+      "naturalWidth": 552,
+      "focusable": true,
+      "named": true
+    },
+    {
+      "id": 36,
+      "pageOverflow": false,
+      "containerWidth": 367,
+      "contentWidth": 552,
+      "scrollEnd": 185,
+      "svgWidth": 551.99658203125,
+      "naturalWidth": 552,
+      "focusable": true,
+      "named": true
+    },
+    {
+      "id": 19,
+      "pageOverflow": false,
+      "containerWidth": 367,
+      "contentWidth": 936,
+      "scrollEnd": 568.888916015625,
+      "svgWidth": 935.998291015625,
+      "naturalWidth": 936,
+      "focusable": true,
+      "named": true
+    },
+    {
+      "id": 40,
+      "pageOverflow": false,
+      "containerWidth": 367,
+      "contentWidth": 936,
+      "scrollEnd": 568.888916015625,
+      "svgWidth": 935.998291015625,
+      "naturalWidth": 936,
+      "focusable": true,
+      "named": true
+    },
+    {
+      "id": 14,
+      "pageOverflow": false,
+      "containerWidth": 367,
+      "contentWidth": 517,
+      "scrollEnd": 150,
+      "svgWidth": 517.3003540039062,
+      "naturalWidth": 517.30126953125,
+      "focusable": true,
+      "named": true
+    },
+    {
+      "id": 35,
+      "pageOverflow": false,
+      "containerWidth": 367,
+      "contentWidth": 379,
+      "scrollEnd": 12.222222328186035,
+      "svgWidth": 379.16668701171875,
+      "naturalWidth": 379.17449951171875,
+      "focusable": true,
+      "named": true
+    },
+    {
+      "id": 20,
+      "pageOverflow": false,
+      "containerWidth": 350,
+      "contentWidth": 845,
+      "scrollEnd": 494.4444580078125,
+      "svgWidth": 845.0000610351562,
+      "naturalWidth": 845,
+      "focusable": true,
+      "named": true
+    },
+    {
+      "id": 41,
+      "pageOverflow": false,
+      "containerWidth": 350,
+      "contentWidth": 728,
+      "scrollEnd": 377.22222900390625,
+      "svgWidth": 727.9948120117188,
+      "naturalWidth": 728,
+      "focusable": true,
+      "named": true
+    },
+    {
+      "id": 5,
+      "pageOverflow": false,
+      "containerWidth": 367,
+      "contentWidth": 1553,
+      "scrollEnd": 1185.5555419921875,
+      "svgWidth": 1552.994873046875,
+      "naturalWidth": 1553,
+      "focusable": true,
+      "named": true
+    }
+  ],
+  "fixes": [
+    {
+      "path": "docs/product/en/build/backend-integration.md",
+      "finding": "Sequence #3 failed parsing because semicolons separated statements inside message text.",
+      "change": "Replaced semicolons with comma/and; all 42 render successfully afterward."
+    },
+    {
+      "path": "docs/product/zh-CN/start/overview.md",
+      "finding": "Runtime split inside word.",
+      "change": "Explicit line break after cloud Sandbox label; inspected full fixed diagram."
+    }
+  ],
+  "visual_reviewed_ids": [
+    "S01",
+    "S05",
+    "C01",
+    "C08"
+  ],
+  "visual_scope": "Both languages desktop; named/focusable horizontal containers keep natural SVG dimensions at 390px without page overflow. Right arrow produced scrollLeft 24.444 after animation on recovery sequence.",
+  "configuration": {
+    "theme": "neutral",
+    "securityLevel": "strict",
+    "htmlLabels": false,
+    "flowchart": {
+      "htmlLabels": false
+    },
+    "responsive": "Natural SVG width, max-width:none, overflow:auto named region tabindex=0"
+  },
+  "private_screenshots": [
+    ".local/docs-diagram-review/current-sessions-bilingual.png",
+    ".local/docs-diagram-review/current-overview-bilingual-fixed.png",
+    ".local/docs-diagram-review/current-overview-zh-final.png",
+    ".local/docs-diagram-review/current-lifecycle-bilingual.png",
+    ".local/docs-diagram-review/current-first-sequence-bilingual.png",
+    ".local/docs-diagram-review/current-worker-narrow-readable.png"
+  ],
+  "limitations": [
+    "Only eight diagrams received full desktop visual inspection; successful generation is not full visual review.",
+    "Final article/site theme, screen reader and touch behavior remain unverified.",
+    "B01 backend authenticated delivery/cleanup acceptance still partial."
+  ],
+  "cleanup": "TaskSpace 81 finished; local preview server on 62418 stopped."
+}

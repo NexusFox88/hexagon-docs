@@ -1,0 +1,80 @@
+---
+title: "工作区、对话、产物与持久化边界"
+---
+
+“任务有状态”包含多种数据，它们存放在不同位置，随生命周期变化的方式也不同。选择保留策略时，先说明需要保留的究竟是文件、对话、运行记录，还是进程内存。
+
+## 数据在哪里
+
+| 数据 | 主要位置 | 用途 |
+| --- | --- | --- |
+| Session / Run、事件、初始化快照 | 控制平面 PostgreSQL | 查询、恢复观察、审计 |
+| 初始上传文件 | 控制平面保存输入，执行时准备到 Sandbox | 建立工作区 |
+| Agent 修改中的工作区 | 云 Sandbox 的受管理目录 | 连续项目工作 |
+| Harness 对话状态 | Harness 管理的 Session 文件 / 原生会话标识 | 多轮上下文 |
+| 导出 Artifact | 当前实现存于 PostgreSQL | 独立于云资源的交付快照 |
+| 后台服务与内存 | 云环境中的运行进程 | 预览、临时计算、连接 |
+
+## 生命周期保留表
+
+| 数据类型 | 计划内暂停 / 唤醒 | Runtime 监督进程意外重启 | Session 关闭并确认清理 | 数据库损坏或丢失 |
+| --- | --- | --- | --- | --- |
+| Session / Run / 公共事件 | 控制平面记录保留 | 已提交记录保留；调查原 invocation | 历史记录保留 | 从一致备份恢复；云进程不能重建记录 |
+| 初始上传文件 | 作为初始输入保留，不是工作区最新快照 | 不能用初始文件覆盖最新工作区来假装恢复 | 控制平面输入记录不等于仍可访问云目录 | 依赖控制平面备份 |
+| 工作区中的修改 | 按已固定的 Provider 策略保留受管理目录 | 文件可能仍在，但不代表活动调用可安全重放 | 原资源销毁后不能假设可访问 | 仍存在的云目录可能帮助调查，不替代控制记录 |
+| Harness 对话文件 / 原生标识 | 依赖兼容 Harness 与受管理文件共同恢复 | 不能从文件存在推断活动对话可继续 | 不提供通过 closed Session 继续对话的保证 | 只剩文件或标识不足以恢复完整 Session |
+| 已捕获的 Artifact 字节与元数据 | 控制平面记录保留 | 已捕获内容保留；未导出内容无此保证 | 可继续经授权下载 | 当前字节也在 PostgreSQL，必须恢复对应备份 |
+| 预览服务进程 / 内存 / 连接 | 依 Provider 策略，可能丢失；不能跨组合承诺 | 不保证存活或可安全重启 | 资源被回收，预览不能继续依赖旧服务 | 数据库恢复不能恢复进程内存或浏览器连接 |
+
+“保留”均以相应存储仍可用且未被另行删除为前提。客户端断线本身不会删除上述数据，也不会取消 Run。数据库丢失与密钥丢失是不同故障：数据库备份包含历史与产物；与其匹配的密钥用于恢复受保护凭据。仅拥有其中一个不能恢复完整工作区服务。
+
+
+## 文件留存不等于 Artifact
+
+Agent 在项目目录写了文件，只能说明工作区有该文件。需要交付和关闭后下载的内容应写入 Run 产物目录，并核对导出列表、大小和 hash。每个 Run 的导出是独立快照，第二轮同名文件不会改写第一轮产物。
+
+同样，文件保持不能单独证明 Harness 对话恢复。验证多轮时分别检查一个明确文件内容和一个前轮对话事实。临时目录不属于统一保证，例如 Agent37 的 `/tmp` 不在恢复保留范围。
+
+## 一个两轮项目的具体例子
+
+第一轮在工作区修改 `app.js`，并将交付版本复制到该 Run 的产物目录。只有 Runtime 导出、控制平面校验并捕获后的那一份，才是可独立下载的 Artifact。第二轮继续修改工作区里的 `app.js`，不会更新第一轮的 Artifact；需要第二轮再次导出新的版本。应用应保存各自的 Run ID、Artifact ID 与摘要，而不能只按文件名判断版本。
+
+关闭 Session 之前，先核对需要保留的文件均在产物列表中，再实际下载并验证摘要。如果只在预览里看到页面能运行，或者只看到工作区文件存在，都没有证明关闭后还能取回源代码。关闭并确认云资源清理之后，再下载一次已捕获产物，可以验证交付与云资源生命周期已分离。
+
+## Run 结果、导出和预览是三个不同结果
+
+Run 的文本结果不是完整工作区备份。当前 worker 在非 interrupted 的 Runtime 终态路径上尝试导出产物，再完成 Run 的终态处理；所以失败或取消的 Run 也可能有已经捕获的文件。反过来，Runtime interrupted 路径不会为这次中断补做导出，不能把未捕获文件当成可下载产物。导出校验失败会记录 `artifact_export_rejected`，不要只凭 Harness 已退出判断交付完成。
+
+预览 URL 是访问运行服务的授权入口，不是静态归档地址。授权过期、Session 关闭或服务进程停止，都可能让原 URL 无法再展示页面。若要长期展示结果，应将完整可部署产物交付给自己的托管系统；这与保留 Hexagon 的临时预览不同。
+
+## 如何验证你的保留需求
+
+对选定组合分别验证四件事：下一轮能读回已修改文件；能引用前轮对话事实；计划内唤醒后的预览服务可用或已按方案重启；关闭后仍能下载并校验已导出产物。这四项不能互相替代。数据库恢复还应在隔离目标检查历史事件、产物内容和凭据可解密性，按[备份恢复指南](/zh-CN/operate/backup-restore)执行；当前 local 离线备份要求先关闭所有 Session，因此不能把它当作活跃 Sandbox 快照工具。
+
+这些是需要验证的结果，不是本页声称已经执行的新验收。导出时序依据：[worker](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/worker.ts)、[Runtime 导出](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/runtime/server.py)。
+
+## 为应用选择保留方式
+
+继续编辑项目：保持 Session 并验证空闲恢复组合。交付一个结果：下载 Artifact 或由应用保存受控副本。长期归档：管理数据库容量、备份和应用自身保留政策，不能把当前保留行为解释成无限期 SLA。需要运行服务：管理进程与预览授权的生命周期，不能仅保存预览 URL。
+
+依据：[产物实现](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/artifacts/artifacts.ts)、[Serverless 策略](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/serverless-sessions.md)。下一步：[产物下载](/zh-CN/build/artifacts)、[多轮验证](/zh-CN/build/multi-turn)、[本地备份恢复](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/local-installation.md#backup-upgrade-and-restore)。
+
+## 有范围的保留证据
+
+2026-11-20 的文档旅程采用 Vercel Sandbox、内置 Pi 1.5.2，以及配置的 Anthropic-compatible Messages 端点与 `deepseek-ai/DeepSeek-V4-Flash`。Python 和 TypeScript 分别独立运行。以下记录证明具体保留结果，不是保留时长保证，也不代表全部组合。
+
+| 证据 | 实际观察到的结果 | 没有证明的范围 |
+| --- | --- | --- |
+| [首个 Session 旅程](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-first-session-docs-cloud.json) | 两套 SDK 都完成 Run，关闭 Session 并取得完成的删除记录，之后下载同一份 19 字节 Artifact，元数据和预期文本匹配 | 多轮对话、暂停／唤醒连续性、数据库恢复 |
+| [两轮项目旅程](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-project-docs-cloud.json) | 每套 SDK 在同一 Session 中使用两个不同 Run；每个 Run 的六份导出文件在关闭后字节一致；旧预览访问被拒绝 | 暂停后预览进程存活、票据自然到期、任意工作区恢复、全局孤儿资源清理 |
+
+项目证据分别验证了两件不能合并为一个“成功”标签的事：导出文件仍可下载，而关闭后的预览不再获准访问。第二轮成功也不证明存在通用记忆服务，或每一种 Harness 对话格式都能跨任意 Provider 恢复策略保留。
+
+## 丢失不同数据，需要不同恢复来源
+
+如果云工作区消失，但控制平面数据库仍在，先列出已经捕获的 Artifact 和保留的 Run 输出。可以用这些交付文件及另外保留的源输入建立新项目，但不能将其称为恢复原进程、原生对话或未保存的工作区修改。初始上传是起始版本，不是不断同步的项目副本。
+
+如果 PostgreSQL 丢失，而云进程仍在运行，该进程不能替代 Session 归属、事件历史、资源操作回执或已存储的 Artifact 字节。保留剩余资源信息，按明确的数据库恢复流程处理后再决定新工作。原资源结果未知时，不要盲目创建替代资源。
+
+如果数据库仍在但加密密钥丢失，明文历史或已存储产物字节不能重建加密的连接凭据和 invocation 材料；反过来，只有密钥也不能重建数据库。本地备份实现将 schema dump 与匹配的私有身份材料打包，并检查身份和解密能力；它要求本地服务停止且 Session 全部关闭。备份包验证通过仍不等于已执行恢复演练。制定操作恢复方案前阅读[备份与恢复](/zh-CN/operate/backup-restore)。
+

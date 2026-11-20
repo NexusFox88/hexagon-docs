@@ -1,0 +1,67 @@
+{
+  "scope": "Actual Fastify GET Run route/projection and error handling with a fake tenant-scoped database. Sample content is a deterministic fixture, not real Agent output. No network listener, real database, cloud or submit/cancel/SSE verification.",
+  "cases": [
+    {
+      "name": "public Run projection",
+      "status": 200,
+      "body": {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "session_id": "00000000-0000-4000-8000-000000000001",
+        "state": "completed",
+        "input": "Return a short greeting.",
+        "output": {
+          "role": "assistant",
+          "text": "Hello.",
+          "artifacts": []
+        },
+        "error": null,
+        "created_at": "2026-11-20T00:00:00.000Z",
+        "updated_at": "2026-11-20T00:00:02.000Z",
+        "origin": {
+          "request_id": "example-request"
+        },
+        "execution_identity": {
+          "tenant_id": "example-tenant",
+          "session_id": "00000000-0000-4000-8000-000000000001",
+          "agent_id": null,
+          "agent_revision": null,
+          "principal": {
+            "key_id": "example-key-id",
+            "role": "application"
+          }
+        }
+      }
+    },
+    {
+      "name": "missing Run",
+      "status": 404,
+      "body": {
+        "error": {
+          "code": "run_not_found"
+        }
+      }
+    },
+    {
+      "name": "invalid UUID",
+      "status": 400,
+      "body": {
+        "error": {
+          "code": "invalid_request",
+          "fields": [
+            "id"
+          ]
+        }
+      }
+    },
+    {
+      "name": "missing identity",
+      "status": 401,
+      "body": {
+        "error": {
+          "code": "unauthorized"
+        }
+      }
+    }
+  ],
+  "passed": true
+}

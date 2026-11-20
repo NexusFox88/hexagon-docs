@@ -1,0 +1,87 @@
+---
+title: "能力声明、兼容性与验证证据"
+---
+
+“支持”可能表示接口已实现、账户可连接、一次任务成功，或完整恢复旅程已验证。选择执行组合时必须知道这个词对应哪一种证据。
+
+## 不同层次回答不同问题
+
+| 信息 | 能回答 | 不能推出 |
+| --- | --- | --- |
+| adapter capability | 当前适配器声明实现该接口 | 你的账户、配额和网络可用 |
+| 连接验证 | 指定配置通过该 adapter 的检查 | 所有操作均已执行；通用 HTTP 验证可能仅查结构 |
+| Session preflight | 定义和已知能力相容 | 真实云创建、模型任务或未来资源一定成功 |
+| 单轮真实执行 | 指定组合完成该次任务 | 多轮、审批、预览和休眠全部可用 |
+| 双 SDK 完整旅程 | 两种客户端分别完成已记录步骤 | 任意版本、模型端点或并发负载都通过 |
+| 故障 / 清理验证 | 特定失败分支按记录恢复 | 当前账户没有其他未决资源 |
+
+## 能力有归属
+
+Sandbox 声明云资源与网络能力；Harness 声明对话、Tools 和初始化能力；Tool adapter 参与审批能力。一个 adapter 不能替另一层授予能力。`required_capabilities` 只是请求条件，不是创建能力的开关。
+
+例如 OCI recipe 可以构建，但所选 Provider 没有 `oci_image`，组合仍不支持。又如模型端点通过验证，不表示该 Harness 的所有 Tool calling 和 continuation 行为都已实际验证。
+
+## 读懂矩阵
+
+一条结果至少核对 Provider、Harness 版本或镜像 digest、模型端点和协议、SDK、任务范围、日期与清理结果。将 passed、failed、未执行和明确 unsupported 分开。未知结果保留 unknown；不能为了整齐把它归为成功或不存在。
+
+历史矩阵证明当时的具体执行。当前 preflight 的 `verification` 保持 unverified，避免把历史通过自动认证到新配置。供应商账户、端点和部署状态发生变化时，需要新的验证。
+
+## 两个判断例子
+
+**例一：镜像能构建，组合仍不支持。** 你在本地成功构建某个 OCI Harness 镜像，只证明构建过程产出了镜像。若所选 Sandbox adapter 未声明 `oci_image`，Session 预检会以 `sandbox_oci_image_unsupported` 拒绝。私有镜像还要求 `private_oci_image`，以及可用的 registry Secret。增加 `required_capabilities` 不能补出这些能力。应选择满足需求的执行路径，重新预检，再验证实际拉取、启动和任务；不能把构建成功登记为实云通过。这是机制示例，不是对某个 Provider 当前支持状态的固定结论。
+
+**例二：模型验证成功，工具旅程仍未验证。** 指定端点通过连接检查，不代表选定 Harness 能以该协议完成 Tool calling。先检查 Harness 的模型协议和 `tools` 声明，再检查绑定 Tool 的操作范围、授权与审批能力。实际旅程还需观察模型发出调用、Runtime / broker 处理、必要授权或审批、结果回到模型、同一 Run 继续并完成。只收到一段模型文本不能证明这条链路。协议不兼容、任务执行失败、尚未执行测试应分别记录。
+
+## supported 与 unverified 可以同时成立
+
+组合解析结果把结构判断与实测分开。下面是说明字段关系的摘录，不是一次真实预检响应：
+
+```json
+{
+  "compatibility": {"status": "supported", "reasons": []},
+  "verification": {"status": "unverified", "evidence": []}
+}
+```
+
+这表示已知需求与声明相容，但这次配置没有被该结果认证为实云通过。Session 预检还检查连接归属、启用状态、已知配置和凭据入口 readiness；它不创建 Session 或 Sandbox。`ready: true` 不意味着云配额预留、镜像已经拉取，或模型与所有 Tool 已执行成功。不兼容请求可能直接得到错误响应，而不是上述 JSON；不要假设总能在成功响应里读取拒绝原因。
+
+## 为一个应用选择证据
+
+1. **列出实际需要的行为。** 例如上传项目、多轮修改、审批后写入、私有预览、空闲唤醒和关闭后下载。以应用旅程为准，不因为已有测试缺某一步就删掉需求。
+2. **固定组合身份。** 记录控制平面 revision、SDK 版本、Sandbox 连接、Harness version / digest、模型 endpoint / model ID / 协议与 Tool 配置。连接显示名不足以唯一标识一次测试。
+3. **排除已知结构冲突。** 用 catalog、连接验证和预检回答各自的问题。遇到明确 unsupported 先处理组合，不把重复任务提交当作兼容性修复。
+4. **寻找范围吻合的既有记录。** 在[已验证组合](/zh-CN/integrations/verified-combinations)逐项核对旅程和日期；较新的专项结果只更新其覆盖的交叉组合，不抹掉旧失败或未决操作。
+5. **补测缺失的关键分支。** 执行所需 SDK 的独立旅程，记录结果与清理；断线、授权、审批、恢复等分支有单独断言。一次成功回答不能代替完整旅程。
+
+结果使用与组合矩阵一致的分类：**已通过、支持但未验证、失败、阻塞 / unknown、有条件通过、明确不支持**。其中“阻塞”是无法继续测试的条件，“unknown”是远程结果尚不确定；即使在展示表中相邻，也应在记录中说明具体属于哪一种。已通过仍必须带范围，有条件通过必须保留条件，未执行不能登记为失败或通过。
+
+当你能说明“这条证据覆盖我的哪一步，还有哪一步没有证据”，就可以做出有依据的组合选择。下一步：[选择组合](/zh-CN/integrations/choose)、[已验证组合](/zh-CN/integrations/verified-combinations)、[测试与真实验收](/zh-CN/contribute/testing)。
+
+## 为什么不能把所有 capability 名称直接合并
+
+解析器按明确的归属规则建立能力集合，不会把每个 adapter 返回的字符串全部合并。
+
+| 请求行为 | 相关声明 | 不能据此推断的事 |
+| --- | --- | --- |
+| 对话、Tools、初始化 | Harness capabilities | Sandbox 声明 `tools` 不能让 Harness 获得工具调用支持 |
+| 资源与网络行为 | Sandbox capabilities，排除归 Harness／审批所有的名称 | Harness 声明 `network_allowlist` 不能实施 Provider 网络限制 |
+| 已绑定 Tools 的审批能力 | Harness 支持 `tools`、至少绑定一个 Tool，且每个绑定 Tool adapter 都声明 `approval` | 一个支持审批的 Tool 不能替另一个未声明的 Tool 作保证；未绑定 Tool 也不能建立审批能力 |
+| 应用必需行为 | 每个 `required_capabilities` 都必须存在于解析后的集合 | 在请求中添加 `snapshot` 不会实现快照 |
+| allowlist 环境中的受保护凭据访问 | Sandbox 支持 `network_allowlist`，并列出配置的凭据 host | 只允许模型 host 不代表另一个凭据代理 host 也可达 |
+
+这些是解析器规则，不证明某次获准操作已正确执行。是否需要审批仍由具体 Tool 策略和调用决定。目录通过 [Harness registry](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/harness.ts) 提供；连接 adapter 与[组合解析器](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/compatibility.ts) 确立相应边界。
+
+## 从真实文档证据得出有范围的结论
+
+[2026-11-20 项目教程记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-project-docs-cloud.json)报告了 Python 与 TypeScript 的独立旅程，组合为 Vercel、内置 Pi 1.5.2，以及配置的 Messages 端点与 DeepSeek-V4-Flash。每条旅程包含同一 Session 内两个 Run、固定测试执行、浏览器检查、关闭和产物保留检查。
+
+恰当结论是：“这个已记录组合通过两套 SDK 完成了两轮项目教程，包括列出的浏览器和关闭后检查。”不能将其写成“Vercel 支持所有 Harness”“所有使用 Messages 的模型都支持 Tools”或“全部 serverless 恢复情形已通过”。外部 Tool 授权／审批和预览自然到期明确不在该记录范围内。
+
+计数也应遵循记录的对象：两套 SDK 旅程、四个 Run 仍是一个配置组合。加上独立的首个 Session 教程，合计是四条教程旅程、六个 Run，不是六个受支持组合。端点、Harness digest 或 adapter 变化后，保留旧结果作为历史证据，再明确实际旅程需要补哪些检查。
+
+## 如何建立你自己的证据
+
+从已验证组合开始，保存任务与检查方法。先运行最小结果和清理，再测试实际需要的文件、Tools、审批、预览和恢复。两种 SDK 都是产品支持要求时，分别执行完整旅程。记录实际命令与观察，失败尝试也保留；私有资源 ID 留在本地证据，公开文档使用脱敏摘要。
+
+依据：[组合解析](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/compatibility.ts)、[验收](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/acceptance.md)、[执行矩阵](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/execution-matrix.md)。下一步：[网络策略验证](/zh-CN/build/sandbox-policy)、[首个 Session](/zh-CN/start/first-session)。

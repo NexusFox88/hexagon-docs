@@ -1,0 +1,97 @@
+---
+title: "处理断线、重试、取消与不确定结果"
+---
+
+先判断失去的是观察连接、请求响应、执行进程还是外部操作结果，再决定动作。超时不等于失败，客户端重连不等于重新执行任务。
+
+## 按故障选择动作
+
+| 观察到的情况 | 保留并查询 | 允许的下一步 |
+| --- | --- | --- |
+| 事件流断开 | Run ID、最后提交的事件 cursor | 重连同一 Run，从 cursor 补读 |
+| Run 提交响应丢失 | Session ID、input、origin、幂等键 | 完全相同的请求重试，取回原 Run |
+| Session 创建响应丢失 | 本地创建意图、时间、连接信息 | 查询 Session / 云操作并调查，避免自动重复创建 |
+| Runtime unreachable | 原 Run、invocation、Sandbox 绑定 | 观察恢复和诊断，不自作主张重启 Harness |
+| Runtime interrupted | 原 Run 和已发出的工具操作 | 调查终态和副作用，不能假定工作区可安全自动重用 |
+| Tool outcome unknown | 调用 ID、request_hash、实际执行策略 | 查询外部服务并提交有证据的对账结论 |
+| close 未确认 | Session ID、资源 ID、删除操作 | 对原 Session 重复清理 / 对账，不丢弃记录 |
+
+## 重试同一提交
+
+在发送之前持久保存下列值。恢复片段接续已有客户端：
+
+```python
+run = client.submit(saved_session_id, saved_input, saved_key, origin=saved_origin)
+```
+
+```typescript
+const run = await client.submit(savedSessionId, savedInput, savedKey, savedOrigin);
+```
+
+同一个 Session 和 key 的不同请求内容会冲突。不要生成新 key 来绕过 `idempotency_conflict`。已经接受的同一请求会返回原记录，即使后来连接被禁用；这不意味着可以提交新的工作。
+
+重试策略应限定次数和退避，区分瞬时传输故障、鉴权失败、输入错误和业务状态冲突。SDK 不会替你盲重放非幂等操作。
+
+## 网络调用前保存恢复记录
+
+可恢复的 Run 提交不能只保存最后一个错误。持久记录业务请求 ID、有权使用的 Session ID、精确 input 和 origin、幂等键、尝试时间、已知时的 Run ID，以及最后提交的事件游标。它们应存放在私有应用存储，原始任务内容可能敏感。响应丢失应记录为提交结果未知，不是任务失败。
+
+[SQLite 意图示例](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/backend-intents.py)演示提交持久化边界，[事件游标示例](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/event-checkpoint.py)演示观察恢复。两者记录不同事实：事件游标不能找回丢失的提交键，提交键也不表示 UI 已收到事件。
+
+| 已知信息 | 下一次安全查询或动作 |
+| --- | --- |
+| 已保存 Run ID | 查询原 Run，必要时重连事件流；不要通过创建新任务了解状态。 |
+| 缺少 Run ID，但保存了原提交意图 | 向原 Session 使用原 key 重发精确请求，保存返回 ID 后继续。 |
+| Session 创建响应丢失 | 按请求时间和目标配置调查候选 Session；这些条件不是唯一幂等保证，多个匹配时保留歧义。 |
+| 云操作结果未知 | 按对账流程检查已记录操作和资源身份，不用新的创建/删除意图替代它。 |
+| 本地记录或 key 丢失 | 先调查现有服务端记录；重建一个新 key 无法识别已经接受的 Run。 |
+
+有限重试结束后，应保留可恢复状态与标识。达到重试次数上限不证明远端任务失败；操作员或后续恢复任务应从原记录继续调查。
+
+## 主动取消与关闭
+
+```python
+client.cancel(run_id)
+current = client.run(run_id)
+# 持续查询到终态或保留待调查状态；cancel 返回不等于所有外部效果已撤销。
+```
+
+```typescript
+await client.cancel(runId);
+const current = await client.run(runId);
+// Continue observing settlement; cancellation cannot retract external effects.
+```
+
+取消阻止新的工具派发，但已经派发的调用仍可能完成或变成 unknown。迟到审批不能让任务复活。取消成功与 Session 清理是不同目标；不用的 Session 仍需 close 并确认删除。
+
+TypeScript 中 AbortSignal 停止的是观察请求；Python 中停止迭代也不是 cancel。不要把网页离开事件直接映射为任务取消，除非你的产品明确如此设计并向用户说明。
+
+
+queued Run 可在取消时直接变成 cancelled；执行中的工作先进入 cancelling。应持续查询持久 Run 状态直到终态，cancel 请求成功不单独证明在途工作已经停止。仍有活动任务时显式关闭 Session 可能返回 session_busy；先完成或取消该任务，再关闭并单独确认云资源清理。
+
+## 对账外部写入
+
+`tool_calls` / `toolCalls` 提供调用与 request_hash。先在远端查明请求是否生效，再通过 `resolve_tool_call` / `resolveToolCall` 提交结果和审计证据。该接口交付已验证结果，不重新请求外部服务。无法证明结果时保留 unknown，不能编造成功或失败。管理身份限制与审批类似，见[对账协议](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/tool-reconciliation.md)。
+
+## 验证恢复
+
+分别注入流断开、提交响应丢失、worker 重启、远程写入响应丢失和删除响应丢失。核对是否仍是同一个 Run / 原始资源，工具副作用次数是否正确，并保留未决 ID。模拟检查只能证明对应分支逻辑，真实云与模型的完整旅程单独记录。
+
+依据：[恢复架构](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/architecture.md)、[持久事件](/zh-CN/build/stream-events)。下一步：[后端接入](/zh-CN/build/backend-integration)。
+
+## 明确每项恢复的结束条件
+
+| 恢复对象 | 完成条件 | 需要升级调查或保留未知的情况 |
+| --- | --- | --- |
+| 观察连接 | 保存的时间线补齐，持久 Run 查询确认当前或终态 | 鉴权失败或多次传输尝试仍无法重连；保留 Run 与游标。 |
+| 丢失的提交响应 | 原意图关联到返回的原 Run ID | 精确意图或 key 丢失、输入冲突；不制造替代身份。 |
+| Runtime 可达性 | 再次观察到原 invocation，或终态失败已持久记录 | Runtime 中断、资源丢失或操作身份仍有歧义。 |
+| 未知 Tool 写入 | 外部证据支持原 call/hash 的已记录对账结果 | 无法区分成功失败；保持 unknown，不盲目重放。 |
+| 取消 | 持久 Run 进入终态，未决外部结果另行追踪 | 持续 cancelling 或外部请求尚未查明。 |
+| Session 清理 | Session 与记录的计算资源、checkpoint、image 操作确认处置 | close 响应丢失、删除未知或所属资源仍在；保留私有 ID。 |
+
+观察截止时间只表示应用停止等待，不代表 Hexagon 已取消任务。向用户返回可恢复的状态，保留调查记录。清理异常必须继续可见，不能为了在业务结果成功后打印“完成”而吞掉异常。
+
+例如，第二轮提交超时且未返回 Run ID：读取保存的 input、origin 和 key，按有界重试策略精确重发；取得 R2 后先保存 R2，再从已提交游标恢复事件。如果随后某个 Tool call 进入 unknown，就应停止提交重试：此时恢复对象已变成该调用的外部结果，而不是原 Run 请求。最后关闭 Session 又是独立操作，需要另行确认结果。
+
+依据：[提交与取消](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts)、[Runtime 监督](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/worker.ts)、[Tool 对账](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/tool-reconciliation.md)、[错误参考](/zh-CN/reference/errors)。下一步：[资源对账](/zh-CN/operate/reconciliation)、[故障排查](/zh-CN/operate/troubleshooting)、[事件与恢复概念](/zh-CN/concepts/events-and-recovery)。

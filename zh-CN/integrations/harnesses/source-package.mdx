@@ -1,0 +1,114 @@
+---
+title: "注册兼容 source Harness 包"
+---
+
+当你需要维护已有的 `hexagon-json-v1` 源码 Harness 时使用本页。新集成优先采用 [OCI 镜像](/zh-CN/integrations/harnesses/oci)，以明确解释器和依赖环境。源码包注册只存储租户所属的数据，控制平面不会导入或执行这些代码；实际安装和执行发生在云 Sandbox。
+
+## 前提与格式
+
+准备有管理权限的客户端、已验证并启用的 Sandbox / 模型连接，以及能运行 `python3` 或 `node` 的 Sandbox。当前源码包 schema 只接受 `model_providers: ["anthropic-compatible"]`，不能通过修改标签获得 Chat Completions 或 Responses 支持。
+
+包包含 1—32 个 UTF-8 源文件，内容合计不超过 512 KiB；每个 content 字符串还受 262144 个 JavaScript 字符单元限制。文件路径最长 240 个字符，必须是符合 schema 的相对路径，不允许空段、`.`、`..`、重复路径或文件与目录冲突。入口文件必须实际包含在 files 中。
+
+这个格式没有 npm / pip lockfile 安装编排，也不是二进制归档上传接口。控制平面只检查结构和内容完整性，不证明代码能正确执行。依赖必须在 Sandbox 中可用，或由你明确管理。
+
+## 注册与选择版本
+
+以下是接入片段，复用[首个 Session 教程](/zh-CN/start/first-session)中的已初始化客户端和连接 ID。从仓库根目录读取现成的 [Python Harness 示例](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/harnesses/python-agent/main.py)；它使用标准库调用 Messages 模型，支持 shell、声明的远程 Tools 和对话历史。
+
+```python
+from pathlib import Path
+
+harness = client.register_harness_package(
+    id="custom.my-agent", version="1.0.0",
+    protocol="hexagon-json-v1", interpreter="python3", entrypoint="main.py",
+    capabilities=["conversation", "tools", "initialization"],
+    model_providers=["anthropic-compatible"],
+    files=[{"path": "main.py", "content": Path(
+        "examples/harnesses/python-agent/main.py").read_text(encoding="utf-8")}],
+)
+definition = dict(
+    harness={"id": harness["id"], "version": harness["version"]},
+    sandbox_connection_id=sandbox_connection_id,
+    model_connection_id=model_connection_id,
+)
+check = client.preflight_session(**definition)
+if not check['ready']:
+    raise RuntimeError('Review compatibility before creating the Session')
+# 按首个 Session 教程先持久保存创建意图，再创建 Session。
+```
+
+```typescript
+import { readFile } from 'node:fs/promises';
+
+const harness = await client.registerHarnessPackage({
+  id: 'custom.my-agent', version: '1.0.0',
+  protocol: 'hexagon-json-v1', interpreter: 'python3', entrypoint: 'main.py',
+  capabilities: ['conversation', 'tools', 'initialization'],
+  model_providers: ['anthropic-compatible'],
+  files: [{ path: 'main.py', content: await readFile(
+    'examples/harnesses/python-agent/main.py', 'utf8') }],
+});
+const definition = {
+  harness: { id: harness.id, version: harness.version },
+  sandbox_connection_id: sandboxConnectionId,
+  model_connection_id: modelConnectionId,
+};
+const check = await client.preflightSession(definition);
+if (!check.ready) throw new Error('Review compatibility before creating the Session');
+// Persist create intent using the first-Session tutorial before provisioning.
+```
+
+用 definition 直接创建 Session，无须先创建 Agent 模板。继续执行提交 Run、保存 Run ID、读取事件与结果、核验产物、关闭并确认清理的完整流程。注册返回的 digest 应与 id/version 一起记录。
+
+同租户下相同规范化内容重复注册是幂等的；已有 id/version 内容变化或与 OCI 注册冲突返回 `harness_version_conflict`。更新代码需使用新版本，并创建选择新版本的 Session，现有 Session 保持固定版本。当前没有源码包删除接口。能力字段是作者声明，不是平台对任意源码的认证。
+
+## stdin、凭据和工具调用
+
+Runtime 在 Session 工作区运行入口，并通过 stdin 传入一个 JSON 对象，然后关闭 stdin。对象包含 protocol、run_id、input、initialization、model、native_session、artifact_directory 和 tools；首轮 native_session 可能缺省。Harness 需要自行保存历史，后续通过返回的 opaque native_session 找回同一会话。
+
+使用传入的 `model.base_url` 和 `model.model`；不要将其替换为硬编码服务地址。当前 worker 提供的 `HEXAGON_MODEL_KEY` 是保护通道的委托访问凭据，原始模型账户密钥留在控制平面。`HEXAGON_TOOL_TOKEN` 只用于本 Run 的本地 Tool 邮箱。不要将这些值写到日志、模型上下文或产物。
+
+远程 Tool 通过 `http://127.0.0.1:8765/tools/<run_id>/call` 调用，Authorization 为 `Bearer <HEXAGON_TOOL_TOKEN>`，JSON 为 `{"id":"<UUID>","name":"<declared name>","arguments":{}}`。同一逻辑调用使用相同 id 与参数轮询，直到 state 为 completed，再处理 result 和 isError。授权与审批等待由控制平面处理。为同一次调用重新生成 UUID 可能创建新的操作；不能以此重试未知外部副作用，也不能绕过邮箱直接获取绑定 Tool 凭据。
+
+## 最终结果与失败
+
+stdout 必须有且仅有一条有效的最终结果 JSON 行：
+
+```json
+{"type":"hexagon.result","text":"实际完成结果","native_session":"opaque-id","failed":false}
+```
+
+text 必须非空；native_session 可省略，提供时必须是 1—512 字符的字符串。最终记录不接受任意附加字段。普通日志不代替结果；缺失、重复、字段错误、failed 为 true 或非零退出都不能产生成功 Run。实际成功还依赖公共产物导出完成。将交付文件写入传入的 artifact_directory，工作区其他文件不会自动成为产物。
+
+Runtime 管理进程和取消。用户断开事件连接不等于取消，取消也不会撤回已经执行的外部 Tool 写入。不要在进程内用无限重试隐藏中断或模型错误。
+
+## 升级时不改变已有工作
+
+将每个 package id/version 视为不可变。服务端为内容 digest 规范化文件顺序与能力集合；同版本改变可执行内容或其他定义字段属于冲突，不是更新。新内容注册为新版本，再由新 Session 选择，不要修改既有 Session 安装的源码来模拟版本升级。
+
+package API 验证源码布局与内容大小，不验证依赖是否存在或模型行为是否正确。应分别检查解释器、实际 import、委托模型访问、最终结果解析和对话历史。仅打印成功形状 JSON、却没有实际执行工作的脚本不能充当有效验收 fixture。
+
+程序失败时，使用契约支持的失败字段，并在适用时以非零退出；不要向严格的最终结果对象添加任意诊断键。诊断作为独立普通日志输出并脱敏。中断后保留原 invocation，调查 Tool 副作用再决定恢复操作。
+
+## 正确判断结果失败
+
+| 程序输出 | 必须如何处理 |
+| --- | --- |
+| 只有普通日志，退出码 0 | 缺少最终记录，失败 |
+| 两条有效最终记录 | 完成结果不唯一，失败 |
+| 一条最终记录且 `failed: true` | 报告程序失败 |
+| 看似成功的记录，但进程非零退出 | 执行失败，不能把记录提升为成功 |
+| 一条有效成功记录，退出码 0 | 仅代表解析成功；仍须检查实际工作与产物导出 |
+
+这些场景检查结果契约，不调用模型。本地源码包测试还会损坏上传字节，要求安装失败。数据库版本测试覆盖相同内容注册、内容变化冲突、注册表重建与租户隔离；必须实际连接测试数据库执行，才能宣称持久化检查通过。早期审阅执行了本地结果与完整性检查，数据库用例因缺少配置而跳过。后续[合并证据复核](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-docs-harness-reuse.json)记录了隔离 PostgreSQL 执行：所选四个文件、16 项测试均通过，其中包含包版本持久化检查，临时 schema 已删除。兼容 API 仍受支持，本页不设定弃用或删除日期。
+
+## 验证完成条件
+
+至少验证两轮对话、一个实际 Tool、初始化（如声明）、产物、失败结果、取消和最终云资源清理。Python 与 TypeScript 客户端分别走完整旅程；自定义 Harness 使用 Python 并不能替代 Python SDK 的独立验证。保留准确版本、digest、组合与验证范围。
+
+本页核对了注册 schema、SDK 方法、worker 委托凭据路径和示例源码；本次文档编写未重新运行实云任务，不能由此宣称新包已验收。
+
+[合并 Harness 证据复核](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-docs-harness-reuse.json)将历史自定义包完整旅程与当前版本不可变、严格结果解析检查分开记录。当前 Python 示例在留存源码上增加了可选 initialization context/system 处理；旧实云证据仅复用于未配置这些选项的未变路径，不声称新包 digest 或可选初始化行为已重新通过实云。
+
+依据：[源码包契约](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/custom-harnesses.md)、[源码包实现](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/harness-packages.ts)、[worker](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/worker.ts)。下一步：[Harness 适配器](/zh-CN/contribute/harness-adapters)、[OCI 注册](/zh-CN/integrations/harnesses/oci)、[HTTP API](/zh-CN/reference/http)。

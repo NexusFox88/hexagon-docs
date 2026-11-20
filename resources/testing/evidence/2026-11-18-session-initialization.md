@@ -1,0 +1,14 @@
+# Session initialization observability
+
+Implemented a first-class read-only initialization endpoint, Python/TypeScript SDK methods and a Console Initialization view beside Conversation. Versioned response exposes the effective historical Session definition, source Agent revision, environment names and explicit values-redacted metadata. New Sessions additionally pin connection display names and protected API binding names. Existing Sessions reconstruct protected bindings from their tenant-scoped persisted join table, without reading current provider configuration or decrypting credentials.
+
+## Verification
+
+- `TEST_DATABASE_URL=… npm run verify`: 79 files / 238 tests passed; TypeScript check passed. Extended the dual-SDK integration test to verify Agent source/revision, connection snapshots, protected-API aliases, hidden environment/secret values and snapshot equality after connection rename and Agent revision. Foreign tenant access is rejected. Application-token routing permits only GET initialization.
+- `TEST_DATABASE_URL=… npm run verify:packages`: built and installed the actual npm tarball and Python wheel; both expose the new methods and passed the four existing packaged SDK/API suites including extended initialization assertions.
+- After the historical-binding compatibility assertion and final UI refinements: targeted SDK interoperability, strict i18n and token tests all passed (3 files / 6 tests), plus `npm run check`.
+- Against the running local service, Python `session_initialization` and TypeScript `sessionInitialization` queried the same existing real-cloud OCI Session and returned exactly equal snapshots. Private results are `.local/session-initialization/python.json` and `typescript.json`. This was a read-only inspection of a historical cloud execution, not a new cloud execution test.
+- Used Ego browser TaskSpace 35 to navigate from Conversation to Initialization, inspect an existing OCI image/digest and model configuration, copy JSON (success status observed), switch English/Chinese, open JSON with the keyboard, and return to Conversation then back. Normal and narrow layout checks showed no document horizontal overflow. Effective narrow CSS width was 578 px (520 emulated browser pixels with existing zoom). Final JSON background and contrast were visually checked.
+- Historical Session shown: `3162301e-dbc7-436e-9f51-34912568314a`. It remained closed throughout. Screenshots and actual command logs are in `.local/session-initialization/`.
+
+No new cloud sandbox or model request was necessary for this read-only feature. The local service was restarted only with no active Runs. No commits or publication. Existing configuration/credentials were preserved. Snapshot data is not represented as current runtime status or a credential-bearing replay specification.

@@ -1,0 +1,82 @@
+---
+title: "在你的产品中加入人工审批"
+---
+
+对外部写入先展示待执行操作，由有权限的人明确批准或拒绝。Hexagon 将决定记录到原 Run，worker 继续交付工具结果；前端不应自己再调用一次外部 API。
+
+需要已配置审批策略的 Tool、一个实际等待审批的 Run，以及可提交决定的管理身份。普通 application Token 可读取审批列表，但不允许调用决定路由。当前能力不是通用组织 RBAC：你的后端仍需验证业务审批者的权限。
+
+## 读取并呈现操作
+
+Python `client.approvals(run_id)`、TypeScript `await client.approvals(runId)` 返回 `approvals`。每条包含 id、run_id、action、state、decision、created_at。结合 `tool_calls` / `toolCalls` 的 approval_id 关联具体调用、参数和请求 hash。
+
+界面至少呈现：目标账户与服务、将执行的操作、关键参数、对应任务和当前状态。外部工具描述和模型生成文本不能替代实际参数。不要默认选中“批准”，也不要把普通授权按钮当作写操作确认。
+
+## 用持久记录构建审批卡片
+
+同时读取 Run 的审批列表与 Tool 调用列表，用调用的 `approval_id` 关联审批的 `id`，不要直接选择列表第一项。以审批 `action` 快照呈现 binding、operation、arguments、connection ID 和 connection version；用 Tool 调用记录补充请求 hash 与执行状态。可通过有权读取的连接元数据获取显示名称，但不能用当前连接配置替代审批快照。
+
+只有当前 pending 审批才展示可执行的批准/拒绝卡片。仅凭 Run 的 `waiting_approval` 不足以判断：`state: unknown` 的调用需要调查界面，而且可能没有新的 pending 审批。批准已记录只说明取得许可，不说明外部写入成功；继续观察调用及其 `is_error` 结果。
+
+绑定连接的版本变化后，broker 再处理操作时会将旧审批标记 expired，并创建新审批。从服务端刷新卡片，要求新的明确决定；不要自动把旧决定复制到新 approval ID。对同一决定重复点击可能返回原结果，但不能绕过新版本审查。
+
+## 提交用户的决定
+
+以下是后端处理函数，接续已初始化且有权限的客户端。`approved` 必须来自已验证业务身份的明确选择；业务归属检查在调用前完成。
+
+```python
+def decide_selected(run_id, approval_id, approved):
+    rows = client.approvals(run_id)['approvals']
+    selected = next((row for row in rows if row['id'] == approval_id), None)
+    if selected is None or selected['state'] != 'pending':
+        raise RuntimeError('Refresh the approval state before deciding')
+    return client.decide(approval_id, approved)
+```
+
+```typescript
+async function decideSelected(runId: string, approvalId: string, approved: boolean) {
+  const { approvals } = await client.approvals(runId);
+  const selected = approvals.find((row: { id: string }) => row.id === approvalId);
+  if (!selected || selected.state !== 'pending')
+    throw new Error('Refresh the approval state before deciding');
+  return client.decide(approvalId, approved);
+}
+```
+
+查询与决定之间仍可能发生竞态；服务端是最后裁决者。收到 `stale_approval` 时刷新审批和 Run 状态，不创建新的审批对象来绕过状态检查。
+
+## 重复、过期与取消
+
+服务器对相同已记录决定返回原结果；相反决定或不再 pending 的操作不能被改写。上述示例为避免误操作，要求调用前仍是 pending；如果响应丢失，重新查询确认存储的 state / decision 是否匹配用户选择。
+
+取消会使待处理审批失效，迟到的批准不能复活 Run。已经批准并发出的请求可能产生外部效果，取消不保证撤销它。拒绝批准返回工具拒绝结果，让 Harness 处理；它不是自动取消整个任务。
+
+Run 处于等待状态也可能涉及未知 Tool 结果。若已发出写入但响应丢失，应检查调用记录并[对账](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/tool-reconciliation.md)，不能再点一次批准来重做写入。人工填写的对账结论需要外部事实支持。
+
+## 验收完整流程
+
+使用获准的专用测试对象：批准前检查外部写入次数为零，批准后检查一次并核对内容；拒绝时保持零写入；重复同一决定不增加操作；取消与迟到决定不能恢复任务。检查页面刷新后仍显示持久结果，不依赖浏览器内存保存审批。
+
+将操作人、业务请求和返回决定记录到应用审计日志，避免记录凭据。测试应明确区分模拟 broker、真实第三方调用和真实云 Harness；本文没有把契约检查视作完整实云验收。
+
+依据：[决定事务](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts)、[Token 路由权限](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/credentials/application-tokens.ts)。下一步：[工具授权](/zh-CN/build/tool-authorization)、[持久事件](/zh-CN/build/stream-events)。
+
+## 恢复丢失的决定响应
+
+在应用请求记录中保留 approval ID 和用户原始选择。超时后，先重新查询该 Run 的审批列表，再显示下一项动作：
+
+| 保存的结果 | 含义与操作 |
+| --- | --- |
+| 同一 ID 为 `approved`，原选择是批准 | 决定已记录；观察 Tool call，不由前端自行执行外部写入。 |
+| 同一 ID 为 `denied`，原选择是拒绝 | 拒绝已记录；观察 Harness 收到结果。 |
+| 同一 ID 仍为 `pending` | 确认当前业务权限后可以重发原选择；状态仍可能并发变化。 |
+| 相反决定、`expired` 或找不到匹配 ID | 刷新并调查，不反转已记录决定，也不复制到另一个审批。 |
+| Run 正在取消或已终态 | 不恢复执行；重复返回的旧决定是回执，不是新的派发许可。 |
+
+即使 Run 状态已变化，服务器仍可能返回相同的历史决定。这个幂等响应不表示操作刚刚执行；需要检查当前调用与外部结果。恢复过程中连接变化仍可能使原审批失效。
+
+## 副作用与取消边界的证据
+
+[Broker 回归测试](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/broker.test.ts)统计受控 HTTP 服务的写入：未授权时为零、等待审批时为零、有效批准后一次、缓存重放不增加、拒绝另一调用也不增加。它还覆盖凭据失效以及连接变化后需要新审批。[取消竞态记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-cancellation-races.md)保留单独的竞态检查；[带日期的双 SDK 云旅程](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-16-current-dual-sdk-journey.md)记录实际云执行中的审批，报告服务仍为受控服务。这些范围不构成任意第三方账户的真实验收，也不是本页片段的新一次执行。
+
+下一步：[未知结果与恢复](/zh-CN/build/recovery)、[凭据与信任边界](/zh-CN/concepts/security-boundaries)、[HTTP API](/zh-CN/reference/http)。

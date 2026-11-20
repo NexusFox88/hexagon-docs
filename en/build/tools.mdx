@@ -1,0 +1,96 @@
+---
+title: "Bind Tools and MCP services"
+---
+
+Configure and authorize an external connection in the control plane, then bind it by name when creating a Session. Sandbox settings, model endpoints, protected HTTP access, and Agent Tools serve distinct purposes.
+
+## Choose an integration
+
+| Connection | Use when | Review |
+| --- | --- | --- |
+| Application connector | The target application has a supported operation | Account, selected operations, OAuth/Token, write approval |
+| HTTP Tool | You need a fixed protected API request mapping | Input schema, mapping, authentication, side-effect policy |
+| Remote MCP | The server exposes MCP discovery and calls | Transport, discovered schemas, selection, approvals |
+
+Catalog presence describes implementation scope, not acceptance for every account or model combination. Consult [application connector evidence](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md).
+
+## Configure a read operation
+
+Add a connection in Console Tools, select its account and permitted operations, authorize, verify, and enable it. Begin with a read against a dedicated test document whose expected contents are known.
+
+For MCP, discover and review tool names, descriptions, and schemas before selecting them. Tools default to approval-required, even if they advertise read-only behavior. External descriptions are data, not authority to grant access.
+
+Supported transports are Streamable HTTP and legacy SSE. Generic stdio, resources/prompts subscriptions, sampling, and elicitation are not exposed. Arbitrary MCP OAuth browser registration and automatic refresh are also outside this interface. See [Remote MCP](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/remote-mcp.md).
+
+## Bind the connection
+
+With initialized clients and verified IDs, select a Harness supporting Tools:
+
+```python
+session = client.create_session(
+    harness={'id': 'pi', 'version': '1.5.2'},
+    sandbox_connection_id=sandbox_connection_id,
+    model_connection_id=model_connection_id,
+    tools={'research': tool_connection_id},
+)
+```
+
+```typescript
+const session = await client.createSession({
+  harness: { id: 'pi', version: '1.5.2' },
+  sandbox_connection_id: sandboxConnectionId,
+  model_connection_id: modelConnectionId,
+  tools: { research: toolConnectionId },
+});
+```
+
+Use `research` in task instructions to explain the bound capability. The connection ID identifies account configuration; the alias names its Session binding. Tools are required at initialization by default. Add the alias to `optional_tools: ['research']` only when missing authorization is acceptable. Optional status does not authorize access or bypass approval.
+
+## Required and optional bindings have different readiness rules
+
+Optional means that readiness can be deferred. It does not mean that an alias may point to a missing, foreign-tenant or wrong-kind connection.
+
+| Configuration | Initialization outcome, assuming other prerequisites pass |
+| --- | --- |
+| Direct Session with no Tools | No Tool is implicitly required; model and Sandbox still need to be ready. |
+| `tools: {research: id}`, connection disabled or not ready | Required by default: `tool_not_ready`. |
+| Same valid binding plus `optional_tools: ['research']` | Readiness can be deferred; a later call can enter `waiting_authorization`. |
+| `optional_tools: ['research']` without `tools.research` | Invalid request: the optional alias has no binding. |
+| Saved Agent declares `research`, but Session omits its binding | `missing_tool_binding`, even if the declared Tool is optional at start. |
+| Binding references a missing/deleted/foreign connection, or a non-Tool connection | Ownership/existence or kind validation rejects it; optionality does not bypass these checks. |
+
+Use [Session preflight](/en/reference/sessions) to compare intended definitions before creating resources. For a direct definition, Python `client.preflight_session(..., tools={'research': tool_connection_id})` and TypeScript `client.preflightSession({...definition, tools: {research: toolConnectionId}})` use the same initialization checks as creation; these expressions are API-shape sketches, with the Sandbox/model/Harness fields supplied by your complete definition. Add `optional_tools` only when the task can legitimately start without that connection being ready. A successful preflight does not approve a later operation or reserve future upstream availability.
+
+Read [initialization](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/session-initialization.md) for the full contract. Required/optional readiness, selected operations and per-call approval are separate controls.
+
+## Start with a documented read-only call
+
+A concrete recorded example is DeepWiki Remote MCP `read_wiki_structure` for `modelcontextprotocol/typescript-sdk`. The [November 18 record](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-18-mcp-lark-responses.md) describes discovery, selection of that one operation, explicit removal of approval for that reviewed read, and actual invocation through separate TypeScript/Pi and Python/OpenCode Sessions on Vercel with the configured SiliconFlow model. Both returned repository topics and confirmed cleanup. The record does not certify every MCP server, current upstream availability or arbitrary OAuth onboarding.
+
+To repeat that pattern with your own service, follow [Remote MCP setup](/en/integrations/mcp), inspect discovery and select exactly the operation you intend. Keep approval enabled unless you have reviewed that operation and intentionally changed its policy. Bind the returned connection ID, submit one explicit read, and inspect the Tool call's arguments and recorded content. Do not infer a real call from the assistant's wording. For a write, continue with the [approval example](/en/build/approvals) and verify the external result separately; the read-only record does not prove write safety.
+
+## Follow one operation through the product
+
+Use a dedicated test record and separate the read and write tasks. First ask `research` to read a known record and compare its actual response with the expected content. Then request a small, reversible update under an approval-required policy. Keep the Session ID, Run ID, Tool call ID and, when present, approval ID in your application records; they identify different objects.
+
+| Stage | What the application observes | What the person can do |
+| --- | --- | --- |
+| Missing or expired account access | Call waiting for authorization | Authorize the bound connection, or refuse this invocation |
+| Authorized operation requires consent | Pending approval linked to the call | Inspect actual arguments and approve or deny |
+| Request has been dispatched | Executing call | Observe; approval is not evidence of external success |
+| Response lost after a potentially effective request | Unknown call, possibly Run waiting_approval | Investigate the external system and reconcile |
+| Result recorded | Completed call and `is_error` | Inspect the result; completed does not necessarily mean successful |
+
+A Tool alias is not a credential and does not grant extra operations. The Session's allowed operations and current connection policy both matter. A connection that changes account identity can fail with `tool_account_changed`; adding an operation to its current configuration does not automatically grant it to an existing Session. Relevant MCP schema changes can fail with `mcp_schema_changed`. Review the new configuration and create a new Session when the intended binding changes.
+
+## Execute and maintain
+
+Submit a task explicitly reading the test object. Inspect the Tool call record and returned content rather than relying on an assistant claim. Original protected credentials remain in the control plane.
+
+MCP names, descriptions, and schemas are rechecked at invocation. Rediscover, review, and create a new Session after relevant changes; existing Sessions do not silently gain operations. Lost responses may become unknown outcomes and must not be blindly replayed.
+
+Verify the real call, expected content, denied unselected operations, authorization/approval branches, and confirmed cleanup. Record live combination acceptance separately from this contract guide.
+
+For runtime decisions, read [authorization](/en/build/tool-authorization) and [approvals](/en/build/approvals). Next by integration type: [application accounts](/en/integrations/apps), [HTTP Tools](/en/integrations/http-tools), [Remote MCP](/en/integrations/mcp).
+
+Implementation: [Session binding checks](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts), [Tool dispatch and pinned operations](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/broker.ts).

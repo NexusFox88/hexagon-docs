@@ -1,0 +1,118 @@
+{
+  "scope": "Fresh application copy, node_modules absent. Existing host Node/npm/Python/PostgreSQL and package cache; not clean OS.",
+  "environment": {
+    "platform": "macOS-26.1-arm64-arm-64bit",
+    "node": "v24.8.0",
+    "npm": "11.6.0",
+    "python": "Python 3.12.11"
+  },
+  "fresh_application_copy": {
+    "files": 1393,
+    "node_modules_absent_before_install": true,
+    "fresh_data_directory": true,
+    "fresh_dedicated_database": true,
+    "inherited_host_dependencies": [
+      "Node/npm",
+      "Python",
+      "PostgreSQL",
+      "OpenSSH",
+      "cloudflared",
+      "package download cache"
+    ]
+  },
+  "checks": {
+    "npm_ci": {
+      "exit_code": 0,
+      "packages_added": 498
+    },
+    "commands": [
+      {
+        "label": "doctor",
+        "exit_code": 0
+      },
+      {
+        "label": "start",
+        "exit_code": 0
+      },
+      {
+        "label": "status",
+        "exit_code": 0
+      },
+      {
+        "label": "python-venv",
+        "exit_code": 0
+      },
+      {
+        "label": "python-install",
+        "exit_code": 0
+      },
+      {
+        "label": "typescript-build",
+        "exit_code": 0
+      },
+      {
+        "label": "python-discovery",
+        "exit_code": 0
+      },
+      {
+        "label": "typescript-discovery",
+        "exit_code": 0
+      },
+      {
+        "label": "restart",
+        "exit_code": 0
+      },
+      {
+        "label": "stop",
+        "exit_code": 0
+      }
+    ],
+    "console_http_served": true,
+    "readiness": {
+      "before": {
+        "database": "ready",
+        "execution": "running",
+        "credentials": "ready",
+        "credential_access": "not_configured"
+      },
+      "after": {
+        "database": "ready",
+        "execution": "running",
+        "credentials": "ready",
+        "credential_access": "not_configured"
+      }
+    },
+    "persistence": {
+      "identity_unchanged": true,
+      "key_unchanged": true,
+      "saved_definition_retained": true
+    }
+  },
+  "cleanup": {
+    "service_stopped": true,
+    "isolated_database_removed": true,
+    "cloud_resources_created": 0
+  },
+  "initial_attempt": {
+    "passed": false,
+    "cause": "Verification driver incorrectly set HEXAGON_ACCESS_TUNNEL=disabled; only cloudflare or unset is accepted. Not a failure of the documented command.",
+    "process_exit_confirmed": true,
+    "database_removed": true,
+    "record": ".local/docs-clean-install/attempt-1/result.json"
+  },
+  "passed": true,
+  "private_result": ".local/docs-clean-install/result.json",
+  "limitations": [
+    "Not a clean OS or multi-OS certification.",
+    "Console HTML served and both SDK local discovery identities checked through authenticated HTTP; browser bootstrap and visual review are outside this check.",
+    "Ingress left unconfigured for management-only installation; this does not prove cloud reachability. Existing scoped S04 cloud evidence remains separate."
+  ],
+  "source_sha256": {
+    "package.json": "f1f4e516f068683c446499e73bcc1119b1d58cfd1eb1713e2603dc41d2dc032b",
+    "package-lock.json": "c665fe0377af9528da88c49e0f01f2be03b04a57101b9d69d1448c826e4241c2",
+    "tooling/local.ts": "46116911afa358a2940c6fed3b0ee1fb42e24b94fd002e6da1cd0fb818cf2f02",
+    "apps/control-plane/main.ts": "7416475316f76d6e3b9b9d7fd19221de8bf38035e65569c8c26d08974302e3d7",
+    "sdk/python/hexagon/__init__.py": "5755460e0ea7b88896782b948296aedcaf985d72e2a5a3a975d6424fdcc8cab0",
+    "sdk/typescript/index.ts": "500288542a730350c640b50d7da5268a87f26eaa698a041a2d8d61f2cde3092c"
+  }
+}

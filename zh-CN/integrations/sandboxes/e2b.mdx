@@ -1,0 +1,104 @@
+---
+title: "接入 E2B"
+---
+
+使用 E2B 运行云端 Harness，并通过 Hexagon 管理任务、私有预览和资源生命周期。本页针对当前 E2B 连接器；凭据必须属于允许创建和删除目标 Sandbox 的账户，OCI 路线还需要 Template 构建和删除权限。
+
+## 模板与连接
+
+准备 E2B API key 和一个实际可用的模板标识。控制平面连接 schema 只有 `template`，默认值为 `base`；不要给 config 添加 CPU、内存等未定义字段。内置 Harness 使用该模板，资源规格由模板决定。
+
+内置 OpenCode 路线需要至少 2048 MiB 内存；默认 base 不能被假定满足这一要求。选择明确配置的模板并核对实际资源信息。Pi 和自定义 Harness 也要验证解释器、依赖和真实内存使用，不能只看安装成功。
+
+下面的环境变量由你的私有配置提供。示例创建一个新连接；重复运行会创建额外连接，应保存返回 ID 后复用。local 客户端用于本地工作区，hosted 客户端初始化见[自托管](/zh-CN/operate/self-host)。
+
+```python
+import os
+from hexagon import Hexagon
+
+client = Hexagon.local()
+connection = client.create_connection(
+    kind="sandbox", provider="e2b", name="E2B workspace",
+    credential=os.environ["E2B_API_KEY"],
+    config={"template": os.environ["E2B_TEMPLATE"]},
+)
+checked = client.validate_connection(connection["id"])
+if checked["status"] != "ready":
+    raise RuntimeError("Inspect E2B connection diagnostics")
+client.update_connection(connection["id"], enabled=True)
+sandbox_connection_id = connection["id"]
+```
+
+```typescript
+import { Hexagon } from '@hexagon/agent-sdk';
+
+const client = await Hexagon.local();
+const credential = process.env.E2B_API_KEY;
+const template = process.env.E2B_TEMPLATE;
+if (!credential || !template) throw new Error('Set E2B_API_KEY and E2B_TEMPLATE');
+const connection = await client.createConnection({
+  kind: 'sandbox', provider: 'e2b', name: 'E2B workspace',
+  credential, config: { template },
+});
+const checked = await client.validateConnection(connection.id);
+if (checked.status !== 'ready') throw new Error('Inspect E2B connection diagnostics');
+await client.updateConnection(connection.id, { enabled: true });
+const sandboxConnectionId = connection.id;
+```
+
+连接验证执行 `list_sandboxes`，不会运行模型或完整 Harness，也不能证明模板能创建成功。验证 ready 后需单独启用。更新模板或凭据后重新验证、启用；现有 Session 保持自己的固定配置。
+
+## 完成第一次任务
+
+将返回的连接 ID 用作[首个 Session](/zh-CN/start/first-session)的 Sandbox 输入，选择已验证并启用的模型连接及兼容 Harness。教程使用的 Python 和 TypeScript 示例分别完成创建、Run、产物和关闭；不要因一套 SDK 成功省略另一套。
+
+先运行一个小任务，要求在导出目录写入固定内容的文件，检查 Run 终态、实际回答和下载字节一致。需要预览时，要求任务启动服务，然后通过 Hexagon 的[私有预览](/zh-CN/build/private-preview)授权入口访问。连接器关闭公共流量，Provider traffic token 由控制平面代理使用，不应提供给浏览器或写入分享链接。
+
+成功条件是任务完成、产物可读、所需预览授权正确，并且 Session 关闭后资源清理得到确认；列举资源或创建成功都不是完整验收。
+
+## OCI 镜像路径
+
+注册公开 OCI Harness 后，E2B 会为 Session 创建自己的 Template，当前实现使用 2 CPU / 4096 MiB。该路径使用准备后的模板，不是把镜像名放进连接的 template 字段。准备和计算资源创建拥有独立的操作记录。
+
+通过 [OCI 指南](/zh-CN/integrations/harnesses/oci)注册镜像、记录 digest 并预检。当前 E2B 不声明 private_oci_image，不要将注册表密码放进普通环境变量绕过限制。镜像构建完成也不证明其 Harness、Tools 或多轮协议正确。
+
+构建回执丢失后，控制平面按原 operation 精确查找 Template；不能可靠确定当前构建时保留 unknown，不盲目重复构建。关闭会先处理计算资源，再清理 Session 自有 Template；共享的用户配置模板不作为 Session 自有模板删除。
+
+## 网络、空闲与恢复
+
+E2B 声明 network_allowlist。限制作用于 Sandbox 出站网络；允许名单必须覆盖任务所需访问，按[网络策略](/zh-CN/build/sandbox-policy)设计并做真实允许与拒绝探测。不要为了排除配置错误临时把账户密钥放进 Sandbox。
+
+空闲时采用原生 pause，下一轮通过 connect 唤醒。用户使用同一 Session 提交新 Run，无须自行调用 Provider resume。策略保留内存与文件系统，但仍须单独验证所选 Harness 的第二轮、对话与文件连续性；活动 Run（包括授权或审批等待）不属于可暂停的空闲状态。
+
+关闭是终结操作，暂停不是删除。E2B 还具有 Provider 的运行到期时间；Hexagon 的生命周期和对账负责跟踪资源，不能从本地进程停止推断云资源已经消失。
+
+## 排查与证据
+
+| 症状 | 检查 |
+| --- | --- |
+| 验证失败 | API key、账户权限、控制平面到 E2B 的网络 |
+| 验证成功但创建失败 | 模板是否存在、资源配额、模板资源规格 |
+| harness_requires_2048mb | 内置 OpenCode 模板实际内存 |
+| OCI 长时间 preparing / unknown | 原构建回执、Template 状态及操作记录；不要重复创建 |
+| Preview 无法访问 | 服务端口、服务是否存活、Hexagon 授权与 Provider 私有通道 |
+| close 尚未完成 | Sandbox 删除及自有 Template 清理的独立结果 |
+
+E2B SDK 使用自己的 dispatcher；当前连接器显式选择环境代理，`NODE_USE_ENV_PROXY=0` 会关闭这项选择。排查连接失败时需同时考虑控制平面出站网络，不能只检查 Sandbox 网络策略。
+
+本页根据当前实现核对，未重新执行云任务。历史内置 Harness 双 SDK 结果见[执行矩阵](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/execution-matrix.md)，休眠分支见[serverless 证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-harness-serverless-matrix.json)。不要将历史内置成功外推到新 OCI 镜像。
+
+依据：[E2B 连接器](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/sandboxes/e2b.ts)、[Harness 镜像契约](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/harness-images.md)。下一步：[首次任务](/zh-CN/start/first-session)、[空闲与唤醒](/zh-CN/build/idle-and-wake)、[清理对账](/zh-CN/operate/reconciliation)。
+
+后续证据：[E2B OCI 专项](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-e2b-oci-preparation.md)记录了 OpenCode 的 Python/Chat 与 TypeScript/Messages 独立旅程、文件字节恢复及模板清理。该范围不覆盖所有 SDK/协议组合；历史失败仍保留。见[组合证据阅读指南](/zh-CN/integrations/verified-combinations)。
+
+## 区分三种模板与资源身份
+
+| 身份 | 如何选择 | 清理责任 |
+| --- | --- | --- |
+| 用户配置的模板 | 内置 Harness 使用连接的 `config.template` | 共享输入；关闭 Session 不删除该模板。 |
+| Session 所属的准备模板 | 已注册公有 OCI Harness 及其镜像准备操作 | 确认 template/build 回执，计算资源清理后删除所属模板。 |
+| 实际 Sandbox | 某次计算资源创建操作 | 单独确认删除；模板 ready 不代表计算资源已创建或已清理。 |
+
+schema 默认的 `base` 是名称，不是已验证的内存规格。[Serverless 记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-harness-serverless-ui.md)保留了 E2B/OpenCode 使用 1 GiB base 模板失败，以及随后选择已配置 2 GiB 模板的过程。OCI 路径的连接器构建请求明确使用 2 CPU、4096 MiB，但不会改变内置 Harness 所用连接模板的资源。
+
+域名限制可参考[公共 API 网络记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-network-api-journey.md)，它在真实 E2B 资源中比较允许与拒绝请求，但使用确定性探针 Harness 和 TypeScript，不是模型驱动的双 SDK 任务。内置 Web 执行与浏览器访问见 [Web 旅程](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-web-preview-journey.md)及[独立 Python 旅程](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-python-web-journey.md)，需保留日期与组合范围，不能把新版本或新模板标成已通过这些历史执行。

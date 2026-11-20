@@ -1,0 +1,95 @@
+---
+title: "Recover from disconnects, retries, cancellation, and unknown outcomes"
+---
+
+Identify whether you lost observation, a request response, the execution process, or an external operation result. A timeout is not proof of failure; reconnecting is not resubmitting work.
+
+| Observation | Retain and inspect | Next action |
+| --- | --- | --- |
+| Event stream disconnect | Run ID and committed cursor | Reconnect to that Run and replay after the cursor |
+| Lost Run submission response | Session, exact input/origin, key | Resend the identical request to recover the original Run |
+| Lost Session creation response | Creation intent, time, connection IDs | Inspect Sessions/resource operations before creating again |
+| Runtime unreachable | Original Run, invocation, Sandbox binding | Observe recovery; do not independently restart the Harness |
+| Runtime interrupted | Run and dispatched Tool operations | Investigate termination and side effects; do not assume safe workspace reuse |
+| Unknown Tool outcome | Call ID, request hash, dispatch policy | Verify externally, then record an evidence-based resolution |
+| Unconfirmed close | Session, resource IDs, deletion operation | Reconcile the original resources and retain records |
+
+## Retry an identical submission
+
+Persist the request before sending. With an initialized client:
+
+```python
+run = client.submit(saved_session_id, saved_input, saved_key, origin=saved_origin)
+```
+
+```typescript
+const run = await client.submit(savedSessionId, savedInput, savedKey, savedOrigin);
+```
+
+Different content under the same Session/key conflicts. Do not generate a new key to bypass `idempotency_conflict`. An already accepted identical request returns its original record even if a connection was subsequently disabled; this does not permit new work.
+
+Bound retry counts and use backoff for transient transport faults. Distinguish authentication, input, and state conflicts. The SDK does not blindly replay non-idempotent operations.
+
+## Keep a recovery record before the network call
+
+A recoverable Run submission needs more than a last-seen error. Persist the business request ID, authorized Session ID, exact input and origin, idempotency key, attempt time, returned Run ID when known, and last committed event cursor. Keep these in private application storage: original task content may be sensitive. Record response loss as an unknown submission outcome, not a failed task.
+
+Use the [SQLite intent example](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/backend-intents.py) for the persistence boundary and the [event checkpoint example](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/event-checkpoint.py) for observation recovery. These examples address different records; an event cursor cannot recover a missing submission key, and a submission key does not acknowledge UI delivery.
+
+| What is known | Safe next read or action |
+| --- | --- |
+| Run ID saved | Query that Run; reconnect its stream if needed. Do not submit a new task to discover status. |
+| Run ID missing, exact submitted intent saved | Reissue that same submission to the same Session/key. Save the returned ID before continuing. |
+| Session creation response missing | Inspect candidate Sessions using request time and intended configuration. Those attributes are investigative evidence, not a unique idempotency guarantee; retain ambiguity if several match. |
+| A cloud operation is unknown | Inspect its recorded operation and resource identity through the reconciliation workflow; do not replace it with a new create/delete intent. |
+| Local journal or key missing | Investigate existing server records first. Reconstructing a new key cannot identify a previously accepted Run. |
+
+Bounded retries should end in a recoverable application state with preserved identifiers. A retry limit being reached does not establish that remote work failed. Let an operator or later recovery job resume investigation from the same record.
+
+## Cancel and close explicitly
+
+```python
+client.cancel(run_id)
+current = client.run(run_id)
+# Observe settlement; cancellation does not reverse all external effects.
+```
+
+```typescript
+await client.cancel(runId);
+const current = await client.run(runId);
+// Continue observing settlement; cancellation cannot retract external effects.
+```
+
+Cancellation prevents new Tool dispatch, but dispatched requests can complete or become unknown. Late approvals cannot revive execution. Cancelling a Run and cleaning up a Session are separate; close unused Sessions and confirm deletion.
+
+An AbortSignal or stopped Python stream stops observation, not execution. Do not map leaving a page to cancellation unless that is an explicit, communicated product behavior.
+
+
+Cancellation can immediately settle a queued Run as cancelled, while executing work enters cancelling first. Poll the durable Run state until terminal; a successful cancel response alone is not proof that in-flight work has stopped. Explicit Session close can return session_busy while work remains active. Settle or cancel that work, then close and verify cloud cleanup as a separate outcome.
+
+## Reconcile external writes
+
+Inspect `tool_calls` / `toolCalls` for the invocation and request hash. Verify the actual remote outcome before using `resolve_tool_call` / `resolveToolCall` with a result and evidence. Resolution delivers a verified result without reissuing the remote request. Leave unknown outcomes unknown when evidence is insufficient. Management permissions apply; see the [reconciliation protocol](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/tool-reconciliation.md).
+
+## Verify recovery
+
+Exercise stream loss, lost submission responses, worker restart, lost write responses, and lost delete responses separately. Confirm original Run/resource identity and correct side-effect counts. Preserve unresolved identifiers. Simulation proves only its modeled branches; record cloud/model journeys independently.
+
+Sources: [recovery architecture](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/architecture.md), [durable events](/en/build/stream-events). Next: [Backend integration](/en/build/backend-integration).
+
+## Define when each recovery attempt is finished
+
+| Recovery | Completion condition | Escalate or retain uncertainty when… |
+| --- | --- | --- |
+| Observation | Stored timeline catches up and a durable Run query confirms current/terminal state | Authorization fails or repeated transport attempts cannot reconnect; retain Run/cursor. |
+| Lost submission | Original intent is associated with the returned original Run ID | Exact intent/key is unavailable or the payload conflicts; do not invent replacement identity. |
+| Runtime reachability | Original invocation is observed again, or its terminal failure is durably recorded | Runtime is interrupted, resource is missing, or operation identity remains ambiguous. |
+| Unknown Tool write | External evidence supports a recorded resolution for the original call/hash | Evidence cannot distinguish success from failure; keep it unknown and block blind replay. |
+| Cancellation | Durable Run reaches a terminal state and outstanding external outcomes are tracked separately | `cancelling` persists or an external request remains unresolved. |
+| Session cleanup | Session and recorded compute/checkpoint/image operations confirm disposition | Close response is lost, deletion is unknown, or owned resources remain; retain private IDs. |
+
+An observation deadline means the application stopped waiting, not that Hexagon cancelled the task. Return a resumable status to your user and keep the recovery record. A cleanup exception must remain visible in that record; do not catch it merely to print “completed” after the business result succeeded.
+
+For a concrete sequence, suppose the second turn timed out before returning its Run ID. Reload its saved input/origin/key and resend exactly once per bounded retry policy. Once R2 is returned, store R2 and resume its stream from the committed cursor. If its Tool call later becomes unknown, stop submission retries: recovery now belongs to that call's external outcome, not to the original Run request. Closing the Session afterward is another operation whose result must be confirmed separately.
+
+Sources: [submission and cancellation](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts), [Runtime supervision](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/worker.ts), [Tool reconciliation](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/tool-reconciliation.md), [error reference](/en/reference/errors). Next: [resource reconciliation](/en/operate/reconciliation), [troubleshooting](/en/operate/troubleshooting), [events and recovery concepts](/en/concepts/events-and-recovery).

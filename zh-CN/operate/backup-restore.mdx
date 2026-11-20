@@ -1,0 +1,71 @@
+---
+title: "备份和恢复控制平面"
+---
+
+本页描述已有 local 离线备份命令。备份覆盖一个数据库 schema 和匹配的私有身份 / 密钥，不是运行中云 Sandbox 的完整快照，也不是 hosted 全套基础设施备份方案。
+
+## 明确备份能恢复什么
+
+| 组件 | 包含或重建方式 | 边界 |
+| --- | --- | --- |
+| 选定 PostgreSQL schema | custom 格式数据库 dump | 不是服务器上所有 schema/数据库 |
+| 已导出产物 | 该 schema 中的 `artifacts.content` 字节 | 未从 Sandbox 导出的文件不包含在内 |
+| 加密凭据 | 数据库信封与匹配的 `master.key` | 任何一部分单独存在都不能恢复可用凭据 |
+| 本地 owner/设置 | `owner.json` 与可选 `deployment.json` | hosted 外部身份、环境与 TLS 须另行备份 |
+| 发现/PID 文件 | 启动时重新生成 | 不复用旧进程身份 |
+| 云计算、快照、模板与外部 Tool 记录 | 不复制进备份包 | 保留供应商标识并单独对账 |
+
+Session 全部关闭的门禁不等于 Provider 全账户孤儿审计。确认该工作负载关联资源，并另外保留未决记录。离线一致性还要求备份期间没有其他进程写入目标数据库/设置；停止一个 launcher 不证明所有外部写入者都已停止。
+
+## 前置条件
+
+安装 pg_dump / pg_restore，使用正确 DATABASE_URL 和 HEXAGON_DATA_DIR。完成或取消活动 Run，关闭所有云 Session 并确认清理，停止本地服务。备份实现会拒绝仍在运行的服务、未关闭 Session、身份或解密不匹配。
+
+```sh
+npm run local -- stop
+npm run local -- backup /absolute/private/new-backup-directory
+```
+
+目标目录必须全新，命令不会覆盖旧备份。备份包含 database.dump、master.key、owner.json、可选 deployment.json、hash 清单和迁移信息。目录和文件按私有权限创建；不能提交到仓库或公开上传。
+
+## 恢复到全新目标
+
+先建立全新空 PostgreSQL 数据库。目标数据目录不存在或为空。以下连接串是示意，使用你准备好的独立目标：
+
+```sh
+DATABASE_URL='postgres://YOUR_USER@127.0.0.1:5432/hexagon_restored' \
+HEXAGON_DATA_DIR='/absolute/private/restored' \
+npm run local -- restore /absolute/private/new-backup-directory
+```
+
+恢复检查 manifest、文件类型与 hash，拒绝非空数据库，使用事务恢复 schema，然后验证 owner 身份和所有加密记录可解密。返回的 schema 若不是 public，后续连接需要配置相应 search_path。使用目标 DATABASE_URL / HEXAGON_DATA_DIR 启动，不要误启动原工作区。
+
+发现文件和 PID 在启动时重新生成，不复制旧进程身份。若恢复在数据库写入后失败，目标可能已不再为空；保留错误记录，检查 staging 目录和数据库，不要直接反复覆盖或删除尚未核实的数据。
+
+## 恢复中断后的处理
+
+| 失败位置 | 目标可能处于什么状态 | 安全的下一步 |
+| --- | --- | --- |
+| manifest、文件类型或 checksum 被拒绝 | 数据库恢复尚未开始 | 检查可信源备份，不修改 hash 掩盖损坏 |
+| 非空目标检查被拒绝 | 已有目标数据保留 | 选择真正为空的专用目标 |
+| `pg_restore` 失败 | 其单事务应回滚，staging 文件可能保留 | 重试前检查实际数据库与私有 staging 记录 |
+| `pg_restore` 后身份/解密或私有文件安装失败 | 数据库可能已填充，私有文件可能暂存或部分安装 | 保持目标离线，保留诊断，定位原因后恢复到另一个全新目标 |
+| restore 返回 verified | 数据库和身份检查通过，服务尚未运行 | 配置返回的 schema/search_path，再启动并完成任务验收 |
+
+整个命令不是跨 PostgreSQL 与文件系统的单个原子事务。再次恢复到已填充目标会被正确拒绝。不要把删除目标作为通用重试步骤，也不要让原部署和恢复部署同时操作同一组远程资源。
+
+## 信任与一致性
+
+只恢复可信来源的备份。hash 证明内容与清单一致，不证明归档作者可信。密钥与数据库要匹配：另一个工作区的 master.key 无法解密本备份。
+
+该命令要求 Session 全部关闭，以避免重建仍活跃的云操作。自行恢复较旧或在线数据库副本时，还需额外对账备份时点后的云资源与外部写入，不能直接假设安全重放。
+
+hosted 的外部主密钥、身份、TLS 和部署配置需由部署方另行备份；不要把 local 工具的成功外推为 hosted 恢复完成。
+
+## 恢复验收
+
+在隔离目标确认历史 Session / Run、初始化、事件和产物可读；凭据可解密；新测试任务可执行并确认清理；没有从旧状态意外复活资源。记录实际恢复命令、schema、验证范围和失败，公开证据不包含备份文件或秘密。
+
+实现依据：[离线备份与恢复](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/deployment/backup.ts)。下一步：[对账](/zh-CN/operate/reconciliation)、[升级](/zh-CN/operate/upgrades)、[持久化](/zh-CN/concepts/persistence)。
+
+[11 月 18 日隔离恢复演练](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-18-local-beta-delivery.md)按排序行哈希比对了当时全部 27 张表，包括 Session、Run、事件、产物、连接与加密凭据，随后在恢复部署上执行了两套 SDK 的云旅程。表数只描述当时检查点，不是当前 schema 清单。这是 local 模式证据，本页未新增恢复执行。

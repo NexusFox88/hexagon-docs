@@ -1,0 +1,73 @@
+---
+title: "Create your first Agent Session"
+---
+
+Run built-in Pi 1.5.2 in a cloud sandbox, create a small text artifact, and verify that the artifact remains readable after closing the Session.
+
+## Prerequisites and evidence scope
+
+Start a [local control plane](/en/start/install). Verify and enable a Sandbox connection and a compatible model connection in Console. Select an exact combination from the [execution matrix](/en/integrations/verified-combinations): a Provider name alone does not establish compatibility with every model endpoint or protocol.
+
+Both programs passed independent real-cloud runs on 2026-11-20 with **Vercel + built-in Pi 1.5.2 + the configured Messages endpoint using deepseek-ai/DeepSeek-V4-Flash**. The [execution record](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-first-session-docs-cloud.json) covers task completion, artifact size/hash/content, closed Sessions, completed deletion operations and identical bytes downloaded after closure. It does not certify another endpoint, account or combination, nor Tools, approvals, multi-turn or preview behavior. Running the programs consumes your Provider and model resources. No saved Agent template or additional Tool is required.
+
+## Run the complete example
+
+From the repository root, set your verified connection IDs. These values are identifiers, not Provider credentials:
+
+```sh
+export HEXAGON_EXAMPLE_SANDBOX_ID='YOUR_SANDBOX_CONNECTION_ID'
+export HEXAGON_EXAMPLE_MODEL_ID='YOUR_MODEL_CONNECTION_ID'
+```
+
+Choose one language. The programs create independent Sessions; running both creates two separate journeys.
+
+Python: install the local SDK, then run the [complete program](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/first-session.py):
+
+```sh
+.local/docs-example-venv/bin/python examples/documentation/first-session.py
+```
+
+TypeScript: with repository dependencies installed, build the SDK and run the [complete program](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/first-session.ts):
+
+```sh
+npm --prefix sdk/typescript run build
+./node_modules/.bin/tsx examples/documentation/first-session.ts
+```
+
+The program creates a Session directly with a pinned Pi version and your connections. It asks the Harness to place `hello.txt` in the supplied Run artifact directory, polls the Run, checks the exported bytes, closes the Session, and downloads an artifact again to check retention.
+
+## Verify the outcome
+
+Look for the Session and Run IDs, the final answer, and `Completed; artifacts and journal:`. Python uses `.local/docs-first-python/`; TypeScript uses `.local/docs-first-typescript/`.
+
+Each directory contains a private `journal.json` and locally named artifact files. Remote paths are not used as local write destinations. At least one exported file must equal `Hello from Hexagon` after trimming surrounding whitespace.
+
+The final journal phase, `closed_and_retention_checked`, records that this program observed successful execution, matching output bytes, a `closed` response, and a successful artifact download after closure. It is evidence only for that execution and combination.
+
+The successful Run's `output` is an object with `role: "assistant"`, `text` and artifact metadata. Read `output.text` and compare its claims with the downloaded file: it should describe creating `hello.txt` with `Hello from Hexagon` and a newline. The wording may vary. A reported workspace path is not a download URL; use the Artifact ID. Check the final answer, terminal state and actual exported bytes independently. The [answer review](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-first-session-answer-review.json) matched both recorded answers to the retained bytes and their actual read/command events; it does not promise deterministic model wording.
+
+## Recover from interruption
+
+The ten-minute observation deadline does not cancel server execution. A Run can remain active after a timeout, lost connection, or closed terminal. Inspect the original IDs in Console.
+
+The program refuses to overwrite an existing journal. Do not delete it simply to retry:
+
+| Saved information | Recovery action |
+| --- | --- |
+| No Session ID | Creation may have succeeded without a response; inspect Sessions and resource operations before creating another |
+| Session ID but no Run ID | If the submission response was lost, call `submit` with the same Session, input, and saved key |
+| Run ID | Query that Run; do not submit another task to resume observation |
+| `closing` phase | Inspect the same Session and resource operations; repeated close reconciles the original resources |
+| Failed Run or incorrect artifact | Inspect events, retain the journal, and explicitly close the Session after investigation |
+
+Request cancellation with Python `client.cancel(run_id)` or TypeScript `await client.cancel(runId)`, then query the terminal state. Cancellation does not reverse dispatched external effects and does not replace Session closure.
+
+Close with Python `client.close(session_id)` or TypeScript `await client.close(sessionId)`. Check the returned state and Console resource operations. An exception is not proof that resources are absent. Unknown external effects require [reconciliation](/en/operate/reconciliation).
+
+Use each journal from one process only. After confirming cleanup, archive the directory before starting a new independent experiment.
+
+Next: [Understand what happened](/en/start/what-happened).
+
+Continue with a larger task: [Complete a real project task](/en/start/project-task).
+
+To integrate this lifecycle, continue with [backend integration](/en/build/backend-integration). Contract sources: [SDK guide](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/README.md), [Session initialization](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/session-initialization.md) and [acceptance journey](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/acceptance.md).

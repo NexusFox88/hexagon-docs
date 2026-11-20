@@ -1,0 +1,114 @@
+---
+title: "Register a compatibility source Harness package"
+---
+
+Use this page to maintain a source Harness using `hexagon-json-v1`. Prefer [OCI images](/en/integrations/harnesses/oci) for new integrations so the interpreter and dependencies have an explicit environment. Registration stores tenant-owned data; the control plane never imports or executes your source. Installation and execution happen in the cloud Sandbox.
+
+## Prerequisites and format
+
+Use a management client, validated and enabled Sandbox/model connections, and a Sandbox with `python3` or `node`. The current source-package schema only accepts `model_providers: ["anthropic-compatible"]`. Changing a declaration does not add Chat Completions or Responses support.
+
+A package contains 1–32 UTF-8 source files totaling at most 512 KiB. Each content string also has a 262144 JavaScript code-unit limit. Paths are at most 240 characters and must be schema-compatible relative paths: no empty segments, `.`, `..`, duplicates, or file/directory conflicts. The entrypoint must be present in files.
+
+The format does not orchestrate npm/pip lockfile installation or accept binary archives. Structural validation and byte integrity do not prove executable correctness. Dependencies must already exist in the Sandbox or be managed explicitly by your package.
+
+## Register and select a version
+
+These integration excerpts reuse an initialized client and connection IDs from the [first Session tutorial](/en/start/first-session). Read the existing [Python Harness example](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/harnesses/python-agent/main.py) from the repository root. It uses the standard library to call a Messages model, with shell access, declared remote Tools, and conversation history.
+
+```python
+from pathlib import Path
+
+harness = client.register_harness_package(
+    id="custom.my-agent", version="1.0.0",
+    protocol="hexagon-json-v1", interpreter="python3", entrypoint="main.py",
+    capabilities=["conversation", "tools", "initialization"],
+    model_providers=["anthropic-compatible"],
+    files=[{"path": "main.py", "content": Path(
+        "examples/harnesses/python-agent/main.py").read_text(encoding="utf-8")}],
+)
+definition = dict(
+    harness={"id": harness["id"], "version": harness["version"]},
+    sandbox_connection_id=sandbox_connection_id,
+    model_connection_id=model_connection_id,
+)
+check = client.preflight_session(**definition)
+if not check['ready']:
+    raise RuntimeError('Review compatibility before creating the Session')
+# Persist create intent using the first-Session tutorial before provisioning.
+```
+
+```typescript
+import { readFile } from 'node:fs/promises';
+
+const harness = await client.registerHarnessPackage({
+  id: 'custom.my-agent', version: '1.0.0',
+  protocol: 'hexagon-json-v1', interpreter: 'python3', entrypoint: 'main.py',
+  capabilities: ['conversation', 'tools', 'initialization'],
+  model_providers: ['anthropic-compatible'],
+  files: [{ path: 'main.py', content: await readFile(
+    'examples/harnesses/python-agent/main.py', 'utf8') }],
+});
+const definition = {
+  harness: { id: harness.id, version: harness.version },
+  sandbox_connection_id: sandboxConnectionId,
+  model_connection_id: modelConnectionId,
+};
+const check = await client.preflightSession(definition);
+if (!check.ready) throw new Error('Review compatibility before creating the Session');
+// Persist create intent using the first-Session tutorial before provisioning.
+```
+
+Create a Session directly with definition; an Agent template is optional. Continue through Run submission, persistent Run IDs, events/results, artifact verification, and confirmed cleanup. Record the returned digest alongside id/version.
+
+Registering identical canonical content within the tenant is idempotent. Changed content under an existing id/version, or a collision with an OCI registration, returns `harness_version_conflict`. Use a new version for changed code and select it in a new Session; existing Sessions remain pinned. There is currently no source-package deletion endpoint. Capabilities are author declarations, not certification of arbitrary uploaded code.
+
+## stdin, credentials, and Tools
+
+Runtime starts the entrypoint in the Session workspace and supplies one JSON object on stdin followed by EOF. It contains protocol, run_id, input, initialization, model, native_session, artifact_directory, and tools; native_session may be absent initially. Your Harness stores its own history and uses the returned opaque native_session to recover it on subsequent Runs.
+
+Use the supplied `model.base_url` and `model.model`, not a hardcoded service URL. The current worker supplies `HEXAGON_MODEL_KEY` as delegated access to the protected model path; the original model account key stays in the control plane. `HEXAGON_TOOL_TOKEN` authorizes only this Run's local Tool mailbox. Never log these values, add them to model context, or export them as artifacts.
+
+Call remote Tools at `http://127.0.0.1:8765/tools/<run_id>/call` with Authorization `Bearer <HEXAGON_TOOL_TOKEN>` and JSON `{"id":"<UUID>","name":"<declared name>","arguments":{}}`. Poll the same logical call with the same id and arguments until state is completed, then process result and isError. The control plane manages authorization and approval waits. Generating another UUID can create a new operation; it is not a safe retry for an unknown external side effect. Do not bypass the mailbox to obtain bound Tool credentials.
+
+## Final output and failure
+
+stdout must contain exactly one valid final result JSON line:
+
+```json
+{"type":"hexagon.result","text":"Actual completed result","native_session":"opaque-id","failed":false}
+```
+
+text must be nonempty; native_session is optional and must contain 1–512 characters when supplied. Arbitrary additional result fields are rejected. Ordinary logs do not substitute for this record. Missing, duplicate, invalid, failed:true, or nonzero-exit results cannot complete successfully. Success also depends on common artifact export. Write deliverables to artifact_directory; other workspace files are not automatically artifacts.
+
+Runtime owns processes and cancellation. Disconnecting an event client does not cancel execution, and cancellation does not retract an external Tool write. Do not hide interruptions or model failures behind infinite retries.
+
+## Upgrade without changing existing work
+
+Treat each package id/version as immutable. The server canonicalizes the file order and capability set for its content digest; changing executable content or other definition fields under the same version is a conflict, not an update. Register the changed package under a new version, then select it for a new Session. Do not edit an existing Session's installed source to simulate a version upgrade.
+
+The package API validates the source layout and content bounds, not dependency availability or model behavior. Check the interpreter, actual imports, delegated model access, final-result parser and conversation history independently. A script that prints a success-shaped JSON result without doing the work is not a valid acceptance fixture.
+
+When the program fails, return the contract's supported failure fields and a nonzero exit where appropriate; do not attach arbitrary diagnostic keys to the strict final-result object. Emit sanitized ordinary diagnostic logs separately. Preserve the original invocation and investigate Tool side effects before restarting after interruption.
+
+## Read result failures correctly
+
+| Program output | Required interpretation |
+| --- | --- |
+| Ordinary logs only, exit 0 | Missing final record; fail |
+| Two valid final records | Ambiguous completion; fail |
+| One final record with `failed: true` | Report the program's failure |
+| Success-shaped record but nonzero process exit | Execution failed; do not promote the record |
+| One valid successful record, exit 0 | Parser success only; still verify actual work and artifact export |
+
+These cases exercise the result contract, not the model. The local package tests also corrupt uploaded bytes and require installation to fail. The database-backed version test covers identical-content registration, changed-content conflicts, registry reconstruction and tenant isolation; it must actually run against a test database before claiming those persistence checks passed. The initial review ran local result/integrity checks and skipped the unconfigured database case. The later [combined evidence review](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-docs-harness-reuse.json) records isolated PostgreSQL execution: all four selected files and 16 tests passed, including package-version persistence checks; the temporary schema was removed. The compatibility API remains supported; this page assigns no deprecation or removal date.
+
+## Completion checks
+
+Verify two conversation turns, an actual Tool, initialization if declared, artifacts, failed results, cancellation, and confirmed cloud cleanup. Run the whole journey independently with Python and TypeScript clients; a Harness written in Python does not replace Python SDK validation. Retain exact versions, digest, combination, and scope.
+
+This page was reviewed against the registration schema, SDK methods, delegated worker credential path, and sample source. No cloud task was rerun for this documentation change; a newly registered package is not thereby accepted.
+
+The [combined Harness evidence review](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-docs-harness-reuse.json) separates the historical full custom-package journey from current immutable-version and strict-result checks. The current Python example adds optional initialization context/system handling to the retained source; older cloud evidence is reused only for the unchanged path without those options. It does not certify the new package digest or optional initialization behavior as freshly cloud-tested.
+
+Sources: [source-package contract](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/custom-harnesses.md), [package implementation](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/harness-packages.ts), [worker](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/worker.ts). Next: [Harness adapters](/en/contribute/harness-adapters), [OCI registration](/en/integrations/harnesses/oci), [HTTP API](/en/reference/http).

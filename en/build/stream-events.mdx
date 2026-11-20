@@ -1,0 +1,124 @@
+---
+title: "Display Run events in your application"
+---
+
+Build progress UI from durable events. A stream is an observation channel: closing a browser, losing a proxy connection, or timing out locally does not cancel a Run.
+
+Start with [backend integration](/en/build/backend-integration) and a Run ID authorized through your business records. The examples use an initialized client and application-owned persistence callbacks.
+
+## Consume and commit a cursor
+
+```python
+cursor = saved_cursor or '0'
+for event in client.stream(run_id, cursor):
+    if event.get('id'):
+        # Deduplicate and save the event plus cursor in one application transaction.
+        store_event_and_cursor_atomically(run_id, event)
+        cursor = event['id']
+    else:
+        handle_transport_event(event)
+result = client.run(run_id)
+```
+
+```typescript
+let cursor = savedCursor ?? '0';
+for await (const event of client.stream(runId, cursor)) {
+  if (event.id) {
+    await storeEventAndCursorAtomically(runId, event);
+    cursor = event.id;
+  } else {
+    handleTransportEvent(event);
+  }
+}
+const result = await client.run(runId);
+```
+
+The storage and handling functions are application callbacks, not SDK methods. Deduplicate by Run and event ID. Advancing the cursor before storing an event can lose data; replay after storing is safe when writes are idempotent. Keep IDs as numeric strings rather than converting them to JavaScript Numbers.
+
+## A runnable checkpoint implementation
+
+[event-checkpoint.py](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/event-checkpoint.py) implements the persistence callback with SQLite. `EventStore.commit(run_id, event)` stores the full event and updates the Run's cursor in one transaction. A replay with identical content is ignored; conflicting content under the same ID stops processing. IDs remain strings in storage and use arbitrary-precision integers only for comparison. Gaps are allowed: event IDs are not a per-Run contiguous counter.
+
+Run its offline restart demonstration without SDK installation or credentials:
+
+```sh
+python3 -B examples/documentation/event-checkpoint.py
+```
+
+For integration, replace the Python callback above with `store.commit` and load the starting cursor using `store.cursor(run_id)`. Use a private database path and one ordered consumer per Run. The demo uses temporary storage and synthetic events; it does not connect to Hexagon or implement authentication, a web server, distributed consumer leasing or browser delivery. The transaction pattern applies equally to a TypeScript backend using its own database driver. Persisting events can retain user content and Tool output; apply your application's access and retention rules.
+
+## Forward events through your application
+
+There are two different progress positions:
+
+| Position | Owner and purpose | When to advance |
+| --- | --- | --- |
+| Control-plane consumption cursor | Backend: which Hexagon events have entered the application database | In the same transaction that saves each event |
+| Browser delivery cursor | Each viewer: which stored events its timeline has applied | After applying or safely storing the received event; replay remains deduplicated |
+
+Do not use the first cursor as proof that every browser received an event. A backend may commit an event and crash before sending it. On browser reconnect, replay your stored timeline after that viewer's cursor, then continue with later stored events. Closing the replay-to-live gap requires a single ordered database read loop or a subscription established before backfill with deduplication; independently fetching history and then starting an unbuffered live listener can miss events.
+
+A minimal application flow is: authenticate the viewer → check its ownership of the business task → resolve the saved Run ID → serve stored events after its cursor → continue delivering newly committed events. The application route and authentication are yours to implement; they are not additional Hexagon endpoints. Recheck access when opening a new connection. Multiple tabs can share the backend collector but maintain independent display state.
+
+Use `(run_id, event.id)` as the timeline key. Append a row only once, even if the transport resends it. Derive rendered state from stored records, and obtain the final answer and terminal status from a Run query. When comparing IDs in TypeScript, use `BigInt(id)` rather than `Number(id)` or lexicographic string ordering; keep the string when serializing JSON. Do not require adjacent IDs to differ by one.
+
+| Failure point | Recovery |
+| --- | --- |
+| Before the database commit | Reconnect from the old committed cursor; the event is received again. |
+| After commit, before browser delivery | Backend cursor remains advanced; the browser replays the application's stored event. |
+| Browser receives the same event twice | The timeline key suppresses a duplicate row. |
+| Stream ends without `stream.end` | Treat it as a transport interruption and reconnect with bounded backoff; do not submit another Run. |
+| Local observation is aborted | Keep execution state unchanged until a durable query or later event updates it. |
+
+## Implement application delivery and viewer state
+
+[event-delivery.mjs](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/event-delivery.mjs) supplies two application-owned helpers:
+
+- `forwardStoredEvents` reads committed events from the application database after the viewer's cursor. It uses the same ordered read loop for history and later commits, avoiding a history-to-live subscription gap. An empty read waits and checks again; it does not declare the Run completed.
+- `RunTimeline` applies envelopes for one Run, suppresses duplicate event IDs, compares IDs using `BigInt`, and tracks connection state separately from the latest queried Run. Render event text with `textContent` or your framework's escaped text binding.
+
+The `readAfter(runId, cursor, signal)` adapter must return committed events for exactly that authorized Run, numerically ordered and strictly after the cursor. Implement it with your application database; the helper does not query Hexagon directly. `wait(signal)` must implement a bounded, abortable polling delay. Abort the controller when the viewer disconnects, and preserve transport backpressure by awaiting each response write before asking the iterator for another item. Do not add a Run cancellation call to this cleanup.
+
+After authenticating and authorizing the viewer, your server can forward each yielded `{run_id, event}` envelope over its own SSE or WebSocket endpoint. This is an application protocol, not a new Hexagon route. The helper does not implement the HTTP server, authentication, timers or final response framing. Query the original Run for the current state/output and pass the authorized result to `timeline.reconcileRun(run)`.
+
+The viewer stores its timeline in memory in this minimal example. After a page reload, replay from `0`; do not restore a cursor alone while discarding the earlier rows. A persistent client must restore both the timeline and its matching cursor atomically. On a transient reconnect in the same page, keep the rows and use `timeline.cursor`.
+
+Run the offline delivery checks:
+
+```sh
+node examples/documentation/check-event-delivery.mjs
+```
+
+The check deliberately drops delivery after a committed row is read, reconnects at the viewer's old cursor, replays a duplicate, then commits a later event after an empty read. It asserts two unique timeline entries, the same Run throughout, IDs beyond JavaScript's safe-integer range, and execution state unchanged by disconnect. It uses an in-memory stored-event adapter; it does not prove real browser or HTTP stream behavior. Run the separate SQLite checkpoint demo to check the database transaction boundary.
+
+## Open the server and browser example
+
+Run `node examples/documentation/event-delivery-server.mjs` from the repository root and open the printed loopback URL. The server reuses `forwardStoredEvents`; the browser reuses `RunTimeline`. Disconnect, wait for several source events, reconnect, and query the Run. Check that the Run ID stays fixed, missing rows appear once, and connection loss does not change the queried execution state. Reloading rebuilds the timeline from cursor `0`.
+
+The standalone [server](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/event-delivery-server.mjs) and [viewer](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/event-delivery-viewer.html) use a synthetic twelve-event source, with IDs larger than JavaScript's safe integer range. They demonstrate actual SSE transport and browser rendering, not cloud execution, authentication, or database durability. The server only binds to loopback and submits no Run. Stop it with Ctrl-C. Replace `readAfter` with authorized committed database reads and `queryRun` with the backend's query of its saved Run; keep the control-plane Token on that backend. The earlier SQLite example supplies the persistence pattern.
+
+## Reconnect to the original Run
+
+The SDK does not provide unbounded automatic retries. After a transport failure, call `stream` on the same Run using the last committed cursor. Use bounded backoff for transport faults; authentication failures require correcting identity first.
+
+TypeScript accepts an AbortSignal as the third `stream` argument to stop local observation. Cancellation is a separate `cancel` call. Closing a Python iterator connection likewise does not cancel execution.
+
+The HTTP endpoint accepts `after` or `Last-Event-ID`; explicit `after` takes precedence, and the SDK uses it. `stream.end` has no event ID. It indicates that the stream has drained a terminal Run, not a durable business event to checkpoint. Query the Run afterward for final status and output.
+
+## Read without streaming
+
+Python `client.events(run_id, cursor)` and TypeScript `await client.events(runId, cursor)` return an `events` array. Each page currently contains at most 500 events. Advance to its last ID and continue until an empty page. An empty page does not establish completion.
+
+Use Run queries for the current state and events for the timeline. Lack of tokens can mean provisioning, authorization, or approval wait rather than failure.
+
+## Present progress safely
+
+Keep connection state separate from execution state. Preserve progress during reconnects, expose actionable waiting states, and distinguish completed, failed, and cancelled. Tool output is not automatically the final assistant answer; use Run `output` for that result.
+
+Authorize backend forwarding through your business records. Do not expose control-plane Tokens to browsers. Render logs and user content as untrusted text rather than executable HTML.
+
+## Verify
+
+Disconnect and reconnect deliberately. Confirm the same Run, no duplicated event IDs, and final state matching a durable query. Simulate a crash between event persistence and UI delivery. Confirm that stopping observation leaves execution running, while explicit cancellation follows its separate lifecycle.
+
+Sources: [stream route](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts), [event queries](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts), [SDK](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/README.md). Next: [Tool authorization](/en/build/tool-authorization), [approvals](/en/build/approvals), [recovery](/en/build/recovery). See [events and states](/en/reference/events-and-states) for exact payloads and state-refresh requirements.

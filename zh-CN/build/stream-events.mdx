@@ -1,0 +1,129 @@
+---
+title: "将 Run 事件显示到你的应用"
+---
+
+使用持久事件构建进度界面。流连接只是观察渠道；浏览器关闭、代理断连或客户端超时不会取消服务器上的 Run。
+
+先完成[后端接入](/zh-CN/build/backend-integration)，取得已授权业务记录中的 Run ID。以下代码接续已初始化的客户端，事件保存函数由应用实现。
+
+## 消费并保存游标
+
+Python：
+
+```python
+cursor = saved_cursor or '0'
+for event in client.stream(run_id, cursor):
+    if event.get('id'):
+        # 应用数据库事务：按 (run_id, event id) 去重保存，并更新消费游标。
+        store_event_and_cursor_atomically(run_id, event)
+        cursor = event['id']
+    else:
+        handle_transport_event(event)
+result = client.run(run_id)
+```
+
+TypeScript：
+
+```typescript
+let cursor = savedCursor ?? '0';
+for await (const event of client.stream(runId, cursor)) {
+  if (event.id) {
+    // 应用事务：按 Run/event ID 去重，并更新游标。
+    await storeEventAndCursorAtomically(runId, event);
+    cursor = event.id;
+  } else {
+    handleTransportEvent(event);
+  }
+}
+const result = await client.run(runId);
+```
+
+`store_*` 和 `handle*` 是应用回调，不是 SDK 方法。事件存储与消费游标必须协调：先推进游标、后保存事件会造成漏显示；先保存后崩溃则可能重放，使用唯一键去重即可。事件 ID 是数字字符串，保留字符串形式，不转成可能失去精度的 JavaScript Number。
+
+## 可运行的游标持久化实现
+
+[event-checkpoint.py](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/event-checkpoint.py)使用 SQLite 实现保存回调。`EventStore.commit(run_id, event)` 在同一事务中保存完整事件并更新该 Run 的游标；相同内容的重放被忽略，同一 ID 出现不同内容时停止处理。ID 在存储中保持字符串，只在比较时使用任意精度整数。允许 ID 有间隔：事件 ID 不是每个 Run 内连续递增的计数器。
+
+无需 SDK 或凭据，即可运行离线重启演示：
+
+```sh
+python3 -B examples/documentation/event-checkpoint.py
+```
+
+接入时，将上文 Python 保存回调替换为 `store.commit`，通过 `store.cursor(run_id)` 读取起始游标。数据库使用私有路径，每个 Run 使用一个按顺序消费的消费者。演示使用临时数据库与合成事件，不连接 Hexagon，也不实现身份认证、Web 服务、分布式消费者租约或浏览器投递。TypeScript 后端使用自己的数据库驱动实现同样的事务。保存事件可能保留用户内容和 Tool 输出，需要遵循应用的访问与保留规则。
+
+## 通过应用后端向浏览器投递
+
+这里存在两个不同的进度位置：
+
+| 位置 | 归属与用途 | 何时推进 |
+| --- | --- | --- |
+| 控制平面消费游标 | 后端：哪些 Hexagon 事件已经进入应用数据库 | 与事件保存处于同一事务 |
+| 浏览器投递游标 | 每个查看者：时间线已经应用哪些存储事件 | 接收事件已应用或安全保存后；重放仍需要去重 |
+
+不能用第一个游标证明每个浏览器都已收到事件。后端可能保存成功后、发送前崩溃。浏览器重连时，先从应用存储中补读该查看者游标之后的时间线，再继续投递新存储事件。历史补读切换到实时投递时，应使用单一有序数据库读取循环，或先建立订阅再补读并去重；独立读取历史后才启动无缓冲监听，会产生漏事件窗口。
+
+最小应用流程是：认证查看者 → 检查业务任务归属 → 找到保存的 Run ID → 返回显示游标之后的存储事件 → 持续投递新提交的事件。应用路由和身份认证由你实现，不是 Hexagon 新增端点。新连接建立时重新检查访问权限。多个标签页可以共享后端采集器，但保留各自显示状态。
+
+时间线使用 `(run_id, event.id)` 作为唯一键；传输重发也只追加一次。展示状态从保存的记录推导，最终回答和终态通过 Run 查询确认。TypeScript 比较 ID 时使用 `BigInt(id)`，不要用 `Number(id)` 或字符串字典序；序列化 JSON 时仍保留字符串。不要要求相邻 ID 相差一。
+
+| 故障位置 | 恢复方式 |
+| --- | --- |
+| 数据库提交前 | 从旧的持久游标重连，重新接收事件。 |
+| 提交后、浏览器投递前 | 后端消费游标已推进；浏览器从应用存储补读。 |
+| 浏览器收到相同事件两次 | 时间线唯一键阻止重复追加。 |
+| 流在没有 `stream.end` 时结束 | 作为传输中断处理，有上限地退避重连，不重新提交 Run。 |
+| 本地观察被中止 | 不修改执行状态，等待持久查询或后续事件更新。 |
+
+## 实现应用投递与界面状态
+
+[event-delivery.mjs](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/event-delivery.mjs)提供两个属于应用自身的辅助组件：
+
+- `forwardStoredEvents` 从应用数据库读取浏览器游标之后的已提交事件。历史记录与后续提交使用同一个有序读取循环，避免先查历史再接实时订阅之间的空档。空结果会等待后再查询，不据此判定 Run 完成。
+- `RunTimeline` 接收单个 Run 的事件 envelope，按 ID 去重，用 `BigInt` 比较 ID，并分别保存连接状态与最近查询的 Run。渲染文本时使用 `textContent` 或框架的转义文本绑定。
+
+`readAfter(runId, cursor, signal)` 适配器必须只返回这个已授权 Run 的已提交事件，按 ID 数值排序，且严格位于 cursor 之后。它由应用数据库实现，辅助组件不直接查询 Hexagon。`wait(signal)` 需要实现有上限、可中止的轮询延迟。浏览器断开时中止对应 controller；发送每个 envelope 时等待传输写入完成，再从迭代器取下一项，以保留背压。不要在这项连接清理中调用 Run 取消。
+
+服务器认证并授权浏览器后，可以通过自己的 SSE 或 WebSocket 接口转发生成的 `{run_id, event}`。这是应用协议，不是新增 Hexagon 路由。辅助组件不实现 HTTP 服务、认证、计时器或最终响应封装。查询原 Run 的当前状态与 output，将授权后的结果传给 `timeline.reconcileRun(run)`。
+
+这个最小示例将浏览器时间线保存在内存。页面刷新后应从 `0` 重放，不要丢弃旧条目却单独恢复游标。持久化客户端需要原子地恢复时间线及匹配游标；同一页面临时重连时保留条目，并使用 `timeline.cursor`。
+
+运行离线投递检查：
+
+```sh
+node examples/documentation/check-event-delivery.mjs
+```
+
+检查会在读取已提交条目后故意丢弃投递，从浏览器旧游标重连、重复投递一条事件，再在一次空查询后提交晚到事件。断言包括时间线恰有两个唯一条目、始终使用同一 Run、超过 JavaScript 安全整数范围的 ID，以及连接断开不改变执行状态。它使用内存中的已存事件适配器，不能证明真实浏览器或 HTTP 流行为；数据库事务边界由前述 SQLite checkpoint 示例单独检查。
+
+## 打开服务端与浏览器示例
+
+在仓库根目录运行 `node examples/documentation/event-delivery-server.mjs`，打开输出的本机地址。服务端复用 `forwardStoredEvents`，浏览器复用 `RunTimeline`。主动断开，等待源事件增加，再恢复连接并查询 Run。检查 Run ID 保持不变、缺失条目补齐且只显示一次、断流不改变已查询的执行状态。刷新页面后从游标 `0` 重建时间线。
+
+独立[服务端](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/event-delivery-server.mjs)与[界面](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/event-delivery-viewer.html)使用十二条模拟事件，ID 超出 JavaScript 安全整数范围。它们演示实际 SSE 传输和浏览器呈现，不验证云执行、认证或数据库持久性。服务只监听本机，不提交 Run；用 Ctrl-C 停止。实际接入时，将 `readAfter` 替换为已授权的数据库已提交事件读取，将 `queryRun` 替换为后端对已保存 Run 的查询；控制平面 Token 保留在后端。持久化模式复用前面的 SQLite 示例。
+
+## 重连原 Run
+
+SDK 不会替应用无限重试。遇到传输失败时，从最后成功保存的 cursor 再次调用相同 Run 的 `stream`。对网络故障可设置有上限的退避；鉴权失败应先修复身份，不能不断重连。
+
+TypeScript 可以给 `stream(runId, cursor, signal)` 传入 AbortSignal，停止本地观察。需要取消任务时，另行调用 `cancel`。Python 关闭迭代连接同样不会取消 Run。
+
+HTTP 流支持 `after` 查询参数，也支持 `Last-Event-ID`，显式 `after` 优先。SDK 使用 `after`。服务端发出的 `stream.end` 没有事件 ID，它表示流已读尽终态，不是可持久重放的业务事件。收到后仍查询 Run，显示最终状态和结果。
+
+## 非流式补读
+
+Python `client.events(run_id, cursor)` 和 TypeScript `await client.events(runId, cursor)` 返回 `events` 数组。当前每次最多返回 500 条，按最后一条 ID 更新 cursor，继续读取直到空页。空页只表示当前没有后续事件，不代表 Run 已完成。
+
+持久 Run 查询可以用来恢复当前状态；事件用来补齐时间线。不要从“没有新 token”推导失败，任务可能等待授权、审批或云启动。
+
+## 前端展示
+
+分开显示连接状态和任务状态。连接重试时保留已有进度；授权与审批等待应给用户可执行入口；终态分别呈现 completed、failed、cancelled。不要把所有工具输出拼接成助手最终答案，最终回答以 Run 的 `output` 为准。
+
+后端对前端转发前检查业务归属，不将控制平面 Token 发给浏览器。日志和用户输入作为不可信文本渲染，不直接注入 HTML。
+
+## 验证
+
+主动断开订阅并恢复，核对 Run ID 不变、事件 ID 无重复、终态与查询一致。模拟保存事件后但推进 UI 前崩溃，确认重放不丢失数据。测试流断开后 Run 继续执行，以及显式取消才改变执行状态。
+
+依据：[流路由](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts)、[事件查询](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts)、[SDK](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/README.md)。下一步：[工具授权](/zh-CN/build/tool-authorization)、[人工审批](/zh-CN/build/approvals)、[恢复](/zh-CN/build/recovery)。精确 payload 与状态刷新条件见[事件和状态参考](/zh-CN/reference/events-and-states)。

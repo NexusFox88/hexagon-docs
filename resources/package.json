@@ -1,0 +1,55 @@
+{
+  "name": "hexagon-workspace",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx apps/control-plane/main.ts",
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "db:migrate": "tsx tooling/migrate.ts",
+    "local": "tsx tooling/local.ts",
+    "verify": "tsx tooling/verify.ts",
+    "verify:packages": "tsx tooling/verify-sdk-packages.ts",
+    "verify:startup": "tsx tooling/smoke-startup.ts",
+    "build:local": "tsx tooling/build-local.ts",
+    "verify:backup": "tsx tooling/smoke-backup.ts",
+    "verify:cloud": "tsx tooling/cloud-matrix.ts",
+    "verify:compatibility": "tsx tooling/cloud-compatibility.ts",
+    "verify:serverless": "tsx tooling/cloud-serverless.ts",
+    "release:check": "tsx tooling/release-check.ts",
+    "release:public-check": "tsx tooling/release-check.ts --public",
+    "console:tokens": "node tooling/generate-console-tokens.mjs"
+  },
+  "dependencies": {
+    "@daytona/sdk": "^0.231.1",
+    "@fastify/static": "^8.0.0",
+    "@fly/sprites": "0.2.4",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@upstash/box": "0.8.0",
+    "@vercel/sandbox": "4.0.0",
+    "ajv": "8.17.1",
+    "e2b": "^2.64.0",
+    "fastify": "^5.0.0",
+    "freestyle": "0.2.23",
+    "ipaddr.js": "2.5.0",
+    "marked": "^18.2.1",
+    "modal": "0.11.1",
+    "oauth4webapi": "3.8.8",
+    "pg": "^8.0.0",
+    "proxy-from-env": "2.1.0",
+    "undici": "8.12.4",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.0",
+    "@types/proxy-from-env": "^1.0.4",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "license": "Apache-2.0"
+}

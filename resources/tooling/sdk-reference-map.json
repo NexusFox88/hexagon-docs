@@ -1,0 +1,541 @@
+{
+  "scope": "Editorial navigation from exact SDK methods to normative response/error contracts and contextual examples. A link does not certify execution. Generators reject missing or stale method mappings.",
+  "groups": {
+    "client": {
+      "contract": "../operate/local-workspace.md",
+      "example": {
+        "en": "{sdk}.md#client-and-identity",
+        "zh-CN": "{sdk}.md#客户端与身份"
+      },
+      "example_overrides": {
+        "typescript": {
+          "en": "typescript.md#initialize-a-client",
+          "zh-CN": "typescript.md#初始化客户端"
+        }
+      }
+    },
+    "request": {
+      "contract": "http.md",
+      "example": {
+        "en": "monitoring.md",
+        "zh-CN": "monitoring.md"
+      }
+    },
+    "preview": {
+      "contract": "artifacts-previews.md",
+      "example": {
+        "en": "../build/private-preview.md",
+        "zh-CN": "../build/private-preview.md"
+      }
+    },
+    "oci": {
+      "contract": "harness-registration.md",
+      "example": {
+        "en": "../integrations/harnesses/oci.md",
+        "zh-CN": "../integrations/harnesses/oci.md"
+      }
+    },
+    "package": {
+      "contract": "harness-registration.md",
+      "example": {
+        "en": "../integrations/harnesses/source-package.md",
+        "zh-CN": "../integrations/harnesses/source-package.md"
+      }
+    },
+    "catalog": {
+      "contract": "harness-registration.md",
+      "example": {
+        "en": "{sdk}.md#catalogs-and-oauth-consent-calls",
+        "zh-CN": "{sdk}.md#目录与-oauth-用户同意调用"
+      }
+    },
+    "oauth": {
+      "contract": "oauth.md",
+      "example": {
+        "en": "{sdk}.md#catalogs-and-oauth-consent-calls",
+        "zh-CN": "{sdk}.md#目录与-oauth-用户同意调用"
+      }
+    },
+    "secrets": {
+      "contract": "secrets.md",
+      "example": {
+        "en": "{sdk}.md#managed-secret-and-application-token-calls",
+        "zh-CN": "{sdk}.md#managed-secret-与应用-token-调用"
+      }
+    },
+    "access": {
+      "contract": "session-access.md",
+      "example": {
+        "en": "session-access.md",
+        "zh-CN": "session-access.md"
+      }
+    },
+    "monitoring": {
+      "contract": "monitoring.md",
+      "example": {
+        "en": "monitoring.md",
+        "zh-CN": "monitoring.md"
+      }
+    },
+    "run-list": {
+      "contract": "runs.md",
+      "example": {
+        "en": "{sdk}.md#read-bounded-pages-of-run-summaries",
+        "zh-CN": "{sdk}.md#有界读取-run-摘要分页"
+      }
+    },
+    "approvals": {
+      "contract": "approvals-tools.md",
+      "example": {
+        "en": "../build/approvals.md",
+        "zh-CN": "../build/approvals.md"
+      }
+    },
+    "connections": {
+      "contract": "connections.md",
+      "example": {
+        "en": "{sdk}.md#connection-lifecycle-calls",
+        "zh-CN": "{sdk}.md#连接生命周期调用"
+      }
+    },
+    "tokens": {
+      "contract": "tokens.md",
+      "example": {
+        "en": "{sdk}.md#managed-secret-and-application-token-calls",
+        "zh-CN": "{sdk}.md#managed-secret-与应用-token-调用"
+      }
+    },
+    "deployment": {
+      "contract": "deployment.md",
+      "example": {
+        "en": "deployment.md",
+        "zh-CN": "deployment.md"
+      }
+    },
+    "resource-operations": {
+      "contract": "resource-operations.md",
+      "example": {
+        "en": "../operate/reconciliation.md",
+        "zh-CN": "../operate/reconciliation.md"
+      }
+    },
+    "agents": {
+      "contract": "agents.md",
+      "example": {
+        "en": "../build/agent-templates.md",
+        "zh-CN": "../build/agent-templates.md"
+      }
+    },
+    "preflight": {
+      "contract": "sessions.md",
+      "example": {
+        "en": "../build/sandbox-policy.md",
+        "zh-CN": "../build/sandbox-policy.md"
+      }
+    },
+    "create-session": {
+      "contract": "sessions.md",
+      "example": {
+        "en": "../../../../examples/documentation/first-session.{extension}",
+        "zh-CN": "../../../../examples/documentation/first-session.{extension}"
+      }
+    },
+    "initialization": {
+      "contract": "sessions.md",
+      "example": {
+        "en": "../build/agent-templates.md",
+        "zh-CN": "../build/agent-templates.md"
+      }
+    },
+    "session": {
+      "contract": "sessions.md",
+      "example": {
+        "en": "../../../../examples/documentation/inspect-run.{extension}",
+        "zh-CN": "../../../../examples/documentation/inspect-run.{extension}"
+      }
+    },
+    "upload": {
+      "contract": "sessions.md",
+      "example": {
+        "en": "../build/project-context.md",
+        "zh-CN": "../build/project-context.md"
+      }
+    },
+    "submit": {
+      "contract": "runs.md",
+      "example": {
+        "en": "../build/backend-integration.md",
+        "zh-CN": "../build/backend-integration.md"
+      }
+    },
+    "run": {
+      "contract": "runs.md",
+      "example": {
+        "en": "../../../../examples/documentation/inspect-run.{extension}",
+        "zh-CN": "../../../../examples/documentation/inspect-run.{extension}"
+      }
+    },
+    "tool-authorization": {
+      "contract": "approvals-tools.md",
+      "example": {
+        "en": "../build/tool-authorization.md",
+        "zh-CN": "../build/tool-authorization.md"
+      }
+    },
+    "tool-resolution": {
+      "contract": "approvals-tools.md",
+      "example": {
+        "en": "approvals-tools.md",
+        "zh-CN": "approvals-tools.md"
+      }
+    },
+    "cancel": {
+      "contract": "runs.md",
+      "example": {
+        "en": "../build/recovery.md",
+        "zh-CN": "../build/recovery.md"
+      }
+    },
+    "pause-resume": {
+      "contract": "sessions.md",
+      "example": {
+        "en": "../build/idle-and-wake.md",
+        "zh-CN": "../build/idle-and-wake.md"
+      }
+    },
+    "close": {
+      "contract": "sessions.md",
+      "example": {
+        "en": "../../../../examples/documentation/first-session.{extension}",
+        "zh-CN": "../../../../examples/documentation/first-session.{extension}"
+      }
+    },
+    "events": {
+      "contract": "runs.md",
+      "example": {
+        "en": "../../../../examples/documentation/inspect-run.{extension}",
+        "zh-CN": "../../../../examples/documentation/inspect-run.{extension}"
+      }
+    },
+    "artifacts": {
+      "contract": "artifacts-previews.md",
+      "example": {
+        "en": "../build/artifacts.md",
+        "zh-CN": "../build/artifacts.md"
+      }
+    },
+    "stream": {
+      "contract": "runs.md",
+      "example": {
+        "en": "../build/stream-events.md",
+        "zh-CN": "../build/stream-events.md"
+      }
+    }
+  },
+  "methods": {
+    "local": {
+      "typescript": "local",
+      "group": "client"
+    },
+    "__init__": {
+      "typescript": "constructor",
+      "group": "client"
+    },
+    "request": {
+      "typescript": "request",
+      "group": "request"
+    },
+    "create_preview": {
+      "typescript": "createPreview",
+      "group": "preview"
+    },
+    "revoke_preview": {
+      "typescript": "revokePreview",
+      "group": "preview"
+    },
+    "register_harness": {
+      "typescript": "registerHarness",
+      "group": "oci"
+    },
+    "register_harness_package": {
+      "typescript": "registerHarnessPackage",
+      "group": "package"
+    },
+    "catalog": {
+      "typescript": "catalog",
+      "group": "catalog"
+    },
+    "applications": {
+      "typescript": "applications",
+      "group": "oauth"
+    },
+    "configure_application_oauth": {
+      "typescript": "configureApplicationOAuth",
+      "group": "oauth"
+    },
+    "authorize_connection": {
+      "typescript": "authorizeConnection",
+      "group": "oauth"
+    },
+    "authorization_flow": {
+      "typescript": "authorizationFlow",
+      "group": "oauth"
+    },
+    "cancel_authorization": {
+      "typescript": "cancelAuthorization",
+      "group": "oauth"
+    },
+    "create_secret": {
+      "typescript": "createSecret",
+      "group": "secrets"
+    },
+    "session_environment": {
+      "typescript": "sessionEnvironment",
+      "group": "access"
+    },
+    "session_authorization": {
+      "typescript": "sessionAuthorization",
+      "group": "access"
+    },
+    "revoke_session_connection": {
+      "typescript": "revokeSessionConnection",
+      "group": "access"
+    },
+    "list_secrets": {
+      "typescript": "listSecrets",
+      "group": "secrets"
+    },
+    "secret": {
+      "typescript": "secret",
+      "group": "secrets"
+    },
+    "update_secret": {
+      "typescript": "updateSecret",
+      "group": "secrets"
+    },
+    "delete_secret": {
+      "typescript": "deleteSecret",
+      "group": "secrets"
+    },
+    "create_access": {
+      "typescript": "createAccess",
+      "group": "access"
+    },
+    "list_access": {
+      "typescript": "listAccess",
+      "group": "access"
+    },
+    "revoke_access": {
+      "typescript": "revokeAccess",
+      "group": "access"
+    },
+    "overview": {
+      "typescript": "overview",
+      "group": "monitoring"
+    },
+    "list_sessions": {
+      "typescript": "listSessions",
+      "group": "monitoring"
+    },
+    "list_runs": {
+      "typescript": "listRuns",
+      "group": "run-list"
+    },
+    "pending": {
+      "typescript": "pending",
+      "group": "monitoring"
+    },
+    "approvals": {
+      "typescript": "approvals",
+      "group": "approvals"
+    },
+    "connection_dependencies": {
+      "typescript": "connectionDependencies",
+      "group": "connections"
+    },
+    "list_tokens": {
+      "typescript": "listTokens",
+      "group": "tokens"
+    },
+    "create_token": {
+      "typescript": "createToken",
+      "group": "tokens"
+    },
+    "rotate_token": {
+      "typescript": "rotateToken",
+      "group": "tokens"
+    },
+    "revoke_token": {
+      "typescript": "revokeToken",
+      "group": "tokens"
+    },
+    "deployment": {
+      "typescript": "deployment",
+      "group": "deployment"
+    },
+    "update_deployment": {
+      "typescript": "updateDeployment",
+      "group": "deployment"
+    },
+    "retry_ingress": {
+      "typescript": "retryIngress",
+      "group": "deployment"
+    },
+    "resource_operations": {
+      "typescript": "resourceOperations",
+      "group": "resource-operations"
+    },
+    "resource_operation": {
+      "typescript": "resourceOperation",
+      "group": "resource-operations"
+    },
+    "review_resource_operation": {
+      "typescript": "reviewResourceOperation",
+      "group": "resource-operations"
+    },
+    "list_agents": {
+      "typescript": "listAgents",
+      "group": "agents"
+    },
+    "agent": {
+      "typescript": "agent",
+      "group": "agents"
+    },
+    "revise_agent": {
+      "typescript": "reviseAgent",
+      "group": "agents"
+    },
+    "archive_agent": {
+      "typescript": "archiveAgent",
+      "group": "agents"
+    },
+    "copy_agent": {
+      "typescript": "copyAgent",
+      "group": "agents"
+    },
+    "preflight_agent": {
+      "typescript": "preflightAgent",
+      "group": "agents"
+    },
+    "preflight_session": {
+      "typescript": "preflightSession",
+      "group": "preflight"
+    },
+    "list_connections": {
+      "typescript": "listConnections",
+      "group": "connections"
+    },
+    "connection": {
+      "typescript": "connection",
+      "group": "connections"
+    },
+    "create_connection": {
+      "typescript": "createConnection",
+      "group": "connections"
+    },
+    "discover_mcp_tools": {
+      "typescript": "discoverMcpTools",
+      "group": "connections"
+    },
+    "connection_authorization": {
+      "typescript": "connectionAuthorization",
+      "group": "oauth"
+    },
+    "disconnect_connection": {
+      "typescript": "disconnectConnection",
+      "group": "connections"
+    },
+    "validate_connection": {
+      "typescript": "validateConnection",
+      "group": "connections"
+    },
+    "update_connection": {
+      "typescript": "updateConnection",
+      "group": "connections"
+    },
+    "delete_connection": {
+      "typescript": "deleteConnection",
+      "group": "connections"
+    },
+    "create_agent": {
+      "typescript": "createAgent",
+      "group": "agents"
+    },
+    "create_session": {
+      "typescript": "createSession",
+      "group": "create-session"
+    },
+    "session_initialization": {
+      "typescript": "sessionInitialization",
+      "group": "initialization"
+    },
+    "session": {
+      "typescript": "session",
+      "group": "session"
+    },
+    "upload": {
+      "typescript": "upload",
+      "group": "upload"
+    },
+    "submit": {
+      "typescript": "submit",
+      "group": "submit"
+    },
+    "run": {
+      "typescript": "run",
+      "group": "run"
+    },
+    "tool_calls": {
+      "typescript": "toolCalls",
+      "group": "tool-authorization"
+    },
+    "deny_tool_authorization": {
+      "typescript": "denyToolAuthorization",
+      "group": "tool-authorization"
+    },
+    "resolve_tool_call": {
+      "typescript": "resolveToolCall",
+      "group": "tool-resolution"
+    },
+    "cancel": {
+      "typescript": "cancel",
+      "group": "cancel"
+    },
+    "pause": {
+      "typescript": "pause",
+      "group": "pause-resume"
+    },
+    "resume": {
+      "typescript": "resume",
+      "group": "pause-resume"
+    },
+    "session_activity": {
+      "typescript": "sessionActivity",
+      "group": "monitoring"
+    },
+    "close": {
+      "typescript": "close",
+      "group": "close"
+    },
+    "decide": {
+      "typescript": "decide",
+      "group": "approvals"
+    },
+    "events": {
+      "typescript": "events",
+      "group": "events"
+    },
+    "artifacts": {
+      "typescript": "artifacts",
+      "group": "artifacts"
+    },
+    "download_artifact": {
+      "typescript": "downloadArtifact",
+      "group": "artifacts"
+    },
+    "stream": {
+      "typescript": "stream",
+      "group": "stream"
+    }
+  }
+}

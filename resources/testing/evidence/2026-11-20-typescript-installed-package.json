@@ -1,0 +1,58 @@
+{
+  "scope": "Local tarball installed into independent application; loopback simulated HTTP only. No real control plane, model, or cloud resources.",
+  "temporary_directory": "/var/folders/gx/mq3_kdhs2q7brx52412nk68c0000gn/T/hexagon-docs-ts-package-ux0l_gmc",
+  "checks": [
+    {
+      "command": [
+        "npm",
+        "--prefix",
+        "sdk/typescript",
+        "run",
+        "build"
+      ],
+      "cwd": "/Users/hexagon-maintainer/CodeProject/Hexagon",
+      "exit_code": 0,
+      "stdout": "\n> @hexagon/agent-sdk@0.1.0 build\n> tsc -p tsconfig.json\n\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "npm",
+        "pack",
+        "./sdk/typescript",
+        "--ignore-scripts",
+        "--pack-destination",
+        "/var/folders/gx/mq3_kdhs2q7brx52412nk68c0000gn/T/hexagon-docs-ts-package-ux0l_gmc",
+        "--json"
+      ],
+      "cwd": "/Users/hexagon-maintainer/CodeProject/Hexagon",
+      "exit_code": 0,
+      "stdout": "[\n  {\n    \"id\": \"@hexagon/agent-sdk@0.1.0\",\n    \"name\": \"@hexagon/agent-sdk\",\n    \"version\": \"0.1.0\",\n    \"size\": 10080,\n    \"unpackedSize\": 36839,\n    \"shasum\": \"c2bec410570df97255fdd0e67730d2ba477c2bdc\",\n    \"integrity\": \"sha512-YW2CscNQwTNZJxs7g9kaj7fOhmdwTLQzHwpTYOkUbsYNG6z7zF/R66tsHEJG89cathfTuivUyPyIXgh1UjjsxQ==\",\n    \"filename\": \"hexagon-agent-sdk-0.1.0.tgz\",\n    \"files\": [\n      {\n        \"path\": \"LICENSE\",\n        \"size\": 11357,\n        \"mode\": 420\n      },\n      {\n        \"path\": \"dist/index.d.ts\",\n        \"size\": 10520,\n        \"mode\": 420\n      },\n      {\n        \"path\": \"dist/index.js\",\n        \"size\": 11776,\n        \"mode\": 420\n      },\n      {\n        \"path\": \"dist/local.d.ts\",\n        \"size\": 195,\n        \"mode\": 420\n      },\n      {\n        \"path\": \"dist/local.js\",\n        \"size\": 2624,\n        \"mode\": 420\n      },\n      {\n        \"path\": \"package.json\",\n        \"size\": 367,\n        \"mode\": 420\n      }\n    ],\n    \"entryCount\": 6,\n    \"bundled\": []\n  }\n]\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "npm",
+        "install",
+        "/var/folders/gx/mq3_kdhs2q7brx52412nk68c0000gn/T/hexagon-docs-ts-package-ux0l_gmc/hexagon-agent-sdk-0.1.0.tgz",
+        "--ignore-scripts",
+        "--no-audit",
+        "--no-fund"
+      ],
+      "cwd": "/var/folders/gx/mq3_kdhs2q7brx52412nk68c0000gn/T/hexagon-docs-ts-package-ux0l_gmc/application",
+      "exit_code": 0,
+      "stdout": "\nadded 1 package in 98ms\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "node",
+        "smoke.mjs"
+      ],
+      "cwd": "/var/folders/gx/mq3_kdhs2q7brx52412nk68c0000gn/T/hexagon-docs-ts-package-ux0l_gmc/application",
+      "exit_code": 0,
+      "stdout": "PASS: installed ESM package; authenticated Run query; lossless cursor; typed HTTP error\n",
+      "stderr": ""
+    }
+  ]
+}

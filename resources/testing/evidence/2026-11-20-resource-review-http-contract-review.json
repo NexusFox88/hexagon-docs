@@ -1,0 +1,255 @@
+{
+  "date": "2026-11-20",
+  "scope": "Current handler/auth/schema and real PostgreSQL transaction/query checks in a newly migrated isolated schema. Lifecycle callbacks are controlled stubs that inspect committed review state and return/throw chosen outcomes. No cloud reconciliation is performed.",
+  "source_sha256": {
+    "apps/control-plane/server.ts": "90b27ace779174006be88890beb73039a273614f4f9ab378e04e819db990c4ca",
+    "modules/sandboxes/operations.ts": "a28720e3fad4a6e713f848ef1a5900948c0337e4bc8ff2f42a91aec5cb49a4a3"
+  },
+  "checks": [
+    {
+      "name": "list all states",
+      "method": "GET",
+      "path": "/resource-operations",
+      "status": 200
+    },
+    {
+      "name": "list pagination",
+      "method": "GET",
+      "path": "/resource-operations?limit=2&offset=0",
+      "status": 200
+    },
+    {
+      "name": "last page",
+      "method": "GET",
+      "path": "/resource-operations?limit=2&offset=2",
+      "status": 200
+    },
+    {
+      "name": "detail excludes list joins",
+      "method": "GET",
+      "path": "/resource-operations/:id",
+      "status": 200
+    },
+    {
+      "name": "application denied",
+      "method": "GET",
+      "path": "/resource-operations",
+      "status": 403
+    },
+    {
+      "name": "application denied",
+      "method": "GET",
+      "path": "/resource-operations/:id",
+      "status": 403
+    },
+    {
+      "name": "application denied",
+      "method": "POST",
+      "path": "/resource-operations/:id/review",
+      "status": 403
+    },
+    {
+      "name": "foreign list empty",
+      "method": "GET",
+      "path": "/resource-operations",
+      "status": 200
+    },
+    {
+      "name": "foreign detail hidden",
+      "method": "GET",
+      "path": "/resource-operations/:id",
+      "status": 404
+    },
+    {
+      "name": "foreign review hidden",
+      "method": "POST",
+      "path": "/resource-operations/:id/review",
+      "status": 404
+    },
+    {
+      "name": "bad UUID",
+      "method": "GET",
+      "path": "/resource-operations/not-an-id",
+      "status": 400
+    },
+    {
+      "name": "bad limit",
+      "method": "GET",
+      "path": "/resource-operations?limit=0",
+      "status": 400
+    },
+    {
+      "name": "bad action",
+      "method": "POST",
+      "path": "/resource-operations/:id/review",
+      "status": 400
+    },
+    {
+      "name": "extra body rejected",
+      "method": "POST",
+      "path": "/resource-operations/:id/review",
+      "status": 400
+    },
+    {
+      "name": "acknowledge",
+      "method": "POST",
+      "path": "/resource-operations/:id/review",
+      "status": 200
+    },
+    {
+      "name": "repeat appends despite same Idempotency-Key",
+      "method": "POST",
+      "path": "/resource-operations/:id/review",
+      "status": 200
+    },
+    {
+      "name": "reopen schedules without dispatch",
+      "method": "POST",
+      "path": "/resource-operations/:id/review",
+      "status": 200
+    },
+    {
+      "name": "nonunknown rejected",
+      "method": "POST",
+      "path": "/resource-operations/:id/review",
+      "status": 409
+    },
+    {
+      "name": "nonunknown rejected",
+      "method": "POST",
+      "path": "/resource-operations/:id/review",
+      "status": 409
+    },
+    {
+      "name": "nonunknown rejected",
+      "method": "POST",
+      "path": "/resource-operations/:id/review",
+      "status": 409
+    },
+    {
+      "name": "dispatch create",
+      "method": "POST",
+      "path": "/resource-operations/:id/review",
+      "status": 200
+    },
+    {
+      "name": "dispatch delete",
+      "method": "POST",
+      "path": "/resource-operations/:id/review",
+      "status": 200
+    },
+    {
+      "name": "dispatch checkpoint",
+      "method": "POST",
+      "path": "/resource-operations/:id/review",
+      "status": 200
+    },
+    {
+      "name": "dispatch restore",
+      "method": "POST",
+      "path": "/resource-operations/:id/review",
+      "status": 200
+    },
+    {
+      "name": "dispatch other-kind",
+      "method": "POST",
+      "path": "/resource-operations/:id/review",
+      "status": 200
+    },
+    {
+      "name": "closing takes precedence",
+      "method": "POST",
+      "path": "/resource-operations/:id/review",
+      "status": 200
+    },
+    {
+      "name": "domain error remains 200",
+      "method": "POST",
+      "path": "/resource-operations/:id/review",
+      "status": 200
+    },
+    {
+      "name": "unexpected exception is 500",
+      "method": "POST",
+      "path": "/resource-operations/:id/review",
+      "status": 500
+    },
+    {
+      "name": "review survived 500",
+      "method": "GET",
+      "path": "/resource-operations/:id",
+      "status": 200
+    },
+    {
+      "name": "review history capped at latest 50",
+      "method": "GET",
+      "path": "/resource-operations/:id",
+      "status": 200
+    }
+  ],
+  "dispatches": [
+    {
+      "method": "provision",
+      "reviewCommitted": true
+    },
+    {
+      "method": "close",
+      "reviewCommitted": true
+    },
+    {
+      "method": "pause",
+      "scope": "sandbox",
+      "reviewCommitted": true
+    },
+    {
+      "method": "resume",
+      "reviewCommitted": true
+    },
+    {
+      "method": "provision",
+      "reviewCommitted": true
+    },
+    {
+      "method": "close",
+      "reviewCommitted": true
+    },
+    {
+      "method": "close",
+      "reviewCommitted": true
+    },
+    {
+      "method": "close",
+      "reviewCommitted": true
+    }
+  ],
+  "passed": true,
+  "cleanup": "Isolated fixture schema dropped.",
+  "limitations": [
+    "Does not verify actual Provider inspection/provision/pause/resume/delete.",
+    "No network timeout or TLS behavior; transport failures are represented by callback exceptions."
+  ],
+  "command": "./node_modules/.bin/tsx .local/docs-content-checks/resource-review-http-contracts.ts",
+  "exit_code": 0,
+  "script_sha256": "8b7a216de7d2995194bee56d993de117e571765cabe3d5fbca808bf9d68b19f9",
+  "reviewed_routes": [
+    "GET /v1/resource-operations",
+    "GET /v1/resource-operations/:id",
+    "POST /v1/resource-operations/:id/review"
+  ],
+  "pages": [
+    {
+      "path": "docs/product/en/reference/resource-operations.md",
+      "sha256": "fa77deba4de10de3b9b2f6ed0c30736a921f2743095df1f85ff53a5ea4e9a925"
+    },
+    {
+      "path": "docs/product/zh-CN/reference/resource-operations.md",
+      "sha256": "50115e887b084566e1d4c453d0f47dbf34afb4937209f8fca586069df6bf5ecd"
+    }
+  ],
+  "editorial_review": [
+    "All three curl requests match current method/path/query/body contracts; no curl transport execution claimed.",
+    "Added review sequence and lost-response/200-domain-error/409/500 decision table.",
+    "Explicitly separated Idempotency-Key-insensitive review append from lifecycle attempt count and bounded history.",
+    "SDK returned-object versus exception distinction reviewed against current generic SDK request implementation."
+  ]
+}

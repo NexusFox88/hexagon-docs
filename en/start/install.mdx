@@ -1,0 +1,109 @@
+---
+title: "Install and start a local control plane"
+---
+
+Start Hexagon from a source checkout. You will be able to open Console, configure cloud Sandbox/model connections, and let local SDKs discover the workspace.
+
+## Prerequisites
+
+- Node.js 22.19.0 or later.
+- Running PostgreSQL and a role able to create tables in a dedicated database.
+- Python 3.10 or later for the Python SDK.
+- cloudflared for temporary development credential ingress; OpenSSH for Instabox.
+- A cloud Sandbox account and model endpoint for subsequent real tasks.
+
+Use the repository's local build/install paths. Do not assume similarly named npm/PyPI packages are publicly published. Installation does not install PostgreSQL or create provider accounts.
+
+## Start
+
+Clone the main repository and enter it. If you already have this checkout, start at `npm ci` from its root:
+
+```sh
+git clone https://github.com/NexusFox88/Hexagon.git
+cd Hexagon
+npm ci
+export DATABASE_URL='postgres://YOUR_USER@127.0.0.1:5432/hexagon'
+npm run local -- doctor
+npm run local -- start
+npm run local -- status
+```
+
+Replace the connection string with your already-created dedicated database. Never reuse an unrelated application's database. Without `DATABASE_URL`, the development default is `postgres://hexagon@127.0.0.1:55432/hexagon`; that does not mean such a database exists.
+
+Doctor checks prerequisites. The launcher applies migrations and manages the local service. On failure, inspect database connectivity and reported missing dependencies before retrying. Preserve data and its matching encryption key; deleting them does not resolve unknown cloud resources.
+
+Open [local Console](http://127.0.0.1:8787/console/). Private data defaults to .local/control-plane, configurable through HEXAGON_DATA_DIR. A retained database must retain its matching encryption key.
+
+## Configure execution
+
+1. Create a provider connection under Infrastructure → Sandbox, validate, and enable.
+2. Configure endpoint, model ID, protocol, and credentials under LLM, validate, and enable.
+3. Select a compatible Harness/connections in API Playground to generate Python or TypeScript code.
+
+An Agent template is optional. Cloud Sandboxes must reach the credential ingress. Opening Console does not prove cloud connectivity. Settings → Network & ingress controls saved deployment settings; restart after changing them. Use a stable external HTTPS ingress or an explicitly selected development tunnel as described in [networking](/en/operate/networking). Management-only disabled ingress does not enable protected cloud execution.
+
+## Install SDKs
+
+Use a separate Python virtual environment:
+
+```sh
+python3 -m venv .local/docs-example-venv
+.local/docs-example-venv/bin/python -m pip install -e sdk/python
+```
+
+The tutorials use this explicit Python path, so opening another terminal does not require activating the environment again. If you installed into a different virtual environment, replace the interpreter path consistently.
+
+
+Build TypeScript from the repository:
+
+```sh
+npm --prefix sdk/typescript run build
+```
+
+Repository programs can import sdk/typescript/dist/index.js. Independent applications can use the [local package distribution process](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/local-installation.md#local-package-distribution).
+
+Python Hexagon.local() and TypeScript await Hexagon.local() discover the current workspace without manually copying an owner token. For multiple workspaces, pass data_directory in Python or dataDirectory in TypeScript. Hosted connections use an explicit URL/Token instead of local discovery identity.
+
+## Read readiness one layer at a time
+
+| Check | Passing evidence | If it is not ready |
+| --- | --- | --- |
+| `doctor` Node/database fields | Supported Node version and a successful database connection probe | Correct the runtime or dedicated database connection before starting |
+| `doctor` optional dependency fields | Python for the Python SDK, OpenSSH for Instabox, cloudflared for development ingress as needed | Install the dependency required by your chosen path; exit code zero alone does not prove every field is ready |
+| `status` | Authenticated health response with API/database ready and usable execution/credential status | Inspect the private service log and the failing subsystem; `unreachable` differs from `stopped` |
+| Console | Workspace opens and expected saved connection metadata is visible | Check the actual launcher-reported URL, selected workspace and local identity |
+| SDK import | Both local packages can be loaded in the intended interpreter/runtime | Correct the environment or rebuild the TypeScript package |
+| First cloud task | The next tutorial observes a completed Run, valid artifact and confirmed cleanup | Investigate the original IDs; local installation alone did not test this layer |
+
+`doctor` currently sets a failing exit code for unsupported Node or an unreachable database. Missing Python, OpenSSH or cloudflared appears in its JSON fields and may still accompany exit code zero. It also checks command availability rather than proving all supported versions or Provider behavior. Its database probe does not prove migration privileges; startup must still apply migrations successfully.
+
+The commands on this page use a POSIX-style shell and local paths. This page does not certify a clean Windows installation or every operating-system/package-manager combination. The [local installation contract](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/local-installation.md) describes the launcher and distribution boundary; use an environment you can verify rather than inferring OS support from the SDK alone.
+
+After the SDK installation/build steps, these checks import packages without creating Sessions, contacting a model or allocating cloud resources:
+
+```sh
+.local/docs-example-venv/bin/python -c 'from hexagon import Hexagon; print("Python SDK import OK")'
+node --input-type=module -e 'import { Hexagon } from "./sdk/typescript/dist/index.js"; console.log(typeof Hexagon === "function" ? "TypeScript SDK import OK" : "Unexpected SDK export")'
+```
+
+The Python package's minimum interpreter version and the control plane's Node requirement are separate. For the repository tutorials, use the control plane's Node requirement even if an SDK package declares a lower minimum.
+
+## Completion and shutdown
+
+Installation is complete when status reports availability, Console opens, and database/workspace identity are usable. Real execution additionally requires validated connections, cloud allocation, and a successful task. Do not record installation as full cloud acceptance.
+
+Before planned shutdown, finish/cancel active Runs, close unused cloud Sessions, and confirm cleanup:
+
+```sh
+npm run local -- stop
+```
+
+Stopping the control plane does not delete cloud Sandboxes. Its expiry enforcement cannot run on schedule while stopped.
+
+Next: [first Session](/en/start/first-session). See [local operations](/en/operate/local-workspace) and the [launcher contract](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/local-installation.md) for deployment, proxies, backup, and recovery. 
+
+## Recorded installation scope
+
+The [November 20 isolated source-install check](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-docs-isolated-install.json) started from a copied current worktree with no `node_modules`, a new data directory and a new dedicated database. `npm ci`, doctor/start/status, Python virtual-environment installation, TypeScript build, both SDKs' local discovery, restart and stop passed. The saved definition, owner identity and encryption key survived restart. The service stopped and the temporary database was removed.
+
+This used an existing macOS host with Node 24.8.0, Python, PostgreSQL, OpenSSH, cloudflared and package caches already available; it is not a clean-OS installation claim. Credential ingress was intentionally unconfigured for management-only startup. Continue to the first-Session tutorial for a real cloud task; its independent dual-SDK cloud evidence has its own recorded configuration. A driver-only first attempt used an unsupported tunnel environment value, failed, and was preserved separately before the corrected attempt.

@@ -1,0 +1,94 @@
+---
+title: "处理工具授权与重新授权"
+---
+
+工具授权解决“这个账户是否有可用凭据来调用该服务”。单次审批解决“是否允许现在执行这一项具体操作”。两者可能先后发生，不能把授权成功当作批准所有写操作。
+
+先[配置并绑定工具](/zh-CN/build/tools)。需要在后续任务中才授权的工具应按实际需求声明为 optional；缺少必需授权可能在 Session 初始化阶段就被拒绝。
+
+## 原 Run 等待时如何恢复
+
+观察 Run 状态和 Tool 调用记录。`waiting_authorization` 应结合具体调用解释，不能只展示“正在思考”。在 Console 找到对应连接，完成账户授权或更新凭据，验证并启用。正常 worker 将继续处理原 Run，不需要为恢复另外提交一个任务。
+
+OAuth 连接需要部署方配置对应应用注册和正确 callback。凭据代理 tunnel 不是管理 API 或 OAuth callback tunnel。直接提供的外部 access token 不一定具有自动刷新能力；账户范围和服务能力以连接器契约为准。
+
+## 区分账户修复与操作同意
+
+| 信号 | 操作前确认 | 正确动作 |
+| --- | --- | --- |
+| 连接禁用或未就绪 | 检查当前验证结果和账户 | 修复或验证连接，再显式启用 |
+| 远端拒绝凭据 | 检查连接器续期方式与目标账户 | 更新该账户凭据，不静默切换账户 |
+| 授权恢复后出现审批等待 | 读取新的 pending 审批与实际参数 | 单独征求本次操作决定 |
+| 调用结果未知 | 检查请求是否已经发出 | 核对外部结果；修复凭据不授权重放 |
+| 本 Session 的访问已撤销 | 检查 Session 访问决定 | 不假定全局重新授权会撤销单 Session 的访问限制 |
+
+`optional_tools` 允许初始化时延后授权，不会让所有依赖检查都变成可选，也不会让执行跳过授权。首次调用仍可能等待。拒绝授权是调用级响应；账户凭据撤销、单 Session 访问撤销和 Run 取消是范围不同的动作。
+
+修复账户后，继续观察原 Run 和调用。若策略要求审批，下一步应展示具体操作，不能宣布整个任务成功。连接版本变化时刷新审批数据，之前显示的同意卡片可能已经失效。
+
+## 查询与拒绝一次授权请求
+
+Python：
+
+```python
+calls = client.tool_calls(run_id)['calls']
+# 在 UI 中显示调用并由有权限的操作者选择；不要自动拒绝全部调用。
+selected = next(call for call in calls if call['id'] == selected_call_id)
+client.deny_tool_authorization(run_id, selected['id'], selected['request_hash'])
+```
+
+TypeScript：
+
+```typescript
+const { calls } = await client.toolCalls(runId);
+const selected = calls.find((call: { id: string }) => call.id === selectedCallId);
+if (!selected) throw new Error('Selected invocation not found');
+await client.denyToolAuthorization(runId, selected.id, selected.request_hash);
+```
+
+这些拒绝操作需要当前权限允许的管理身份；普通 application Token 不具有该变更路由权限。浏览器不能直接拿 owner Token；由已授权服务端或 Console 执行。
+
+拒绝只影响这次待授权调用。Harness 收到 `tool_authorization_denied`，原 Run 可以继续解释限制。它不撤销账户凭据、不取消 Run，也不禁止以后新的调用再次请求授权。
+
+重复相同拒绝返回已记录结果，不重新启动任务。hash 不匹配、非待处理调用、已在执行或取消竞态会被拒绝；重新查询实际状态后决定下一步，不能修改 hash 绕过校验。
+
+## 凭据失效与外部结果未知
+
+授权失败后补充正确凭据不意味着可以重做任何已发出的操作。若先前写入已经发送但结果未知，按[Tool 对账](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/tool-reconciliation.md)处理。拒绝授权也不能撤销此前已发生的请求。
+
+关闭或取消 OAuth consent flow 与取消 Run 是不同动作。用户离开授权页面时应保留可恢复的等待状态，允许其明确拒绝或稍后完成，不生成新的重复任务。
+
+验证成功路径时确认同一 Run 继续；验证拒绝路径时确认没有新外部调用、凭据未被修改、原任务能够解释拒绝。不同应用的真实账户验证范围参见[应用连接器](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。下一步：[人工审批](/zh-CN/build/approvals)。
+
+## 通过 SDK 修复手动提供的凭据
+
+对于接受手动凭据的连接器，在后端使用管理客户端，从私有服务端配置取得同一目标账户的新凭据。以下片段更新已有连接，不创建替代 Run，也不会自动批准该操作。
+
+```python
+client.update_connection(connection_id, credential=replacement_credential)
+checked = client.validate_connection(connection_id)
+if checked['status'] != 'ready':
+    raise RuntimeError('Inspect validation before enabling the connection')
+client.update_connection(connection_id, enabled=True)
+current = client.run(original_run_id)
+calls = client.tool_calls(original_run_id)['calls']
+```
+
+```typescript
+await client.updateConnection(connectionId, {credential: replacementCredential});
+const checked = await client.validateConnection(connectionId);
+if (checked.status !== 'ready') throw new Error('Inspect validation before enabling');
+await client.updateConnection(connectionId, {enabled: true});
+const current = await client.run(originalRunId);
+const {calls} = await client.toolCalls(originalRunId);
+```
+
+继续观察，不预期调用后立即进入终态。托管 OAuth 连接器应使用对应授权流程，不能用这些手动凭据片段替代，参见[应用账户](/zh-CN/integrations/apps)。全程保留原 Run 和 call ID；验证显示账户改变，或者调用已经是 `unknown` 时，先调查绑定或外部结果再继续。
+
+## 已记录的成功与拒绝案例
+
+[11 月 16 日云旅程](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-16-current-dual-sdk-journey.md)记录 Instabox/Pi/SiliconFlow 上双 SDK 的运行时报告授权、随后审批和恰好一次 fixture 报告写入。报告服务是受控测试设施，不是真实 SaaS 账户。[授权拒绝记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-tool-authorization-denial.md)另行记录 E2B/OpenCode/MiniMax 任务中的 Console 拒绝：原 Run 完成并说明拒绝原因，报告连接保持 draft，没有创建审批，报告写入为零。
+
+这些都是带日期的验收记录。[拒绝回归测试](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/authorization-denial.test.ts)还通过真实双 SDK 传输对本地服务检查重复拒绝、hash、租户、取消保护和凭据不变。阅读测试源码不是新一次执行，这些记录也不证明所有账户的过期或刷新流程。
+
+依据：[连接管理](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/connections/connections.ts)、[Tool broker](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/broker.ts)、[应用授权](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。下一步：[审批](/zh-CN/build/approvals)、[凭据轮换](/zh-CN/operate/credentials)、[事件和状态](/zh-CN/reference/events-and-states)。

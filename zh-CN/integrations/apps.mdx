@@ -1,0 +1,952 @@
+---
+title: "连接你的应用账户"
+---
+
+应用连接器把固定的第三方操作接入 ToolBroker。一个 Connection 表示一个租户所属账户和所选操作，不是应用的全部 API。应用凭据留在控制平面，Session 只绑定使用权限。
+
+## 创建连接并选择操作
+
+下面以 Notion 只读配置为例。先把专用测试页面分享给 integration，并开放所需评论读取权限。这里创建连接不执行搜索或读取；验证会请求账户身份。环境变量来自私有配置，hosted 初始化见[自托管](/zh-CN/operate/self-host)。保存返回 ID 后复用。
+
+```python
+import os
+from hexagon import Hexagon
+client = Hexagon.local()
+connection = client.create_connection(
+    kind="tool", provider="notion", name="Project notes",
+    credential=os.environ["NOTION_TOKEN"],
+    config={"authentication":"api_key", "operations":["search","read_blocks","read_comments"]},
+)
+checked = client.validate_connection(connection["id"])
+if checked["status"] != "ready":
+    raise RuntimeError("Inspect account and permission diagnostics")
+client.update_connection(connection["id"], enabled=True)
+```
+
+```typescript
+import { Hexagon } from '@hexagon/agent-sdk';
+const client = await Hexagon.local();
+const credential = process.env.NOTION_TOKEN;
+if (!credential) throw new Error('Set NOTION_TOKEN');
+const connection = await client.createConnection({
+  kind: 'tool', provider: 'notion', name: 'Project notes', credential,
+  config: { authentication: 'api_key', operations: ['search','read_blocks','read_comments'] },
+});
+const checked = await client.validateConnection(connection.id);
+if (checked.status !== 'ready') throw new Error('Inspect account and permission diagnostics');
+await client.updateConnection(connection.id, { enabled: true });
+```
+
+按 [Tools 绑定](/zh-CN/build/tools)把 connection.id 放到 `tools: {notes: connection_id}`，使用支持 Tools 的 Harness。提交明确任务读取测试页面及评论，检查实际 Tool 结果、分页和子块，不能只核对 Agent 的自然语言结论。两套 SDK 独立执行并关闭 Session。
+
+操作默认选择非写项；显式 operations 只能选本页列出的 ID。所有写操作必须审批，replay=never；读操作也可能计费。授权、操作选择、第三方 scope 和具体资源分享是不同条件，任何一个缺失都可能拒绝调用。
+
+## OAuth 与权限证据
+
+有 OAuth 的应用先注册部署/租户自己的 OAuth client，设置精确 callback URL，再从 Console 授权账户。没有内置共享授权 SaaS。Google 服务是独立连接与 consent，Microsoft 使用 delegated 权限。凭据通道的 HTTPS 入口不是 OAuth 管理 callback 的替代。
+
+查看 allowed_operations、scope_source、permission_checks 和 permission_coverage：本地允许的操作不等于 Provider 实际授予 scope。partial/unknown 不能写成全部权限验证。验证不执行写入；资源分享和字段权限仍可能影响实际调用。
+
+Token refresh 与重新授权不同；不确定的 refresh 结果需要重新授权，不能盲重用可能已旋转的 refresh token。变更账户/权限使旧策略失效，使用新 Session。disconnect 只停止 Hexagon 本地使用，不撤销 Provider 端 Token，也不能收回已经发送的请求。详见[授权](/zh-CN/build/tool-authorization)。
+
+## 应用目录
+
+下列操作、必填参数和写入分类从当前注册表提取。完整类型、可选字段与约束以应用目录 API `GET /v1/applications` 返回的 schema 为准。操作描述保留实现中的英文原文，避免翻译 API 标识。每个示例均指在已授权测试对象上，通过 Session 请求所列操作，不是未经批准向真实用户发送内容。
+
+[Notion](#notion) · [Todoist](#todoist) · [Google Calendar](#google-calendar) · [Exa](#exa) · [Tavily](#tavily) · [Gmail](#gmail) · [Google Drive / Docs](#google-drive) · [GitHub](#github) · [Slack](#slack) · [Linear](#linear) · [DeepL](#deepl) · [Microsoft Outlook](#outlook) · [Microsoft Outlook Calendar](#outlook-calendar) · [Microsoft OneDrive](#onedrive) · [Microsoft To Do](#microsoft-todo) · [Microsoft Teams](#microsoft-teams) · [Google Sheets](#google-sheets) · [Google Tasks](#google-tasks) · [Google Contacts](#google-contacts) · [Asana](#asana) · [Airtable](#airtable) · [ClickUp](#clickup) · [Trello](#trello) · [Discord](#discord) · [Telegram Bot](#telegram) · [Dropbox](#dropbox) · [HubSpot](#hubspot) · [Calendly](#calendly) · [Firecrawl](#firecrawl) · [Brave Search](#brave-search) · [Apify](#apify) · [GitLab](#gitlab) · [Readwise Reader](#readwise) · [飞书 / Feishu](#feishu) · [Lark](#lark) · [Salesforce](#salesforce) · [Attio](#attio)
+
+<a id="notion"></a>
+
+### Notion (`notion`)
+
+**配置 / 鉴权**：Integration/PAT Token；支持 OAuth。
+
+**权限与限制**：共享目标页面给 integration；页面属性不等于正文，read_blocks 只读直接子块，递归与分页需逐次读取；评论还需 comment-read 权限。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `search` | — | 默认不要求 | Search accessible Notion pages by title. Results are limited to granted content. |
+| `read_page` | `page_id` | 默认不要求 | Read page properties. Use read_blocks for page content. |
+| `read_blocks` | `block_id` | 默认不要求 | Read direct child blocks; follow child IDs and pagination for complete content. |
+| `read_comments` | `block_id` | 默认不要求 | Read accessible comments attached to a page or block; requires comment-read capability. |
+| `create_page` | `parent_page_id`, `title` | 必须 | Create a child page with a title and plain text paragraph. |
+| `append_text` | `page_id`, `text` | 必须 | Append a paragraph to an existing page. |
+| `update_paragraph` | `block_id`, `text` | 必须 | Replace the text of a paragraph block. |
+| `add_comment` | `page_id`, `text` | 必须 | Add a comment to a page. |
+
+**具体读取示例**：选择 `search`，参数为 `{"query": "Hexagon acceptance", "page_size": 10}`。按标题找到已共享的测试页，再用 read_blocks/read_comments 读取内容；搜索不是完整阅读。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["search"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="todoist"></a>
+
+### Todoist (`todoist`)
+
+**配置 / 鉴权**：API Token；支持 OAuth。
+
+**权限与限制**：项目与任务归属受账户权限限制，完成任务是写操作；先读取专用测试任务，再测试完成。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_projects` | — | 默认不要求 | List accessible Todoist projects. |
+| `list_tasks` | — | 默认不要求 | List tasks, optionally within one project. Follow next_cursor for more results. |
+| `get_task` | `task_id` | 默认不要求 | Read one task. |
+| `create_task` | `content` | 必须 | Create a Todoist task; without project_id it goes to Inbox. |
+| `update_task` | `task_id` | 必须 | Update a task title, description, priority or due date. |
+| `complete_task` | `task_id` | 必须 | Complete a task. |
+
+**具体读取示例**：选择 `list_projects`，参数为 `{}`。比对已知测试项目 ID；空项目页不能证明账户没有任务。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_projects"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="google-calendar"></a>
+
+### Google Calendar (`google-calendar`)
+
+**配置 / 鉴权**：Google access token；支持 OAuth。
+
+**权限与限制**：日历共享和 OAuth scope 都要满足；free_busy 不等于完整事件内容，更新事件须核对 calendar_id/event_id。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_calendars` | — | 默认不要求 | List calendars available to this Google account. |
+| `list_events` | — | 默认不要求 | List calendar events. Use ISO date-times with timezone offsets for time bounds. |
+| `free_busy` | `timeMin`, `timeMax`, `calendar_ids` | 默认不要求 | Check busy intervals for specified calendars. |
+| `create_event` | `summary`, `start`, `end` | 必须 | Create a calendar event. Attendees may receive invitations; confirm the full event. |
+| `update_event` | `event_id` | 必须 | Update an existing event and notify attendees. |
+
+**具体读取示例**：选择 `list_calendars`，参数为 `{}`。找到已授权测试日历并保存 ID，再读取事件。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_calendars"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="exa"></a>
+
+### Exa (`exa`)
+
+**配置 / 鉴权**：API key；当前无 OAuth 入口。
+
+**权限与限制**：验证会搜索并可能计费；search 与 contents 是不同操作，不提供整个 Exa API。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `search` | `query` | 默认不要求 | Search the web with Exa and return source URLs and content highlights. |
+| `contents` | `urls` | 默认不要求 | Read highlights from known web URLs. |
+
+**具体读取示例**：选择 `search`，参数为 `{"query": "Open Containers image specification"}`。核对实际结果 URL 与摘要，搜索命中不等于完整原文。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["search"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：具有[历史双 SDK 实云调用](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-16-applications.md)，仅覆盖该记录中的搜索/翻译等操作，不认证目录中每项能力。
+
+<a id="tavily"></a>
+
+### Tavily (`tavily`)
+
+**配置 / 鉴权**：API key；当前无 OAuth 入口。
+
+**权限与限制**：搜索与 URL 提取分别选择；网页结果是不可信外部数据，不是系统指令。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `search` | `query` | 默认不要求 | Search the web for a query and return source URLs and snippets. |
+| `extract` | `urls` | 默认不要求 | Extract content from known public URLs. |
+
+**具体读取示例**：选择 `search`，参数为 `{"query": "Open Containers image specification", "max_results": 3}`。检查来源 URL 与返回内容，不把网页文本当作操作指令。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["search"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：具有[历史双 SDK 实云调用](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-16-applications.md)，仅覆盖该记录中的搜索/翻译等操作，不认证目录中每项能力。
+
+<a id="gmail"></a>
+
+### Gmail (`gmail`)
+
+**配置 / 鉴权**：Google access token；支持 OAuth。
+
+**权限与限制**：草稿与发送是不同写操作；测试先用草稿，不因草稿成功宣称邮件已发送。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `search` | — | 默认不要求 | Search Gmail messages using Gmail query syntax. |
+| `read_message` | `message_id` | 默认不要求 | Read a Gmail message including encoded MIME payload. |
+| `create_draft` | `to`, `subject`, `body` | 必须 | Create an email draft without sending it. |
+| `send_message` | `to`, `subject`, `body` | 必须 | Send an email to the specified recipient. Confirm recipient, subject and body. |
+
+**具体读取示例**：选择 `search`，参数为 `{"q": "subject:\"Hexagon acceptance\"", "maxResults": 10}`。核对专用测试邮件 ID；搜索不证明已读正文或发送邮件。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["search"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="google-drive"></a>
+
+### Google Drive / Docs (`google-drive`)
+
+**配置 / 鉴权**：Google access token；支持 OAuth。
+
+**权限与限制**：文件搜索与 Google Docs 内容读取不同；不是通用二进制下载或任意文件格式编辑。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `search_files` | — | 默认不要求 | Search Drive using its query syntax; returns only files accessible to this account. |
+| `read_document` | `document_id` | 默认不要求 | Read a native Google Doc by ID. |
+| `create_document` | `title` | 必须 | Create an empty Google Doc with a title. |
+| `append_text` | `document_id`, `text` | 必须 | Append text to a Google Doc. |
+
+**具体读取示例**：选择 `search_files`，参数为 `{"q": "name = 'Hexagon acceptance' and trashed = false", "pageSize": 10}`。核对共享测试文件 ID；元数据搜索不证明已下载正文。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["search_files"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="github"></a>
+
+### GitHub (`github`)
+
+**配置 / 鉴权**：PAT；支持 OAuth。
+
+**权限与限制**：仓库可见性和 Token 权限共同限制；支持 OAuth App，不支持 GitHub App installation auth。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_repositories` | — | 默认不要求 | List repositories accessible to the authenticated account. |
+| `list_issues` | `owner`, `repo` | 默认不要求 | List repository issues and pull requests. |
+| `read_issue` | `owner`, `repo`, `issue_number` | 默认不要求 | Read an issue or pull request. |
+| `read_file` | `owner`, `repo`, `path` | 默认不要求 | Read a repository file; content may be base64 encoded. |
+| `create_issue` | `owner`, `repo`, `title` | 必须 | Create a repository issue. |
+| `add_comment` | `owner`, `repo`, `issue_number`, `body` | 必须 | Post a comment to an issue or pull request. |
+
+**具体读取示例**：选择 `list_repositories`，参数为 `{"per_page": 10, "page": 1}`。找到获准测试仓库并检查分页，再读取 issue。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_repositories"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="slack"></a>
+
+### Slack (`slack`)
+
+**配置 / 鉴权**：Bot token；支持 OAuth。
+
+**权限与限制**：Bot 需有会话访问权限；history 与 thread 分开，不提供消息监听或频道托管。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_channels` | — | 默认不要求 | List channels visible to the connected Slack bot. |
+| `read_history` | `channel` | 默认不要求 | Read channel messages visible to this connection. |
+| `read_thread` | `channel`, `ts` | 默认不要求 | Read replies where the connected token has access; bot access varies by conversation type. |
+| `post_message` | `channel`, `text` | 必须 | Send a message as the connected Slack app. Confirm channel and text. |
+
+**具体读取示例**：选择 `list_channels`，参数为 `{"limit": 10}`。找到授权身份可访问的频道；列表不代表属于所有私有频道。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_channels"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="linear"></a>
+
+### Linear (`linear`)
+
+**配置 / 鉴权**：Personal API key；支持 OAuth。
+
+**权限与限制**：GraphQL 写响应含 errors 时可能已有副作用，必须对账，不能因 data=null 就自动重试。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_teams` | — | 默认不要求 | List accessible Linear teams. |
+| `list_issues` | — | 默认不要求 | List Linear issues. Use endCursor to request another page. |
+| `read_issue` | `issue_id` | 默认不要求 | Read one Linear issue by ID or identifier. |
+| `create_issue` | `team_id`, `title` | 必须 | Create a Linear issue in a team. |
+| `update_issue` | `issue_id` | 必须 | Update a Linear issue title or description. |
+| `add_comment` | `issue_id`, `body` | 必须 | Add a comment to a Linear issue. |
+
+**具体读取示例**：选择 `list_teams`，参数为 `{}`。先核对已知 team ID，再选择 issue 操作。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_teams"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="deepl"></a>
+
+### DeepL (`deepl`)
+
+**配置 / 鉴权**：API key；当前无 OAuth 入口。
+
+**权限与限制**：config.region 选 free 或 paid，需匹配 key；翻译属于非写操作但可能消耗额度。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `translate_text` | `text`, `target_lang` | 默认不要求 | Translate plain text with DeepL; target_lang is a language code such as EN-US or ZH. |
+
+**具体读取示例**：选择 `translate_text`，参数为 `{"text": "Hello, world.", "source_lang": "EN", "target_lang": "DE"}`。检查返回的德语翻译与用量；归类为读取仍可能消耗额度。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["translate_text"], "region": "free"}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。 付费 API 账户改用 paid。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：具有[历史双 SDK 实云调用](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-16-applications.md)，仅覆盖该记录中的搜索/翻译等操作，不认证目录中每项能力。
+
+<a id="outlook"></a>
+
+### Microsoft Outlook (`outlook`)
+
+**配置 / 鉴权**：Microsoft delegated access token；支持 OAuth。
+
+**权限与限制**：草稿和发送独立授权；只覆盖所列邮件操作，不是邮箱同步引擎。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_messages` | — | 默认不要求 | List mail messages, one page at a time. Continue using @odata.nextLink as next_page_url. |
+| `read_message` | `message_id` | 默认不要求 | Read an Outlook message by ID. |
+| `create_draft` | `to`, `subject`, `text` | 必须 | Create a plain-text Outlook draft; does not send it. |
+| `send_message` | `to`, `subject`, `text` | 必须 | Send an email. Confirm recipient, subject and text before approval. |
+
+**具体读取示例**：选择 `list_messages`，参数为 `{"top": 10}`。将消息 ID 与测试邮箱比对；列举不是发送。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_messages"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="outlook-calendar"></a>
+
+### Microsoft Outlook Calendar (`outlook-calendar`)
+
+**配置 / 鉴权**：Microsoft delegated access token；支持 OAuth。
+
+**权限与限制**：核对日历与事件归属；创建更新是写操作，不提供完整日历同步。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_calendars` | — | 默认不要求 | List Outlook calendars. Follow @odata.nextLink with next_page_url. |
+| `list_events` | `calendar_id` | 默认不要求 | List events in a calendar, one page at a time. |
+| `create_event` | `calendar_id`, `subject`, `start`, `end` | 必须 | Create an Outlook event with explicit local date-time and time zone. |
+| `update_event` | `event_id` | 必须 | Update an event; existing attendees may receive updates. |
+
+**具体读取示例**：选择 `list_calendars`，参数为 `{"top": 10}`。在任何事件写入前识别测试日历及资源 ID。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_calendars"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="onedrive"></a>
+
+### Microsoft OneDrive (`onedrive`)
+
+**配置 / 鉴权**：Microsoft delegated access token；支持 OAuth。
+
+**权限与限制**：列文件、元数据与重命名不代表通用文件内容编辑。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_files` | — | 默认不要求 | List folder children (root by default); follow @odata.nextLink as next_page_url. Metadata only. |
+| `read_file` | `item_id` | 默认不要求 | Read file or folder metadata, not binary file contents. |
+| `create_folder` | `name` | 必须 | Create a folder under the selected parent; conflicts fail. |
+| `rename_file` | `item_id`, `name` | 必须 | Rename a file or folder. |
+
+**具体读取示例**：选择 `list_files`，参数为 `{"top": 10}`。核对授权文件夹内的名称与 ID，分页另行处理。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_files"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="microsoft-todo"></a>
+
+### Microsoft To Do (`microsoft-todo`)
+
+**配置 / 鉴权**：Microsoft delegated access token；支持 OAuth。
+
+**权限与限制**：先确定 task list，再读写目标任务；完成操作会改变远端状态。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_task_lists` | — | 默认不要求 | List Microsoft To Do lists; follow @odata.nextLink. |
+| `list_tasks` | `list_id` | 默认不要求 | List tasks in a Microsoft To Do list. |
+| `create_task` | `list_id`, `title` | 必须 | Create a To Do task with optional plain-text notes. |
+| `complete_task` | `list_id`, `task_id` | 必须 | Mark a To Do task completed. |
+
+**具体读取示例**：选择 `list_task_lists`，参数为 `{"top": 10}`。创建或完成任务前先识别专用任务列表。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_task_lists"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="microsoft-teams"></a>
+
+### Microsoft Teams (`microsoft-teams`)
+
+**配置 / 鉴权**：Microsoft delegated access token；支持 OAuth。
+
+**权限与限制**：Teams、channels 与 chats 范围不同；发送目标受用户和组织策略限制，不提供 Bot 托管。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_teams` | — | 默认不要求 | List joined Teams; organization consent may be required. |
+| `list_channels` | `team_id` | 默认不要求 | List channels in a joined team. |
+| `list_chats` | — | 默认不要求 | List chats visible to the signed-in user; follow @odata.nextLink. |
+| `read_history` | `chat_id` | 默认不要求 | Read chat messages with delegated user permission. |
+| `send_message` | `chat_id`, `text` | 必须 | Send a plain-text message to an existing chat as the authorized user. |
+
+**具体读取示例**：选择 `list_teams`，参数为 `{}`。核对已加入团队；列举成功不授权向所有频道发消息。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_teams"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="google-sheets"></a>
+
+### Google Sheets (`google-sheets`)
+
+**配置 / 鉴权**：Google access token；支持 OAuth。
+
+**权限与限制**：使用明确 spreadsheet 与 range；append/update 不同，列表和范围读取不等于全表导出。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `search_spreadsheets` | — | 默认不要求 | List accessible Sheets files. Follow nextPageToken. |
+| `read_spreadsheet` | `spreadsheet_id` | 默认不要求 | Read spreadsheet and tab metadata without cell data. |
+| `read_values` | `spreadsheet_id`, `range` | 默认不要求 | Read cell values in an A1 range such as Sheet1!A1:D20. |
+| `append_values` | `spreadsheet_id`, `range`, `values` | 必须 | Append rows after a table. RAW is default; USER_ENTERED interprets formulas. |
+| `update_values` | `spreadsheet_id`, `range`, `values` | 必须 | Overwrite cells in an A1 range; RAW is default. |
+| `create_spreadsheet` | `title` | 必须 | Create a spreadsheet with a title. |
+
+**具体读取示例**：选择 `search_spreadsheets`，参数为 `{"pageSize": 10}`。找到共享测试表格 ID，再选择明确的单元格读取操作。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["search_spreadsheets"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="google-tasks"></a>
+
+### Google Tasks (`google-tasks`)
+
+**配置 / 鉴权**：Google access token；支持 OAuth。
+
+**权限与限制**：任务列表与任务分别识别，完成是远端写入。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_task_lists` | — | 默认不要求 | List task lists; follow nextPageToken. |
+| `list_tasks` | `list_id` | 默认不要求 | List tasks including completed ones when requested. |
+| `create_task` | `list_id`, `title` | 必须 | Create a task. Due dates are calendar dates; parent and previous IDs control placement. |
+| `complete_task` | `list_id`, `task_id` | 必须 | Mark a Google task completed. |
+
+**具体读取示例**：选择 `list_task_lists`，参数为 `{"maxResults": 10}`。核对专用任务列表 ID，并保留返回的下一页 token。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_task_lists"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="google-contacts"></a>
+
+### Google Contacts (`google-contacts`)
+
+**配置 / 鉴权**：Google access token；支持 OAuth。
+
+**权限与限制**：更新名字需要对应 etag，不能用过时内容覆盖；不提供全部联系人字段编辑。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_contacts` | — | 默认不要求 | List personal contacts with names, emails and phone numbers; follow nextPageToken. |
+| `read_contact` | `person_id` | 默认不要求 | Read one contact. Supply the ID after people/ from resourceName. |
+| `create_contact` | `given_name` | 必须 | Create a personal contact with name and optional email and phone. |
+| `update_contact` | `person_id`, `etag`, `given_name` | 必须 | Replace contact names using the latest etag from read_contact. Protects concurrent changes. |
+
+**具体读取示例**：选择 `list_contacts`，参数为 `{"pageSize": 10}`。核对专用测试联系人，避免导出无关联系人信息。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_contacts"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="asana"></a>
+
+### Asana (`asana`)
+
+**配置 / 鉴权**：PAT；支持 OAuth。
+
+**权限与限制**：workspace/project/task 分层权限需逐项满足；评论是独立写操作。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_workspaces` | — | 默认不要求 | List accessible Asana workspaces; follow next_page.offset. |
+| `list_projects` | `workspace_id` | 默认不要求 | List workspace projects, one page at a time. |
+| `list_tasks` | `project_id` | 默认不要求 | List tasks in a project; use next_page.offset for pagination. |
+| `get_task` | `task_id` | 默认不要求 | Read a task and its details. |
+| `create_task` | `project_id`, `name` | 必须 | Create a task in a project with optional notes and due date. |
+| `update_task` | `task_id` | 必须 | Update task fields, including completion status. |
+| `add_comment` | `task_id`, `text` | 必须 | Add a plain-text comment to a task. |
+
+**具体读取示例**：选择 `list_workspaces`，参数为 `{"limit": 10}`。先定位获准工作区，再选择项目或任务。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_workspaces"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="airtable"></a>
+
+### Airtable (`airtable`)
+
+**配置 / 鉴权**：Personal access token；当前无 OAuth 入口。
+
+**权限与限制**：base 权限与表/字段 schema 必须匹配，不能从可列 base 推断全部记录可写。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_bases` | — | 默认不要求 | List bases granted to the personal access token; follow offset. |
+| `read_base_schema` | `base_id` | 默认不要求 | Read tables and field definitions before creating or updating records. |
+| `list_records` | `base_id`, `table_id` | 默认不要求 | List records with optional formula/view filter; follow offset. |
+| `read_record` | `base_id`, `table_id`, `record_id` | 默认不要求 | Read one record by ID. |
+| `create_record` | `base_id`, `table_id`, `fields` | 必须 | Create a record with a field-name/value map. Linked fields take arrays of record IDs. |
+| `update_record` | `base_id`, `table_id`, `record_id`, `fields` | 必须 | Update selected fields of a record. |
+
+**具体读取示例**：选择 `list_bases`，参数为 `{}`。核对 Token 获准访问的 base；列举不证明表格写权限。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_bases"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="clickup"></a>
+
+### ClickUp (`clickup`)
+
+**配置 / 鉴权**：Personal access token；当前无 OAuth 入口。
+
+**权限与限制**：当前 list 发现是 folderless lists，不代表遍历所有嵌套项目。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_workspaces` | — | 默认不要求 | List authorized ClickUp workspaces (called teams in API v2). |
+| `list_spaces` | `team_id` | 默认不要求 | List spaces in a workspace. |
+| `list_lists` | `space_id` | 默认不要求 | List folderless task lists in a space. |
+| `list_tasks` | `list_id` | 默认不要求 | List tasks in a list. Page numbers start at zero. |
+| `get_task` | `task_id` | 默认不要求 | Read a ClickUp task. |
+| `create_task` | `list_id`, `name` | 必须 | Create a task in a list. due_date is a Unix timestamp in milliseconds. |
+| `update_task` | `task_id` | 必须 | Update a task name, description or status. |
+| `add_comment` | `task_id`, `text` | 必须 | Post a comment to a task. |
+
+**具体读取示例**：选择 `list_workspaces`，参数为 `{}`。核对后续操作所需的测试 workspace/team ID。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_workspaces"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="trello"></a>
+
+### Trello (`trello`)
+
+**配置 / 鉴权**：JSON: api_key + token；当前无 OAuth 入口。
+
+credential 为 JSON 字符串：`{"api_key": "<private value>", "token": "<private value>"}`.
+
+**权限与限制**：使用 JSON 字符串凭据；board/list/card ID 不可互换。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_boards` | — | 默认不要求 | List boards visible to the authorized Trello member. |
+| `list_lists` | `board_id` | 默认不要求 | List lists in a board. |
+| `list_cards` | `list_id` | 默认不要求 | List cards in a list. |
+| `read_card` | `card_id` | 默认不要求 | Read a card by ID. |
+| `create_card` | `list_id`, `name` | 必须 | Create a card in a list with optional description. |
+| `update_card` | `card_id` | 必须 | Update or archive a card. |
+| `add_comment` | `card_id`, `text` | 必须 | Post a comment on a card. |
+
+**具体读取示例**：选择 `list_boards`，参数为 `{}`。找到专用看板，不选择同名生产看板。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_boards"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="discord"></a>
+
+### Discord (`discord`)
+
+**配置 / 鉴权**：Bot token；当前无 OAuth 入口。
+
+**权限与限制**：Bot 必须有 server/channel 权限；编辑能力受 Bot 消息归属限制，不是用户登录或网关监听。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_servers` | — | 默认不要求 | List guilds accessible to the connected bot. Follow the last ID with after. |
+| `list_channels` | `guild_id` | 默认不要求 | List channels in a guild accessible to the bot. |
+| `read_history` | `channel_id` | 默认不要求 | Read channel messages. Requires history permission and applicable message-content intent. |
+| `send_message` | `channel_id`, `text` | 必须 | Send a bot message. Mentions are disabled to prevent accidental notifications. |
+| `edit_message` | `channel_id`, `message_id`, `text` | 必须 | Edit a message owned by this bot; mentions remain disabled. |
+
+**具体读取示例**：选择 `list_servers`，参数为 `{"limit": 10}`。核对 bot 可见的服务器；频道权限仍须单独检查。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_servers"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="telegram"></a>
+
+### Telegram Bot (`telegram`)
+
+**配置 / 鉴权**：Bot token；当前无 OAuth 入口。
+
+**权限与限制**：read_chat 不提供任意历史消息；发送编辑受 Bot 与 chat 权限限制，无 polling/webhook 托管。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `read_bot` | — | 默认不要求 | Read the connected Telegram bot profile. |
+| `read_chat` | `chat_id` | 默认不要求 | Read a chat the bot can access. Telegram bots cannot enumerate arbitrary private chats. |
+| `send_message` | `chat_id`, `text` | 必须 | Send a plain-text bot message to an existing reachable chat; no history polling or webhook takeover. |
+| `edit_message` | `chat_id`, `message_id`, `text` | 必须 | Edit a bot message by chat and message IDs. |
+
+**具体读取示例**：选择 `read_bot`，参数为 `{}`。核对预期 bot 身份；此调用不读取聊天历史，也不发送消息。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["read_bot"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="dropbox"></a>
+
+### Dropbox (`dropbox`)
+
+**配置 / 鉴权**：Access token；支持 OAuth。
+
+**权限与限制**：文件夹/search 有分页；元数据读取不是任意二进制内容下载。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_files` | — | 默认不要求 | List folder entries. Pass returned cursor to continue; root accepts / or empty path. |
+| `read_file` | `path` | 默认不要求 | Read file/folder metadata, not binary file content. |
+| `search_files` | — | 默认不要求 | Search accessible file names and metadata; continue with returned cursor. |
+| `create_folder` | `path` | 必须 | Create a Dropbox folder. Existing names cause an error rather than auto-renaming. |
+| `move_file` | `from_path`, `to_path` | 必须 | Move or rename a file or folder. Confirm both paths. |
+
+**具体读取示例**：选择 `list_files`，参数为 `{"path": "", "limit": 10, "recursive": false}`。核对已知根目录条目与返回 cursor；这是有界且非递归的列举。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_files"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="hubspot"></a>
+
+### HubSpot (`hubspot`)
+
+**配置 / 鉴权**：Private access token；支持 OAuth。
+
+**权限与限制**：读权限可用探测验证，私有 Token 的写权限可能保持 unknown；不能用本地选中项冒充 Provider scopes。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_contacts` | — | 默认不要求 | List CRM contacts; follow paging.next.after. Requires contacts read scope. |
+| `search_contacts` | `query` | 默认不要求 | Search CRM contacts by text. Use after from paging.next. |
+| `read_contact` | `contact_id` | 默认不要求 | Read one CRM contact. |
+| `create_contact` | `properties` | 必须 | Create a CRM contact from HubSpot internal property names and values. |
+| `update_contact` | `contact_id`, `properties` | 必须 | Update selected CRM contact properties. |
+| `list_deals` | — | 默认不要求 | List CRM deals; requires deals read scope. |
+| `create_deal` | `properties` | 必须 | Create a CRM deal; include required pipeline/stage internal identifiers. |
+
+**具体读取示例**：选择 `list_contacts`，参数为 `{"limit": 10}`。核对专用 CRM 联系人 ID；字段与对象权限仍须分别检查。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_contacts"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="calendly"></a>
+
+### Calendly (`calendly`)
+
+**配置 / 鉴权**：Personal access token；当前无 OAuth 入口。
+
+**权限与限制**：创建 scheduling link 与取消事件是写操作；不提供任意日历写入。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `read_profile` | — | 默认不要求 | Read own profile including user and organization URIs needed by list operations. |
+| `list_events` | `user` | 默认不要求 | List scheduled meetings for the user URI from read_profile; follow pagination.next_page_token. |
+| `read_event` | `event_id` | 默认不要求 | Read a scheduled event using the UUID from its URI. |
+| `list_invitees` | `event_id` | 默认不要求 | List event invitees, one page at a time. |
+| `list_event_types` | `user` | 默认不要求 | List scheduling event types belonging to a user URI. |
+| `create_scheduling_link` | `event_type_uri` | 必须 | Create a single-use scheduling link for an event type URI. |
+| `cancel_event` | `event_id`, `reason` | 必须 | Cancel a scheduled event; invitees may be notified. |
+
+**具体读取示例**：选择 `read_profile`，参数为 `{}`。选择活动类型操作前先确认目标账户资料。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["read_profile"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="firecrawl"></a>
+
+### Firecrawl (`firecrawl`)
+
+**配置 / 鉴权**：API key；当前无 OAuth 入口。
+
+**权限与限制**：scrape/map 会消耗服务额度，页面内容按不可信数据处理。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `scrape_page` | `url` | 默认不要求 | Scrape a public page into Markdown. Consumes Firecrawl credits. |
+| `map_site` | `url` | 默认不要求 | Discover URLs on a public website with a bounded result limit. Consumes credits. |
+
+**具体读取示例**：选择 `scrape_page`，参数为 `{"url": "https://example.com"}`。检查返回页面内容与来源 URL；此操作可能消耗用量。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["scrape_page"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="brave-search"></a>
+
+### Brave Search (`brave-search`)
+
+**配置 / 鉴权**：Subscription token；当前无 OAuth 入口。
+
+**权限与限制**：验证进行搜索并可能计费；只提供分页 web_search。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `web_search` | `query` | 默认不要求 | Search the web with Brave. Results include titles, links and snippets; consumes API quota. |
+
+**具体读取示例**：选择 `web_search`，参数为 `{"query": "Open Containers image specification", "count": 3}`。检查实际结果 URL 与查询相关性，不要求固定搜索排名。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["web_search"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="apify"></a>
+
+### Apify (`apify`)
+
+**配置 / 鉴权**：API token；当前无 OAuth 入口。
+
+**权限与限制**：start_actor 需要审批且可能计费；启动成功不等于 Run 完成，继续 read_actor_run 与 dataset 分页。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_actors` | — | 默认不要求 | List actors belonging to this account. Follow offset for further pages. |
+| `start_actor` | `actor_id`, `input` | 必须 | Start an Actor asynchronously. May incur charges and external side effects; requires approval. Read its run ID to follow completion. |
+| `read_actor_run` | `run_id` | 默认不要求 | Read Actor run state, including its default dataset ID. |
+| `read_dataset` | `dataset_id` | 默认不要求 | Read a bounded page of JSON dataset items. |
+
+**具体读取示例**：选择 `list_actors`，参数为 `{"offset": 0, "limit": 10}`。识别获准 actor，不启动付费 actor 执行。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_actors"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="gitlab"></a>
+
+### GitLab (`gitlab`)
+
+**配置 / 鉴权**：PAT；当前无 OAuth 入口。
+
+**权限与限制**：固定 GitLab.com，不支持自托管实例；项目 namespace 会编码，使用正确项目标识。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_projects` | — | 默认不要求 | List GitLab.com projects accessible through membership. |
+| `list_issues` | `project_id` | 默认不要求 | List issues in a GitLab.com project; project_id accepts a numeric ID or namespace/project. |
+| `create_issue` | `project_id`, `title` | 必须 | Create an issue in a GitLab.com project. |
+
+**具体读取示例**：选择 `list_projects`，参数为 `{"per_page": 10, "page": 1}`。核对 GitLab.com 测试项目；本连接器不面向任意自托管 GitLab 域名。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_projects"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="readwise"></a>
+
+### Readwise Reader (`readwise`)
+
+**配置 / 鉴权**：Readwise Token；当前无 OAuth 入口。
+
+**权限与限制**：Reader 文档列表需分页，save_document 是写入；验证 204 可成功，不要求虚构 JSON。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_documents` | — | 默认不要求 | List Reader documents. Use nextPageCursor from the response as pageCursor. |
+| `save_document` | `url` | 必须 | Save a URL to Readwise Reader. Existing documents may be updated. |
+
+**具体读取示例**：选择 `list_documents`，参数为 `{"location": "later", "withHtmlContent": false}`。核对已知 Later 文档及分页；单页没有结果不证明全局不存在。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_documents"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="feishu"></a>
+
+### 飞书 / Feishu (`feishu`)
+
+**配置 / 鉴权**：JSON: app_id + app_secret；当前无 OAuth 入口。
+
+credential 为 JSON 字符串：`{"app_id": "<private value>", "app_secret": "<private value>"}`.
+
+**权限与限制**：使用飞书国内 API origin；自建应用需发布并启用 Bot，群成员、文档分享和表格权限分别配置。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_chats` | — | 默认不要求 | List groups this app bot belongs to. Requires chat read permission and bot membership. |
+| `read_chat_messages` | `chat_id` | 默认不要求 | Read messages in an authorized group. The app needs message read permission; page_token continues the result. |
+| `send_chat_message` | `chat_id`, `text` | 必须 | Send a plain-text message to a group where this bot is authorized. Requires approval. |
+| `read_document` | `document_id` | 默认不要求 | Read raw text of an authorized cloud document. Share the document with the app and grant docs read permission. |
+| `list_bitable_records` | `app_token`, `table_id` | 默认不要求 | Read a bounded page of records in an authorized Bitable table. |
+| `create_bitable_record` | `app_token`, `table_id`, `fields` | 必须 | Create a record in an authorized Bitable table. Requires approval and write permission. |
+
+**具体读取示例**：选择 `list_chats`，参数为 `{"page_size": 10}`。核对包含飞书应用 bot 的测试群组；不发送消息。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_chats"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="lark"></a>
+
+### Lark (`lark`)
+
+**配置 / 鉴权**：JSON: app_id + app_secret；当前无 OAuth 入口。
+
+credential 为 JSON 字符串：`{"app_id": "<private value>", "app_secret": "<private value>"}`.
+
+**权限与限制**：使用国际 Lark origin，不能混用飞书凭据；这是应用身份，不是用户 OAuth 或 IM webhook 托管。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_chats` | — | 默认不要求 | List groups this app bot belongs to. Requires chat read permission and bot membership. |
+| `read_chat_messages` | `chat_id` | 默认不要求 | Read messages in an authorized group. The app needs message read permission; page_token continues the result. |
+| `send_chat_message` | `chat_id`, `text` | 必须 | Send a plain-text message to a group where this bot is authorized. Requires approval. |
+| `read_document` | `document_id` | 默认不要求 | Read raw text of an authorized cloud document. Share the document with the app and grant docs read permission. |
+| `list_bitable_records` | `app_token`, `table_id` | 默认不要求 | Read a bounded page of records in an authorized Bitable table. |
+| `create_bitable_record` | `app_token`, `table_id`, `fields` | 必须 | Create a record in an authorized Bitable table. Requires approval and write permission. |
+
+**具体读取示例**：选择 `list_chats`，参数为 `{"page_size": 10}`。核对包含应用 bot 的国际 Lark 测试群组，不复用飞书凭据。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_chats"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="salesforce"></a>
+
+### Salesforce (`salesforce`)
+
+**配置 / 鉴权**：Externally managed access token；支持 OAuth。
+
+**权限与限制**：必须提供 HTTPS My Domain instance_url；固定 REST v62.0，list 是 recent-items，不是全量导出或任意 SOQL。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_contacts` | — | 默认不要求 | List recent Salesforce contacts; this endpoint is a bounded recent-items view, not a complete export. |
+| `read_contacts` | `record_id` | 默认不要求 | Read one Salesforce Contact. |
+| `create_contacts` | `fields` | 必须 | Create a Salesforce Contact using API field names. |
+| `update_contacts` | `record_id`, `fields` | 必须 | Update a Salesforce Contact using API field names. |
+| `list_accounts` | — | 默认不要求 | List recent Salesforce accounts; this endpoint is a bounded recent-items view, not a complete export. |
+| `read_accounts` | `record_id` | 默认不要求 | Read one Salesforce Account. |
+| `create_accounts` | `fields` | 必须 | Create a Salesforce Account using API field names. |
+| `update_accounts` | `record_id`, `fields` | 必须 | Update a Salesforce Account using API field names. |
+| `list_opportunities` | — | 默认不要求 | List recent Salesforce opportunities; this endpoint is a bounded recent-items view, not a complete export. |
+| `read_opportunities` | `record_id` | 默认不要求 | Read one Salesforce Opportunity. |
+| `create_opportunities` | `fields` | 必须 | Create a Salesforce Opportunity using API field names. |
+| `update_opportunities` | `record_id`, `fields` | 必须 | Update a Salesforce Opportunity using API field names. |
+
+**具体读取示例**：选择 `list_contacts`，参数为 `{}`。比对近期测试 Contact；近期条目视图不是完整联系人导出。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_contacts"], "instance_url": "https://YOUR-DOMAIN.my.salesforce.com"}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。 将 YOUR-DOMAIN 替换为自己获准的 My Domain。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+<a id="attio"></a>
+
+### Attio (`attio`)
+
+**配置 / 鉴权**：Workspace token；支持 OAuth。
+
+**权限与限制**：只覆盖 people/companies/deals，values 需匹配工作区字段；自省 scope 不代表每条记录均可访问。
+
+| 操作 | 必填参数 | 审批 | 实现描述 |
+| --- | --- | --- | --- |
+| `list_records` | `object` | 默认不要求 | List records of a standard Attio object with bounded offset pagination. |
+| `read_record` | `object`, `record_id` | 默认不要求 | Read one Attio record. |
+| `create_record` | `object`, `values` | 必须 | Create an Attio record using attribute values. |
+| `update_record` | `object`, `record_id`, `values` | 必须 | Update an Attio record using attribute values. |
+
+**具体读取示例**：选择 `list_records`，参数为 `{"object": "people", "limit": 10, "offset": 0}`。按工作区属性定义比对专用 people 记录；这里使用 offset 分页。
+
+**最小 Token 配置**：`{"authentication": "api_key", "operations": ["list_records"]}`。凭据格式见上文；使用托管 OAuth 时应走部署的同意流程，不直接把 OAuth token 填入此示例。
+
+这是请求示例，不是新增供应商调用记录。写入仅在明确获准的可清理测试记录上验证，检查拒绝时零副作用及批准后的实际结果。
+
+**证据**：当前依据是注册实现和确定性契约记录；本页不宣称真实账户、OAuth consent 或写入已经验收。见[应用实现与证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)。
+
+## 错误、变更与对账
+
+401 使凭据失效，403 可能是资源/操作权限，429 是速率或额度问题。写请求已派发后出现不确定响应，必须查看原调用及 request_hash，在第三方记录中核对后[对账](/zh-CN/operate/reconciliation)，不能重放来确认。Linear mutation 的 GraphQL errors 即使伴随 data=null 也不能证明零副作用。
+
+新 Session 固定账户标识的能力取决于 Provider 是否提供稳定身份；旧快照不能追溯获得该保证。目录中的 provider 存在只证明有适配，不证明账户有权限或服务当前健康。本页没有执行新的第三方操作或 OAuth consent，也未发送邮件/消息。
+
+依据：[应用注册表](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/apps/registry.ts)、[应用契约](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)、[CRM 验收范围](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-18-crm-authorization.md)。下一步：[授权](/zh-CN/build/tool-authorization)、[审批](/zh-CN/build/approvals)、[Tool 连接器](/zh-CN/contribute/tool-connectors)。

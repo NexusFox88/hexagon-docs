@@ -1,0 +1,126 @@
+---
+title: "添加 Harness 适配器"
+---
+
+Harness 适配器把 Agent 实现接入 Hexagon 已有的 Runtime、模型访问与 Tool broker，负责启动配置、结果解释和连续对话状态转换。Runtime 管理进程；控制平面负责 Session、Run、持久化事件、凭据、审批和云资源清理。不要另起控制平面服务，也不要把 Harness 执行放进 API 进程。
+
+先阅读[接入契约](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/harness-integration-contract.md)与[架构](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/architecture.md)。本文是实际实现的扩展流程；注册成功不代表兼容性验证完成。
+
+## 分别选择分发方式与协议
+
+新接入优先采用 [OCI 镜像](/zh-CN/integrations/harnesses/oci)，固定解释器和依赖，并解析为 linux/amd64 manifest digest。Dockerfile 配方不等于已发布镜像，已发布镜像也不等于已执行组合。私有仓库支持还取决于 Sandbox Provider。
+
+[源码包](/zh-CN/integrations/harnesses/source-package)保留为 Python、Node 使用 `hexagon-json-v1` 的兼容路径，不负责编排依赖安装。两种路径都保存租户所属的注册并固定版本，控制平面不会导入上传的源码。相同 id/version 修改内容会冲突；改变固定定义时使用新版本和新 Session。
+
+模型协议、Tool 支持及连续对话语义以 [protocols.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/protocols.ts)为准。例如当前 Codex 声明 Responses，Hermes 声明 Chat Completions，Aider 不声明远程 Tools。镜像标签不能增加协议实现；扩展协议需要实现与拒绝测试，不能只增加 catalog 值。
+
+## 理解适配器的三个方法
+
+权威接口是 [HarnessAdapter](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/harness.ts)：
+
+| 方法 | 职责 | 审查重点 |
+| --- | --- | --- |
+| `install(connector, sandbox)` | 向 guest 放置适配器及 bridge 文件 | 依赖是否固定并在 Sandbox 安装，而非控制平面执行？ |
+| `invocation(...)` | 返回命令 argv、环境、可选 stdin 与 Tool 定义 | 输入、模型访问、原生 Session 和初始化是否正确映射，是否避免 shell 插值和凭据泄露？ |
+| `result(stdout)` | 解释真实最终回复、原生标识和失败状态 | 缺失、畸形、重复或上游错误结果是否如实失败？ |
+
+已有分发逻辑见 [runtime-adapter.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/runtime-adapter.ts)，受管 CLI 结果处理见 [managed-cli.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/managed-cli.ts)。OCI 提供依赖；适配器补充 bridge 和配置，不应静默替换镜像中固定的 CLI。argv 保持独立字符串，并针对固定版本测试真实参数。契约要求单次受监督调用时，不要使用 daemon 入口。
+
+模型访问由 worker 提供作用域受限的配置。保留代理 URL 和委托认证安排，不要替换为供应商端点或账户密钥。CLI 要求 `/v1` 前缀时保留它。原始模型与 Provider 密钥留在控制平面；不要记录环境凭据、导出到产物，或隐式启用其他账户集成。
+
+## 从最小 Python Harness 开始
+
+现有 [Python Agent](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/harnesses/python-agent/main.py)提供真实模型驱动循环、shell 执行、Tool mailbox、有界步数与本地对话历史。对应 [OCI Dockerfile](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/harnesses/oci/custom-python/Dockerfile)固定基础镜像并选择 `hexagon-json-v1`。修改前阅读两者；shell 是 guest 的执行能力，不构成额外隔离边界。
+
+在仓库根目录可以准备本地镜像：
+
+```sh
+docker build -f examples/harnesses/oci/custom-python/Dockerfile -t hexagon-custom-python:dev .
+```
+
+命令需要 Docker，可能下载依赖，只创建本地镜像；云 Provider 通常无法消费这个本地标签。镜像发布是单独操作。按 [OCI 指南](/zh-CN/integrations/harnesses/oci)的双语注册示例操作时使用可访问的不可变引用，不能为本地构建编造 digest。
+
+`hexagon-json-v1` 程序从 stdin 接收一个 JSON 对象，随后收到 EOF。输入包括 `run_id`、`input`、作用域受限的 `model` 端点和名称、可选 `native_session`、本轮 `artifact_directory` 以及声明的 `tools`；当前适配器也可传递初始化信息。使用传入配置，在 Session workspace 保存历史，将导出文件写入给定的产物目录。
+
+成功的最终结果是一行 JSON：
+
+```json
+{"type":"hexagon.result","text":"The actual assistant response","native_session":"opaque-session-id","failed":false}
+```
+
+恰好输出一个最终结果，`text` 非空，可选原生标识不超过 512 字符。源码包解析器使用严格 schema，不要额外加入诊断字段。当前示例的异常输出包含诊断字段，源码包解析器会拒绝它，不能视为成功；派生实现时应审查并测试错误输出。普通日志不能替代回复。共享 worker 还要求进程结果与产物导出成功，单独一条看似正确的 JSON 不代表 Run 完成。
+
+## 可跨分发路径使用的失败记录
+
+派生 `hexagon-json-v1` 实现时，输出仅含契约字段、内容有界的失败记录，然后以非零状态退出：
+
+```python
+import json
+import sys
+
+print(json.dumps({
+    "type": "hexagon.result",
+    "text": "Custom Harness execution failed.",
+    "failed": True,
+}), flush=True)
+sys.exit(1)
+```
+
+这是失败处理片段，不是完整 Harness。不要把异常对象、上游响应体或凭据序列化到最终记录。没有有效继续标识时，明确省略 native_session。失败标志与退出状态都保留失败语义，不能生成兜底成功结果。对每条目标解析路径测试该片段，并单独验证 worker 的退出状态处理。链接的 Python Agent 异常分支目前带额外诊断字段；需要同时适配两条分发路径时，使用这里更严格的结构。
+
+下一步：[OCI 注册](/zh-CN/integrations/harnesses/oci)、[源码包兼容路径](/zh-CN/integrations/harnesses/source-package)、[测试与证据](/zh-CN/contribute/testing)。
+
+## 使用 Tool bridge 与连续对话契约
+
+已绑定 Tools 通过既有 mailbox 或 bridge 访问，不能直接取上游凭据调用。自定义循环向 `http://127.0.0.1:8765/tools/<run_id>/call` 发送 Run 作用域的 `HEXAGON_TOOL_TOKEN`、稳定调用 ID、声明的名称和参数。在授权、审批等待期间，继续使用相同 ID 和参数查询，最终检查结果及 `isError`。等待期间换调用 ID 可能创建不同 invocation。原生支持 MCP 的 CLI 通过适配器配置使用 [tool_bridge.py](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/runtime/tool_bridge.py)。
+
+支持原生连续对话时，返回真实原生标识并在下一轮传回。上游 CLI 要求自己的 Session 标识时，不能从 Run ID 编造。通用 Python 示例自己管理历史，其标识契约不同。使用依赖前文的追问验证状态保持；支持文件系统恢复时，还需在恢复后验证。初始化要明确首轮与后续轮次的处理；声明能力不等于实现。
+
+取消由 Runtime 管理。适配器不能启动逃离监督的独立 Agent daemon。阅读 [Runtime](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/runtime/server.py)，测试子进程、Tool 等待期间取消和迟到输出。客户端事件连接断开不取消 Run。进程丢失时保留不确定状态，不要盲目启动第二次调用。不同 CLI 的原生事件可见性不同，只展示真实事件，不伪造隐藏推理。
+
+## 注册与验证需要一起维护
+
+新增 OCI 协议时，一起审查协议声明、镜像 schema 与注册、Runtime 适配器、结果解析、catalog、模板和证据。使用已有协议时通常可复用注册机制，无需新增内置分支。相关源码包括 [images.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/images.ts)、[catalog.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/catalog.ts)、[templates.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/templates.ts)、[verification.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/verification.ts)。源码包注册位于 [harness-packages.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/harness-packages.ts)。定义、仓库 Secret 与 Session 绑定必须检查租户所有权。
+
+从确定性的解析与配置检查开始：
+
+```sh
+npx vitest run modules/harnesses/runtime-adapter.test.ts modules/harnesses/managed-cli.test.ts modules/harnesses/managed-cli-config.test.ts
+```
+
+为新适配器添加自己的测试，不能假设现有测试已经覆盖它。验证畸形、缺失、重复最终输出，非零退出，上游错误，不兼容模型绑定，以及初始化与原生状态映射。使用真实上游二进制配合 fixture 模型响应，可以证明 CLI 参数和 bridge 行为，仍不能证明真实模型与云端兼容性。
+
+最后，两种 SDK 分别完成镜像注册、创建云 Session、保持上下文的两轮对话、调用已分配 Tool、导出并下载产物、取消活动轮次，以及 Provider 确认清理。按声明能力加入授权审批等待、持久化事件和跨语言继续。仅支持对话的契约明确排除不支持的 Tool、产物能力，不能记作通过。按[测试指南](/zh-CN/contribute/testing)记录精确 digest、命令、Provider、模型协议与名称、SDK、场景和日期，保留失败与未决资源 ID。只有对应证据才能更新已验证组合。
+
+## 将成功判据拆成独立检查
+
+不要只为 `result(stdout)` 准备一条成功 JSON。适配器解析、进程退出和平台终态是不同判断，下面的输入应在新实现的测试中分别出现：
+
+| 输入或场景 | 应确认的结果 |
+| --- | --- |
+| 一条真实非空最终结果、正常退出 | 解析出回复；worker 仍检查执行状态及导出，不能只凭解析成功宣告完成 |
+| 没有最终结果或重复最终结果 | 明确失败，不能取日志最后一行当作回复 |
+| 最终对象缺字段、类型错误或 text 为空 | 明确失败，不生成兜底的“任务成功”文本 |
+| `failed: true` 或原生 CLI 的错误终态 | 保留失败语义，即使 stdout 中有可读文本 |
+| 成功样式结果但进程退出码非零 | worker 不得记录 completed |
+| waiting_authorization / waiting_approval 时进程结束 | 不得绕过等待状态直接成功 |
+| Runtime interrupted，或取消中的迟到输出 | 遵循平台中断 / 取消状态，不让迟到成功文本重启或完成旧任务 |
+| 第二轮收到 native_session | 使用第一轮返回的真实标识，验证前轮事实与文件分别保持 |
+
+源码包的严格结果 schema 与 OCI 通用解析器不是同一段代码。源码包拒绝额外字段；当前 OCI 通用 `hexagon-json-v1` 分支没有使用同一严格 schema。为了跨分发方式复用，最终结果只输出约定字段，并分别测试两条注册路径。不要因一种分发方式接受了诊断字段，就把这种接受行为写成通用协议保证。
+
+对一次最终失败，还要检查原始可观察原因。worker 会结合已持久化的模型传输记录，将部分失败区分为 `model_transport_failed`、`model_authentication_failed`、`model_rate_limited` 或 `model_request_failed`；否则可能是 `harness_execution_failed`。贡献者不应把所有非零退出都改写成用户 key 错误，也不应将上游原始响应泄露进公共错误。
+
+## 为最小 Harness 设计验收脚本
+
+先固定一个明确支持的 Provider、镜像 digest、模型协议和 SDK 版本，再按以下顺序记录观察；这些是待执行的验收步骤，不是本页新增的通过记录。
+
+1. 第一轮要求读取一个可验证的模型响应、保存已知文件并导出产物；核对退出、最终结果与下载摘要。
+2. 第二轮沿用同一 Session，用新 Run ID 与新提交幂等键，要求引用前轮对话事实并读取该文件，不能在第二轮输入中直接给出答案。
+3. 对声明支持 Tools 的 Harness，让一次调用经过既有 bridge；分别验证正常返回与 `isError`，并保持调用 ID 和参数稳定。
+4. 在授权或审批等待时确认原 Run 仍是等待状态；决定后继续原调用，核对外部操作次数，不能用第二个 Run 冒充续跑。
+5. 取消一个活动轮次，确认 Runtime 管理的进程状态、Run 终态与已派发外部操作结果；取消不能撤回既有副作用。
+6. 关闭 Session，确认云资源及关联对象清理，再下载已导出的产物。另一套 SDK 独立走完所需旅程，跨语言继续另作明确记录。
+
+仅支持对话的适配器保留较窄的声明，并明确标记上述哪些能力不支持；它不能被计入完整 Tool / 产物旅程通过。协议兼容、真实模型使用和故障恢复分别记录，见[能力与证据](/zh-CN/concepts/capabilities-and-evidence)。
+

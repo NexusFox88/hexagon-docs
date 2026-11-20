@@ -1,0 +1,91 @@
+---
+title: "Applications 与 OAuth HTTP 契约"
+---
+
+六个管理路由均要求 owner 认证和租户归属。OAuth 同意与单次操作审批不同；授权 flow 不是 Run，取消它不会撤销已有 Provider 账户或撤回外部操作。示例使用 owner Token 和不带 `/v1` 的 API origin。
+
+## 应用目录
+
+`GET /v1/applications` 返回 **200**、`{applications,oauth_clients}`。应用项包含 id/name/category、credential_url、oauth 支持布尔值、credential_fields、verification_may_charge、evidence 和 operations。操作项包含 name、description、write、input_schema、required_scopes。Evidence 表示声明的实现/验证范围，不是你的账户实时就绪状态。
+
+OAuth_clients 包含 provider、client_id、redirect_uri、updated_at，不包含 client_secret，无分页契约。
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" "$HEXAGON_API_URL/v1/applications"
+```
+
+## 配置 OAuth 客户端
+
+`PUT /v1/applications/{provider}/oauth-client` 接受严格 client_id（1–2000 字符）、client_secret（1–32,768 字符）、redirect_uri。Redirect 路径必须恰为 `/oauth/callback`，不含用户名、密码、query、fragment；要求 HTTPS，但允许 HTTP loopback 主机 127.0.0.1、localhost、[::1]。必须与 Provider 注册的回调一致。
+
+将真实值保存在私有 oauth-client.json，不放入 shell 历史：
+
+```sh
+curl --fail-with-body --silent --show-error --request PUT \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data-binary @oauth-client.json \
+  "$HEXAGON_API_URL/v1/applications/$HEXAGON_PROVIDER/oauth-client"
+```
+
+成功 **200** 返回 `{configured:true,provider,client_id,redirect_uri}`。配置插入或替换租户/Provider 客户端，加密保存 Secret，不完成用户同意。不支持的 Provider 返回 `400 app_oauth_unsupported`，严格输入无效为 `400 invalid_request`。配置变化会使进行中 flow 的 client_updated_at 检查不匹配；client ID 变化可能要求已有授权重新认证。重复配置不是保留 flow 的无副作用操作。
+
+## 发起同意流程
+
+`POST /v1/connections/{id}/authorize` 无必需请求体，返回 **200**、`{id,authorization_url,expires_in:600}`。保存 flow ID，再由目标用户打开 URL；其中含 state，应私有处理。创建 flow 不会自动代替用户同意。
+
+```sh
+umask 077
+curl --fail-with-body --silent --show-error --request POST \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" --output oauth-flow.json \
+  "$HEXAGON_API_URL/v1/connections/$HEXAGON_CONNECTION_ID/authorize"
+```
+
+先确认 curl 成功再读取保存的 JSON。目标必须是未删除的 Tool 连接、支持 OAuth 的应用，并已配置客户端。不存在/其他租户/非 Tool 返回 `404 connection_not_found`；不支持 OAuth 为 400；未配置为 `409 app_oauth_setup_required`。
+
+新 flow 会取消同一连接已有 pending flows，没有幂等键；自动重试 POST 可能使已经展示给用户的 URL 失效。Flow 固定连接版本与客户端 updated_at，保存随机 state 摘要和加密 verifier，在 Provider 定义支持时使用 PKCE。请求 scope 来自已选择的应用操作/配置。
+
+## 查询或取消 flow
+
+`GET /v1/authorization-flows/{id}` 返回 **200**、`{id,connection_id,status,error_code,expires_at}`。状态包括 pending/completed/failed/cancelled/expired。超过截止时间的 pending 在读取时显示 expired，此投影本身不持久化过期转换。未知或其他租户 flow 返回 `404 app_oauth_flow_not_found`。
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/authorization-flows/$HEXAGON_FLOW_ID"
+```
+
+同路径 DELETE 返回 **200** 和 flow 对象，不是 204。它将保存的 pending 改为 cancelled，其他状态不改变；重复取消存在的 flow 可接受，不存在仍为 404。
+
+```sh
+curl --fail-with-body --silent --show-error --request DELETE \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/authorization-flows/$HEXAGON_FLOW_ID"
+```
+
+Provider 回调使用独立 `/oauth/callback`，不要发送 owner Token 或手工重放授权码。回调检查 state、到期、连接版本和客户端配置，兑换 code 并验证账户/scope。成功保存 OAuth 封装、清除 managed Secret 关联、递增连接版本、设为 ready/enabled、完成 flow。与普通连接验证不同，成功回调会显式启用连接。
+
+拒绝同意记录 failed/app_oauth_denied，其他已捕获回调失败记录 failed/app_oauth_failed；无效或复用 state 可返回 `400 app_oauth_state_invalid`。失败兑换也可能将浏览器送回 Console，因此重定向不证明成功，应轮询 flow 并检查连接最终状态。
+
+## 检查连接授权
+
+`GET /v1/connections/{id}/authorization` 返回 **200**，包含 connection_id、authentication、provider_revoked:false、state、refresh_available、可空 expires_at。它读取保存的凭据生命周期，不实时检查 Provider 撤销。连接不存在为 404，非 Tool 为 `400 connection_kind_mismatch`。
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/connections/$HEXAGON_CONNECTION_ID/authorization"
+```
+
+| 状态 | 含义 |
+| --- | --- |
+| disconnected | 没有保存的连接凭据 |
+| manual | 非 OAuth 凭据，连接未标记 invalid |
+| reauthorization_required | 手工凭据 invalid、OAuth 封装不可读、client ID 不匹配、连接 invalid，或 OAuth 已过期且无 refresh |
+| refreshing | 保存的 refresh 尝试处于 started，且不足 40 秒 |
+| refresh_unknown | 其他未解决的已记录 refresh 尝试情况 |
+| oauth | 保存的生命周期允许继续使用/刷新，不一定表示 access token 尚未过期 |
+
+Refresh_available 只说明存有 refresh token，不证明重放安全；状态查询不执行 refresh。未知 refresh 结果不能盲重放可能已轮换的 token，应进入重新授权流程。删除本地 Tool 凭据使用[断开连接](/zh-CN/reference/connections)，明确返回 provider_revoked:false。Flow 取消和断开都不承诺 Provider 侧撤销。
+
+来源：[OAuth 实现](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/apps/oauth.ts)、[应用目录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/apps/registry.ts)、[HTTP 路由](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts)。本轮没有修改 OAuth 客户端、同意、Token 兑换或外部账户。下一步：[应用集成](/zh-CN/integrations/apps)、[HTTP 总览](/zh-CN/reference/http)。

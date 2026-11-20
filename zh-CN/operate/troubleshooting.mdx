@@ -1,0 +1,99 @@
+---
+title: "按症状排查问题"
+---
+
+先保存 Session、Run、操作 ID 和最后事件 cursor，再调查。重试前确认动作是否可能已经生效；不要把所有错误都归因于用户凭据或建议重新创建任务。
+
+## 症状索引
+
+| 症状 | 首先检查 | 下一步与完成信号 |
+| --- | --- | --- |
+| 控制平面启动失败 | doctor、数据库身份 / 端口、私有 service.log | 修复具体前提后同工作区启动；status 与鉴权正常 |
+| 本地 SDK 找不到工作区 | HEXAGON_DATA_DIR、工作目录、descriptor 权限与 loopback | 显式指定正确 data directory；能查询原 Session |
+| 401 / 403 | 哪个服务返回、Token 到期 / 撤销、所需管理权限 | 修复正确身份，不把 owner 凭据交给前端 |
+| 连接无法启用 | 配置修改后是否重新验证、Secret 是否禁用 | validate ready 后单独 enable；不是仅编辑 enabled |
+| Session 预检拒绝 | Harness 版本、模型协议、工具 readiness、OCI / 网络能力 | 修复明确 reason，保持所需策略，不静默放宽 |
+| 创建长期无结果 | 原 resource operation 与 Provider handle | 对账原创建；不因空列表自动新建 |
+| Run 无输出 | 持久状态、等待授权 / 审批、provisioning 阶段 | 执行相应动作；查询原 Run 而非重复 submit |
+| 等待授权 | 必需 Tool 调用与账户授权状态；区分账户授权和单次审批 | 完成目标账户授权，观察原调用恢复或记录明确的终态失败 |
+| 等待审批 | pending 审批、准确 Tool 参数与有权限的决策者 | 显式批准或拒绝该调用；核对已记录决定及调用 / Run 后续状态，不只看弹窗消失 |
+| 模型请求失败 | 所选协议、模型标识、凭据入口和脱敏上游错误 | 定位后修复对应边界；区分传输 / 鉴权错误与协议 / 模型不支持，用安全的后续任务核对预期模型响应 |
+| Tool 写入没有确认结果 | Call ID、业务引用与外部操作记录 | 对账原副作用；即使 Run 失败，也先确认实际结果再决定是否重试 |
+| 流式 UI 停止 | 客户端连接和已保存 cursor、Run 当前状态 | 原 Run 重连并去重，最终结果与查询一致 |
+| 文件上传被拒绝 | 路径、编码 / 大小、是否已提交首个 Run | 未执行前纠正；已启动工作区通过任务修改 |
+| Artifact 列表为空 | Run 状态、产物目录、导出错误 | 核对实际文件与导出，不只相信自然语言回答 |
+| 预览打不开 | 进程 / 端口、grant 过期、Session 状态、origin / TLS | 普通 HTTP 页面可操作，失效授权被拒绝 |
+| 唤醒后文件 / 对话缺失 | 保存目录、Provider 策略、Harness 精确版本 | 文件与对话分别验证，未知 invocation 不重放 |
+| close 卡在 closing | 原删除操作、资源 / 关联端点实际状态 | 核对 Provider 特定的删除完成证据与关联资源，不用 acknowledge 代替 |
+
+## 示例：没有新事件
+
+读取 Run：若 waiting_approval，则查看审批记录与 Tool 调用；用户确认后由有权限身份提交决定。如果 Run 已 completed，则问题可能在游标处理，补读事件并读取 output。如果 Runtime unreachable，记录原绑定与阶段，观察恢复，不另启 Harness。
+
+这三种情况界面都可能“没有新文本”，但操作完全不同。网络连接恢复不代表外部写入已确认，Tool outcome unknown 要进入[对账流程](/zh-CN/operate/reconciliation)。
+
+## 先做一次有界的只读检查
+
+已有 Session / Run ID 时，可使用仓库中的诊断程序。先按[示例准备说明](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/README.zh-CN.md)安装对应 SDK，再从仓库根目录选择一种客户端执行：
+
+```sh
+python examples/documentation/inspect-run.py --session YOUR_SESSION_ID --run YOUR_RUN_ID --after 0 --max-pages 20
+```
+
+```sh
+npm --prefix sdk/typescript run build
+./node_modules/.bin/tsx examples/documentation/inspect-run.ts --session YOUR_SESSION_ID --run YOUR_RUN_ID --after 0 --max-pages 20
+```
+
+将占位 ID 替换为原任务标识。这两个 CLI 使用本地工作区发现，不是 hosted Token 配置示例。程序先核对 Run 属于指定 Session，再读取状态、有限事件页和产物元数据；不会提交、取消、批准或关闭任务。输出仍含私有资源 ID，按本地诊断记录保管。
+
+- `run_state` 与 `error_code` 帮助选择症状分支；无 error_code 不代表所有依赖健康。
+- `event_type_counts` 只是本次读取范围内的计数，不能当作全部历史统计。
+- `reached_empty_event_page` 不代表任务完成；`last_observed_cursor` 不是应用已处理事件的持久检查点。
+- 查询不是原子快照，过程中状态可能变化。不要因几次字段不一致就重建任务，应按同一标识继续核对。
+
+## 真实记录：凭据入口停止后的恢复
+
+[2026-11-18 自动凭据入口验收](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-18-automatic-credential-ingress.md)记录了一个真实云场景：控制平面仍在运行，但受保护模型请求使用的凭据入口被有意停止。它证明“API 能访问”与“Sandbox 能完成受保护上游调用”是两条不同链路。
+
+| 环节 | 该历史记录中的观察与处理 |
+| --- | --- |
+| 故障触发 | Python 路径在创建 Session 前停止入口；TypeScript 路径在创建后、提交 Run 前停止入口 |
+| 定位 | 检查专用凭据入口 readiness，而不是先更换模型或 Provider key |
+| 恢复 | Python 的 create_session 路径与 TypeScript 的 worker 执行路径分别触发平台管理入口恢复，不依赖手工网络设置 |
+| 执行确认 | Vercel / Pi / SiliconFlow 的两次任务分别返回预期的 Python 与 TypeScript 标记 |
+| 清理确认 | 两个 Session 均关闭，Provider 删除操作完成，测试 application Token 撤销 |
+| 范围限制 | 这是该日期、组合与部署策略的历史证据，不证明所有网络错误都能自动恢复 |
+
+同一记录还保留了一次实现问题：恢复保护条件曾把空闲 Runtime 也当成必须阻止替换入口的活动任务，后续缩小到已持久化的非终态 invocation；没有删除原任务资源来绕过保护。排查时应区分保护条件误判与真实活动调用，不能通过杀掉原任务来制造“恢复成功”。
+
+如果当前出现 `credential_ingress_recovery_blocked`，先查看是否仍有需要原入口的持久活动 invocation。对显式禁用或外部 / hosted 入口，平台遵循部署策略，不会擅自打开开发隧道。按[网络入口指南](/zh-CN/operate/networking)处理对应部署，并以原任务状态、实际调用结果与清理为完成信号。
+
+## 把症状定位到负责的层
+
+| 观察 | 主要调查对象 | 避免的错误推断 |
+| --- | --- | --- |
+| 本地发现失败，尚未发 HTTP 请求 | SDK、目录与本地身份 | 直接判定模型或云账户坏了 |
+| 请求已接受，Run 长时间 queued | worker 就绪与调度 | 把 API 200 当作已开始执行 |
+| provisioning 与资源 unknown | Provider 操作、原句柄与对账 | 把超时当作没有分配资源 |
+| Runtime unreachable / interrupted | 原 Runtime 绑定与 invocation | 通过再启动 Harness 重放不确定任务 |
+| Harness 退出或输出无效 | Harness 版本、invocation 退出 / 错误及 adapter 事件契约 | Runtime 可达就代表 Harness 执行成功 |
+| 模型传输成功但响应被拒绝 | 精确模型协议、脱敏响应错误与所选模型 | HTTP 可达就代表协议兼容 |
+| waiting_authorization / waiting_approval | Tool 调用、账户授权或具体审批 | 把等待当作模型失去响应 |
+| Run completed 但界面不更新 | 客户端游标与结果读取 | 再提交一个任务补齐 UI |
+| 预览失败而产物可下载 | 服务进程、端口与预览授权 | 把预览存活和产物持久性混为一谈 |
+
+## 收集可用问题报告
+
+包含代码 / SDK 版本、Provider 与 Harness 版本、模型协议、发生阶段、脱敏错误、复现步骤、预期与实际结果、相关证据路径、资源是否已清理。私有资源 ID 留在本地便于后续清理，公开报告使用脱敏引用。不要粘贴 owner Token、数据库连接密码、预览 ticket、原始 header 或供应商响应体。
+
+有历史失败但后来成功时，分别说明每次尝试；不要删除失败记录让结果看似全部通过。模拟复现与真实云复现也分别标明。
+
+## 对应操作手册
+
+- [身份与 Token](/zh-CN/operate/access-control)、[凭据轮换](/zh-CN/operate/credentials)
+- [网络入口](/zh-CN/operate/networking)、[观察和诊断](/zh-CN/operate/observability)
+- [应用恢复](/zh-CN/build/recovery)、[资源对账](/zh-CN/operate/reconciliation)
+- [文件上传](/zh-CN/build/project-context)、[产物](/zh-CN/build/artifacts)、[预览](/zh-CN/build/private-preview)
+
+本索引依据当前各操作契约组织，具体错误以原始状态和受控诊断为准。完成排障需观察目标行为恢复并确认资源结果，不能仅以错误提示消失为完成。

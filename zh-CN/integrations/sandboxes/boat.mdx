@@ -1,0 +1,91 @@
+---
+title: "接入 Boat"
+---
+
+Boat 提供文件、命令、私有预览和快照支持的 stop/resume。当前连接器不声明 OCI 或域名 allowlist。执行仍由 Hexagon Runtime 与 Harness 管理，Provider 配额、期限和清理状态单独检查。
+
+## 配置与首次任务
+
+准备目标账户的 API key。config 只有 size，接受 small、default、large，默认 small；不要把其他 Provider 的 medium 值、镜像或 CPU 字段套用进来。实际资源规格和可用额度由账户决定。
+
+以下本地管理客户端示例从私有环境读取 key。hosted 初始化见[自托管](/zh-CN/operate/self-host)。保存创建后的连接 ID，避免重复运行产生额外连接。
+
+```python
+import os
+from hexagon import Hexagon
+client = Hexagon.local()
+connection = client.create_connection(
+    kind="sandbox", provider="boat", name="Boat workspace",
+    credential=os.environ["BOAT_API_KEY"], config={"size": "small"},
+)
+checked = client.validate_connection(connection["id"])
+if checked["status"] != "ready":
+    raise RuntimeError("Inspect Boat connection diagnostics")
+client.update_connection(connection["id"], enabled=True)
+```
+
+```typescript
+import { Hexagon } from '@hexagon/agent-sdk';
+const client = await Hexagon.local();
+const credential = process.env.BOAT_API_KEY;
+if (!credential) throw new Error('Set BOAT_API_KEY');
+const connection = await client.createConnection({
+  kind: 'sandbox', provider: 'boat', name: 'Boat workspace', credential,
+  config: { size: 'small' },
+});
+const checked = await client.validateConnection(connection.id);
+if (checked.status !== 'ready') throw new Error('Inspect Boat connection diagnostics');
+await client.updateConnection(connection.id, { enabled: true });
+```
+
+验证只列举 Sandbox；ready 不证明能够分配、运行或彻底清理。明确启用后，用 connection.id 作为[首个 Session](/zh-CN/start/first-session)的 sandbox_connection_id，配合兼容模型与 Harness。分别执行双 SDK 的实际任务、产物和关闭流程。修改凭据或 size 后重新验证与启用，已有 Session 保留固定配置。
+
+创建启用 snapshots，并设置 noEnv=true，避免继承 Provider 账户环境；恢复同样设置 noEnv。Provider API key 留在控制平面。用户主动配置的 Agent 环境仍可被任务代码读取，不能把 noEnv 理解成所有变量都不可见。
+
+## 执行与文件限制
+
+当前连接器的前台命令期限为 1—590 秒，后台命令为 1—3600 秒，默认 60 秒。这是连接器命令限制，不等于整个 Run 的最长时长。后台启动返回 pid 后仍需检查 Runtime 或应用健康；输出截断会失败，不把不完整结果当成功。
+
+单次文件写入最多 5 MiB，并核对 Provider 返回的字节数。读取对 base64 字符串设置 7 MiB 上限并核对解码后的长度；不要把编码长度直接当原始文件大小。更上层 API 或产物还有独立约束。先以小文件核对字节完整性，大交付物按实际支持范围设计。
+
+## 私有预览
+
+通过[Hexagon 私有预览](/zh-CN/build/private-preview)访问任务服务。连接器以 public=false 建立端口入口，提取 Provider 返回的私有 token，在控制平面转换为 `_port_auth` Cookie；不会把含 token 的 URL 直接交给浏览器。
+
+应用需监听正确端口。预览失败时分开检查用户进程、Provider 入口、Cookie 和平台授权；不改成公开端口绕过检查。预览是开发访问，不是正式网站部署。
+
+## 快照、TTL 与恢复
+
+stop 保留用于恢复的快照，下一轮向同一 Session submit 自动 resume，刷新运行 TTL。受管理文件与对话可延续，进程内存、打开的连接和服务存活不保证。Provider archived 映射为 paused，ready/idle/running 规范化为 running，不能由这些映射推断精确计费状态。
+
+运行 TTL 与最终删除不同：到期停止计算可能仍保留快照。控制平面承担持久期限和清理，停止本地服务不能证明远程已释放。历史试用账户曾受并发和 TTL 限制；当前账户额度需实际核对，不能把历史数量作为普遍承诺。
+
+按[空闲与唤醒](/zh-CN/build/idle-and-wake)验证第一轮写文件、第二轮读取与对话继续，并单独检查预览服务。不要由单轮成功推断完整恢复。
+
+## 验证账户环境隔离
+
+在专用测试账户中配置一个无敏感内容的账户级标记 `HEXAGON_BOAT_ACCOUNT_PROBE`，不要使用真实 secret，也不要把该标记配置到 Agent 环境。第一轮要求 Harness 执行存在性检查，只输出 `present` 或 `absent`，不得打印环境变量值。预期结果为 `absent`。同一 Session 确认 stop/resume 后再检查一次。如果出现 `present`，停止练习，检查账户设置与 create/resume 请求中的 `noEnv`，再考虑运行敏感任务。这只核对一个指定标记，不代表审计了所有 guest 凭据。连接器在两个请求中均设置 `noEnv: true`，但源码核对本身不能证明 Provider 实际执行了隔离。本页未新增执行这项练习。
+
+## 异步删除必须等到确认
+
+Boat 的最终删除有独立 operation 回执。平台保存 deletion operation ID，轮询该操作，确认 targetId 匹配原 Sandbox，status=completed 后再确认资源不存在；blocked 和超时都不能标记清理成功。
+
+**如果删除回执丢失，仅查不到 Sandbox 也不足以证明 purge 完成。** 保留 unknown 和原资源标识，按[清理对账](/zh-CN/operate/reconciliation)继续调查，不能用再次创建或删除其他对象消除不确定性。平台不把 stop、快照或删除请求已受理当作 Session 清理完成。
+
+例如，已保存的删除 operation 仍 pending，但 Sandbox 查询返回 404，应保留清理未决状态并继续观察该 operation。如果它报告 completed，但 target 是另一个资源，应按目标不匹配处理。只有原目标的 operation completed，加上确认资源不存在，才能判定完成。私有恢复记录分别保留 Session ID、Sandbox ID、平台 operation ID 和 Provider 删除回执；它们标识的是不同对象。
+
+创建使用原 operation ID 作为 Idempotency-Key，精确名称和 label 用于分页对账。相似名称或不完整列表不能作为资源归属依据。
+
+| 症状 | 排查方向 |
+| --- | --- |
+| boat_http_401 / 403 | API key、账户权限 |
+| 分配或并发失败 | size、当前额度、保留的旧资源；不要循环创建 |
+| boat_command_output_truncated | 使用文件输出并核验完整性 |
+| boat_command_completion_unknown | 原命令状态，不重复有副作用命令 |
+| boat_file_exceeds_5_mib | 写入字节限制和上层约束 |
+| boat_deletion_blocked | 原删除 operation 阻塞原因与原资源 |
+| boat_deletion_operation_missing | 缺失回执，保留未知结果 |
+
+本页是配置与实现核对，未重新执行云任务。历史旅程见[扩展矩阵](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-expanded-harness-matrix.md)，恢复范围见[serverless 矩阵](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-harness-serverless-matrix.json)。成功条件须包含实际任务、双 SDK、所需恢复及最终删除确认。
+
+依据：[Boat 连接器](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/sandboxes/boat.ts)。下一步：[清理对账](/zh-CN/operate/reconciliation)、[容量与成本](/zh-CN/operate/capacity-and-cost)、[已验证组合](/zh-CN/integrations/verified-combinations)。

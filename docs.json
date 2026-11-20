@@ -1,0 +1,348 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Hexagon",
+  "colors": {
+    "primary": "#171717",
+    "light": "#FAFAFA",
+    "dark": "#171717"
+  },
+  "favicon": "/favicon.svg",
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "navigation": {
+    "languages": [
+      {
+        "language": "en",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "en/index",
+              "en/directory",
+              "en/agents"
+            ]
+          },
+          {
+            "group": "Continue getting started",
+            "pages": [
+              "en/start/overview",
+              "en/start/use-cases",
+              "en/start/install",
+              "en/start/first-session",
+              "en/start/what-happened",
+              "en/start/project-task"
+            ]
+          },
+          {
+            "group": "Build your application",
+            "pages": [
+              "en/build/backend-integration",
+              "en/build/project-context",
+              "en/build/multi-turn",
+              "en/build/stream-events",
+              "en/build/artifacts",
+              "en/build/private-preview",
+              "en/build/tools",
+              "en/build/tool-authorization",
+              "en/build/approvals",
+              "en/build/idle-and-wake",
+              "en/build/recovery",
+              "en/build/agent-templates",
+              "en/build/connection-lifecycle",
+              "en/build/sandbox-policy"
+            ]
+          },
+          {
+            "group": "Concepts",
+            "pages": [
+              "en/concepts/sessions-runs-agents",
+              "en/concepts/execution-architecture",
+              "en/concepts/initialization",
+              "en/concepts/events-and-recovery",
+              "en/concepts/persistence",
+              "en/concepts/security-boundaries",
+              "en/concepts/capabilities-and-evidence",
+              "en/concepts/serverless-lifecycle"
+            ]
+          },
+          {
+            "group": "Deploy and operate",
+            "pages": [
+              "en/operate/local-workspace",
+              "en/operate/self-host",
+              "en/operate/networking",
+              "en/operate/access-control",
+              "en/operate/credentials",
+              "en/operate/observability",
+              "en/operate/reconciliation",
+              "en/operate/upgrades",
+              "en/operate/backup-restore",
+              "en/operate/capacity-and-cost",
+              "en/operate/troubleshooting"
+            ]
+          },
+          {
+            "group": "Connections and compatibility",
+            "pages": [
+              "en/integrations/choose",
+              "en/integrations/models",
+              "en/integrations/model-protocols",
+              "en/integrations/harnesses",
+              "en/integrations/harnesses/oci",
+              "en/integrations/harnesses/source-package",
+              "en/integrations/sandboxes",
+              "en/integrations/sandboxes/e2b",
+              "en/integrations/sandboxes/modal",
+              "en/integrations/sandboxes/blaxel",
+              "en/integrations/sandboxes/fly-sprites",
+              "en/integrations/sandboxes/upstash-box",
+              "en/integrations/sandboxes/vercel",
+              "en/integrations/sandboxes/agent37",
+              "en/integrations/sandboxes/boat",
+              "en/integrations/sandboxes/freestyle",
+              "en/integrations/sandboxes/fly-machines",
+              "en/integrations/sandboxes/instabox",
+              "en/integrations/http-tools",
+              "en/integrations/mcp",
+              "en/integrations/verified-combinations",
+              "en/integrations/apps"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "en/reference/http",
+              "en/reference/events-and-states",
+              "en/reference/typescript",
+              "en/reference/python",
+              "en/reference/configuration",
+              "en/reference/errors",
+              "en/reference/limits",
+              "en/reference/glossary",
+              "en/reference/cli"
+            ]
+          },
+          {
+            "group": "Contribute",
+            "pages": [
+              "en/contribute/codebase",
+              "en/contribute/documentation",
+              "en/contribute/proposals-and-prs",
+              "en/contribute/development",
+              "en/contribute/testing",
+              "en/contribute/sandbox-connectors",
+              "en/contribute/harness-adapters",
+              "en/contribute/tool-connectors",
+              "en/changelog"
+            ]
+          },
+          {
+            "group": "More",
+            "pages": [
+              "en/reference/agents",
+              "en/reference/approvals-tools",
+              "en/reference/artifacts-previews",
+              "en/reference/connections",
+              "en/reference/deployment",
+              "en/reference/harness-registration",
+              "en/reference/monitoring",
+              "en/reference/oauth",
+              "en/reference/resource-operations",
+              "en/reference/runs",
+              "en/reference/secrets",
+              "en/reference/session-access",
+              "en/reference/sessions",
+              "en/reference/tokens"
+            ]
+          }
+        ]
+      },
+      {
+        "language": "cn",
+        "groups": [
+          {
+            "group": "概览",
+            "pages": [
+              "zh-CN/index",
+              "zh-CN/directory",
+              "zh-CN/agents"
+            ]
+          },
+          {
+            "group": "开始使用",
+            "pages": [
+              "zh-CN/start/overview",
+              "zh-CN/start/use-cases",
+              "zh-CN/start/install",
+              "zh-CN/start/first-session",
+              "zh-CN/start/what-happened",
+              "zh-CN/start/project-task"
+            ]
+          },
+          {
+            "group": "构建应用",
+            "pages": [
+              "zh-CN/build/backend-integration",
+              "zh-CN/build/project-context",
+              "zh-CN/build/multi-turn",
+              "zh-CN/build/stream-events",
+              "zh-CN/build/artifacts",
+              "zh-CN/build/private-preview",
+              "zh-CN/build/tools",
+              "zh-CN/build/tool-authorization",
+              "zh-CN/build/approvals",
+              "zh-CN/build/idle-and-wake",
+              "zh-CN/build/recovery",
+              "zh-CN/build/agent-templates",
+              "zh-CN/build/connection-lifecycle",
+              "zh-CN/build/sandbox-policy"
+            ]
+          },
+          {
+            "group": "概念",
+            "pages": [
+              "zh-CN/concepts/sessions-runs-agents",
+              "zh-CN/concepts/execution-architecture",
+              "zh-CN/concepts/initialization",
+              "zh-CN/concepts/events-and-recovery",
+              "zh-CN/concepts/persistence",
+              "zh-CN/concepts/security-boundaries",
+              "zh-CN/concepts/capabilities-and-evidence",
+              "zh-CN/concepts/serverless-lifecycle"
+            ]
+          },
+          {
+            "group": "部署与运维",
+            "pages": [
+              "zh-CN/operate/local-workspace",
+              "zh-CN/operate/self-host",
+              "zh-CN/operate/networking",
+              "zh-CN/operate/access-control",
+              "zh-CN/operate/credentials",
+              "zh-CN/operate/observability",
+              "zh-CN/operate/reconciliation",
+              "zh-CN/operate/upgrades",
+              "zh-CN/operate/backup-restore",
+              "zh-CN/operate/capacity-and-cost",
+              "zh-CN/operate/troubleshooting"
+            ]
+          },
+          {
+            "group": "连接与兼容性",
+            "pages": [
+              "zh-CN/integrations/choose",
+              "zh-CN/integrations/models",
+              "zh-CN/integrations/model-protocols",
+              "zh-CN/integrations/harnesses",
+              "zh-CN/integrations/harnesses/oci",
+              "zh-CN/integrations/harnesses/source-package",
+              "zh-CN/integrations/sandboxes",
+              "zh-CN/integrations/sandboxes/e2b",
+              "zh-CN/integrations/sandboxes/modal",
+              "zh-CN/integrations/sandboxes/blaxel",
+              "zh-CN/integrations/sandboxes/fly-sprites",
+              "zh-CN/integrations/sandboxes/upstash-box",
+              "zh-CN/integrations/sandboxes/vercel",
+              "zh-CN/integrations/sandboxes/agent37",
+              "zh-CN/integrations/sandboxes/boat",
+              "zh-CN/integrations/sandboxes/freestyle",
+              "zh-CN/integrations/sandboxes/fly-machines",
+              "zh-CN/integrations/sandboxes/instabox",
+              "zh-CN/integrations/http-tools",
+              "zh-CN/integrations/mcp",
+              "zh-CN/integrations/verified-combinations",
+              "zh-CN/integrations/apps"
+            ]
+          },
+          {
+            "group": "参考",
+            "pages": [
+              "zh-CN/reference/http",
+              "zh-CN/reference/events-and-states",
+              "zh-CN/reference/typescript",
+              "zh-CN/reference/python",
+              "zh-CN/reference/configuration",
+              "zh-CN/reference/errors",
+              "zh-CN/reference/limits",
+              "zh-CN/reference/glossary",
+              "zh-CN/reference/cli"
+            ]
+          },
+          {
+            "group": "贡献",
+            "pages": [
+              "zh-CN/contribute/codebase",
+              "zh-CN/contribute/documentation",
+              "zh-CN/contribute/proposals-and-prs",
+              "zh-CN/contribute/development",
+              "zh-CN/contribute/testing",
+              "zh-CN/contribute/sandbox-connectors",
+              "zh-CN/contribute/harness-adapters",
+              "zh-CN/contribute/tool-connectors",
+              "zh-CN/changelog"
+            ]
+          },
+          {
+            "group": "更多",
+            "pages": [
+              "zh-CN/reference/agents",
+              "zh-CN/reference/approvals-tools",
+              "zh-CN/reference/artifacts-previews",
+              "zh-CN/reference/connections",
+              "zh-CN/reference/deployment",
+              "zh-CN/reference/harness-registration",
+              "zh-CN/reference/monitoring",
+              "zh-CN/reference/oauth",
+              "zh-CN/reference/resource-operations",
+              "zh-CN/reference/runs",
+              "zh-CN/reference/secrets",
+              "zh-CN/reference/session-access",
+              "zh-CN/reference/sessions",
+              "zh-CN/reference/tokens"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "GitHub",
+        "href": "https://github.com/NexusFox88/Hexagon"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "[ Hexagon -> ]",
+      "href": "https://hexagon.autos"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/NexusFox88/Hexagon"
+    }
+  },
+  "seo": {
+    "metatags": {
+      "canonical": "https://docs.hexagon.autos"
+    }
+  },
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/en/index"
+    },
+    {
+      "source": "/quickstart",
+      "destination": "/en/start/first-session"
+    },
+    {
+      "source": "/index",
+      "destination": "/en/index"
+    }
+  ]
+}

@@ -1,0 +1,116 @@
+---
+title: "Agent template HTTP contract"
+---
+
+Agents are optional reusable configuration templates. A revision does not rewrite already-created Sessions. Use direct Session creation when no saved template is needed. All operations are tenant-scoped; application tokens may list, read, create and preflight Agents, while revise/archive/copy require an owner.
+
+## Definition schema
+
+Create accepts a strict Agent definition. Revise and preflight embed that same schema under `definition`.
+
+| Field | Requirement / default |
+| --- | --- |
+| `name` | Required string, 1–200 characters |
+| `harness` | Required strict `{id:string,version:string}`, exact registered pair |
+| `identity`, `instructions`, `context` | Optional initialization fields; constraints in [Session reference](/en/reference/sessions) |
+| `variables`, `env` | Environment maps with the same restrictions as Sessions; variables preferred; nonempty env plus variables rejected |
+| `resources` | Default idle_timeout_seconds=60 and timeout_seconds=600; integer ranges 15–3600 and 60–3600 |
+| `network` | Default `{mode:"unrestricted",allowed_hosts:[]}`; alternate mode allowlist |
+| `required_capabilities` | String array, default `[]` |
+| `tools` | Array of strict `{name,required_at_start}`; name matches `^[a-z][a-z0-9_]*$`, required_at_start defaults true; array defaults empty |
+| `bindings` | Optional strict object: required Sandbox/model connection UUIDs, optional tools/connections UUID maps defaulting to `{}` |
+
+Tool names must be unique. Harness must support requested initialization/Tools. Saved binding IDs are checked for tenant ownership and appropriate kinds; configuration validity is not a live execution receipt. Optional-at-start Tools still require their bindings when creating a Session. Agent tools are declarations in an array, whereas Session tools are name-to-connection mappings.
+
+## Create, list and read
+
+`POST /v1/agents` returns **201** with `id`, `name`, `definition`, `env_names`, `revision`, `archived_at`, `created_at`, `updated_at`. Environment values are saved separately and not returned in definition. The initial revision is also recorded in revision history.
+
+Save this minimal definition as `agent-definition.json`. It intentionally omits connection defaults:
+
+```json
+{"name":"Project reviewer","harness":{"id":"pi","version":"1.5.2"},"instructions":"Report actual tests and explain limitations."}
+```
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data-binary @agent-definition.json "$HEXAGON_API_URL/v1/agents"
+```
+
+`GET /v1/agents` returns **200**, `{agents:[...]}`, ordered by creation time ascending, including archived templates, without pagination. Entries have the creation response fields. `GET /v1/agents/{id}` returns **200**, the same fields plus `revisions`, ordered by revision descending. Each historical entry contains revision, name, definition, env_names and created_at. Missing/foreign Agent returns `404 agent_not_found`.
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" "$HEXAGON_API_URL/v1/agents"
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" "$HEXAGON_API_URL/v1/agents/$HEXAGON_AGENT_ID"
+```
+
+These examples assume the API origin without `/v1` and a suitable backend token. Creation has no idempotency key; repeated requests create separate templates. Inspect the list after a lost response before creating another.
+
+## Preflight an unsaved definition
+
+`POST /v1/agents/preflight` accepts strict `{definition,bindings}`. The top-level bindings object requires sandbox_connection_id and model_connection_id UUIDs, with tools/connections maps defaulting to empty. It evaluates the definition using those explicit bindings; do not assume any definition.bindings automatically supplies them.
+
+Save as `agent-preflight.json`, replacing both placeholder connection IDs:
+
+```json
+{
+  "definition":{"name":"Project reviewer","harness":{"id":"pi","version":"1.5.2"}},
+  "bindings":{"sandbox_connection_id":"00000000-0000-4000-8000-000000000001","model_connection_id":"00000000-0000-4000-8000-000000000002"}
+}
+```
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data-binary @agent-preflight.json "$HEXAGON_API_URL/v1/agents/preflight"
+```
+
+Success is **200** with the Session preflight readiness/combination/lifecycle/connection-boundary object. No Agent or Session is inserted. This invokes credential-ingress readiness and local compatibility checks, not a cloud task. See [Session preflight](/en/reference/sessions) for scope and errors.
+
+## Revise with optimistic concurrency
+
+`PUT /v1/agents/{id}` accepts strict `{expected_revision:positive_integer,definition:AgentDefinition}`. Supply the latest observed revision and a complete replacement definition. This is not a field-wise PATCH. Omitted non-environment fields receive schema defaults rather than inheriting the previous definition.
+
+Environment is the exception: omitting both variables and env preserves the old values; supplying either replaces the entire map; an explicit empty map clears it. The response reveals only names. Save the complete intended update as `agent-revision.json`:
+
+```json
+{"expected_revision":1,"definition":{"name":"Project reviewer","harness":{"id":"pi","version":"1.5.2"},"instructions":"Explain each change and its actual verification."}}
+```
+
+```sh
+curl --fail-with-body --silent --show-error --request PUT \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data-binary @agent-revision.json "$HEXAGON_API_URL/v1/agents/$HEXAGON_AGENT_ID"
+```
+
+Replace revision 1 with your observed value. Success returns **200** with the new Agent projection, increments revision and stores history. A revision mismatch returns `409 agent_revision_changed`; re-read and reconcile instead of blindly changing expected_revision. A lost successful response can cause that conflict on retry. Archived templates return `409 agent_archived`. Existing Sessions retain their pinned revision and effective environment.
+
+## Copy a template
+
+`POST /v1/agents/{id}/copy` accepts strict `{name:string}` of length 1–200. Success returns **201**, a newly created Agent object with its own initial history. It copies the current source definition and decrypted effective environment into the new Agent; it does not return plaintext environment values. The new name replaces the source name. Current implementation permits copying an archived source, subject to current definition/binding validation.
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data '{"name":"Project reviewer experiment"}' \
+  "$HEXAGON_API_URL/v1/agents/$HEXAGON_AGENT_ID/copy"
+```
+
+Copy is not an empty configuration or an independent external account. It can retain connection IDs and sensitive environment defaults. Review those bindings before using the copy. It has no request deduplication guarantee.
+
+## Archive a template
+
+`POST /v1/agents/{id}/archive` takes no required body and returns **200**, `{id,revision,archived_at}`. Repetition preserves the first archive timestamp; it does not increment revision. No unarchive or hard-delete endpoint is defined here.
+
+```sh
+curl --fail-with-body --silent --show-error --request POST \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/agents/$HEXAGON_AGENT_ID/archive"
+```
+
+Archived templates remain readable, cannot be revised or used to create new Sessions (including by selecting an older revision), and do not close their existing Sessions. Closing those resources remains a separate lifecycle action.
+
+Malformed strict input returns `400 invalid_request`; missing/foreign templates return `404 agent_not_found`. Validation may fail before template lookup, so clients must inspect the actual error code. Other compatibility, environment, initialization and binding failures follow the shared definition/Session rules. Sources: [Agent schemas and operations](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts), [routes and role checks](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts). These are source-reviewed contracts, not fresh HTTP/database acceptance. Next: [template workflow](/en/build/agent-templates), [HTTP overview](/en/reference/http).

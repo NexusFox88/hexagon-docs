@@ -1,0 +1,64 @@
+---
+title: "Choose a Sandbox Provider"
+---
+
+A Sandbox supplies the cloud execution environment; a Harness runs Agent tasks inside it. Local and hosted describe the control plane location. Both can use these cloud providers. Select required capabilities first, then check evidence for the exact Harness, model protocol, and SDK combination.
+
+## Registered capabilities
+
+Every target below declares files, commands, and private preview. “No” means the current Hexagon connector does not expose that capability; it does not describe all vendor products. This table follows the registry and connectors, not live acceptance results.
+
+| Provider | API provider | Domain allowlist | OCI | Idle strategy |
+| --- | --- | --- | --- | --- |
+| [E2B](/en/integrations/sandboxes/e2b) | `e2b` | Yes | Public image build | pause / connect |
+| [Modal](/en/integrations/sandboxes/modal) | `modal` | Yes | Public and private | snapshot / recreate |
+| [Blaxel](/en/integrations/sandboxes/blaxel) | `blaxel` | No | No | automatic standby |
+| [Fly Sprites](/en/integrations/sandboxes/fly-sprites) | `sprites` | No | No | automatic standby |
+| [Upstash Box](/en/integrations/sandboxes/upstash-box) | `upstash` | No | No | persistent pause / resume |
+| [Vercel Sandbox](/en/integrations/sandboxes/vercel) | `vercel` | No | No | persistent stop / resume |
+| [Agent37](/en/integrations/sandboxes/agent37) | `agent37` | No | No | stop / start |
+| [Boat](/en/integrations/sandboxes/boat) | `boat` | No | No | snapshot stop / resume |
+| [Freestyle VMs](/en/integrations/sandboxes/freestyle) | `freestyle` | No | No | VM pause / start |
+| [Fly Machines](/en/integrations/sandboxes/fly-machines) | `fly-machines` | No | Public | suspend / start |
+| [Instabox](/en/integrations/sandboxes/instabox) | `instabox` | No | No | suspend / resume |
+
+## Interpret the conditions
+
+- **Networking:** only E2B and Modal declare network_allowlist. Unsupported restrictions fail before allocation instead of silently allowing open networking. Account for the actual credential ingress, model, and Tool request paths.
+- **OCI:** Modal supports native OCI including private images; Fly Machines uses public images; E2B prepares public images in a Session-owned Template. Resolution, build, and executable Harness compatibility are separate checks. See [OCI integration](/en/integrations/harnesses/oci).
+- **Pause:** E2B, Freestyle, and Instabox use memory-preserving strategies. Filesystem strategies do not guarantee arbitrary process or memory continuity. Fly Machines allows cold-boot fallback. Modal snapshot/recreate changes the cloud resource ID while preserving Session identity.
+- **Automatic standby:** Blaxel and Sprites control standby timing. It is not confirmed explicit suspension by Hexagon. Unobservable compute or billing state is unknown, not inferred from an idle timer.
+- **Deletion:** pause, stop, and snapshots are not cleanup. Closing must reconcile compute, associated endpoints, and image-preparation resources as applicable.
+
+Fly Sprites and Fly Machines have different APIs and lifecycles; their configuration is not interchangeable. Daytona is absent from the current public registry. A historical prototype is not support for new connections.
+
+## Configure and validate
+
+1. Select a provider in Console Sandbox configuration, or create a kind=sandbox connection with management-client create_connection / createConnection. Read that provider's schema and setup_url; do not reuse another provider's fields.
+2. Submit the provider credential as the connection credential, retained in the control plane. Do not put it in Agent environment, project files, or frontend code.
+3. Validate, then explicitly enable. Validation scope varies by provider; listing resources does not establish every allocation, image-build, or deletion permission.
+4. Preflight with a compatible Harness/model, then verify a real task, files, required preview, and cleanup. Start with [E2B](/en/integrations/sandboxes/e2b) or the [first Session](/en/start/first-session).
+5. Independently verify next-turn auto-wake, retained files, and conversation when using idle transitions. Single-turn success is insufficient.
+
+Template, image, region, CPU, and memory fields depend on the provider schema. Session timeout/idle settings are not a universal machine specification. Editing a connection invalidates validation and disables it; existing Sessions retain pinned configuration. See [connection changes](/en/build/connection-lifecycle).
+
+## Evidence and diagnostics
+
+Inspect dates, SDKs, Harness versions, model protocols, and branches in the [execution matrix](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/execution-matrix.md) and [Harness serverless ledger](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-harness-serverless-matrix.json). Historical success does not cover every current combination or prove current account quota. This page is source-reviewed; no new cloud verification was performed.
+
+Locate failures in authentication, quota, image preparation, allocation, Runtime, model, preview, or cleanup. Preserve the original operation and resource records after a lost create response; allocating another resource does not establish what happened to the first.
+
+Sources: [registry](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/sandboxes/registry.ts), [lifecycle strategies](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/serverless-sessions.md). Next: [choose a combination](/en/integrations/choose), [network policy](/en/build/sandbox-policy), [reconciliation](/en/operate/reconciliation).
+
+## Capability labels and evidence are separate
+
+| Label | How to read this page |
+| --- | --- |
+| Supported | The current connector declares the named interface, such as files/commands/preview for all eleven entries. Verify live permissions and the required scenario separately. |
+| Conditional | The interface has stated distribution or lifecycle conditions: for example, E2B public OCI preparation, or filesystem recovery without process-memory promises. |
+| Unsupported | The current connector lacks the requested interface, shown as “No” above; do not infer a different vendor product is also incapable. |
+| Unknown | Evidence cannot establish the requested live behavior, account condition or billing state. Do not turn this into “supported” because another capability passed. |
+
+The “Yes” allowlist cells describe connector support, not a universal hostname/bypass guarantee. OCI cells carry image-distribution conditions. The idle column names the strategy; it is not a cleanup status or proof of memory retention. Use [verified combinations](/en/integrations/verified-combinations) for execution and recovery records, and [Sandbox provider contracts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/sandbox-providers.md) for configuration and lifecycle details.
+
+Editorial source: the eleven rows and capability flags were compared with the exported `sandboxConnections` registry; strategy descriptions additionally use the lifecycle contract. Registry `evidence` tags remain declarations, not independent proof of each table cell's real journey. A registry or connector change requires rechecking this table and the affected provider page.

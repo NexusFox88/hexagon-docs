@@ -1,0 +1,59 @@
+---
+title: "选择执行组合"
+---
+
+从任务需要的能力选择 Sandbox、Harness、模型协议和 Tools，再用预检检查结构兼容，最后用真实旅程验证。不要先按 Logo 随意组合，再把失败当作网络问题。
+
+## 选择顺序
+
+1. 明确任务：是否需要工具、对话继续、文件、预览、网络限制或休眠恢复。
+2. 选择 Harness 的准确 id/version，确认工具、初始化和模型协议支持。
+3. 确认你的模型端点提供所需协议及目标模型，配置并验证连接。
+4. 选择能运行该 Harness 的 Sandbox；OCI、私有镜像、网络 allowlist 都有独立能力要求。
+5. 绑定获准 Tools，明确必需 / 可选与审批策略。
+6. 预检后创建 Session，执行任务、结果和清理验证。
+
+可从 `client.catalog()` 读取当前注册项；Python 与 TypeScript 方法同名，TypeScript 需 await。目录是能力声明，不是实时账户健康或实云认证。
+
+## 从任务要求开始，不按矩阵总数选型
+
+当前首个 Session 和项目教程已有 Vercel、内置 Pi 1.5.2、已配置 Messages/DeepSeek-V4-Flash 端点的[双 SDK 新实测](/zh-CN/integrations/verified-combinations)。可以将它作为有范围的参考，再验证自己的连接。若需要不同模型协议、OCI 分发、外部 Tool 审批或网络 allowlist，必须单独核对相应证据；教程通过不补足这些范围。
+
+比较替代方案前，写出所需行为，例如“两轮项目任务、私有 HTTP 预览、产物留存、不用外部 Tools”。一条能证明这些要求的记录，比大量无关的通过组合更有用。要求不被支持时，应保留要求、选择另一组合或明确报告缺口。
+
+## 起步与替代路线
+
+已有历史完整旅程包括 E2B / Pi 1.5.2 / SiliconFlow，以及 E2B / OpenCode 1.2.27 / SiliconFlow 的双 SDK 验证。参阅[精确历史记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/execution-matrix.md)，同时核对端点、协议、任务范围和日期。这些是选择试验起点的证据，不代表你的当前账户和模型仍无需验证。
+
+需要 OCI 镜像时，原生路线为 Modal 或 Fly Machines；E2B 另有通过 Session 自有 Template 准备公开 OCI 镜像的路线。构建、运行和模板清理需要分别核验，私有镜像能力另行检查。不要把内置 OpenCode 在某 Provider 成功推断成该 Provider 支持 OCI OpenCode。
+
+需要固定网络 allowlist 时，选择明确声明对应能力的 Provider，并包含凭据通道主机。需要 serverless 时，另外查[休眠恢复矩阵](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-harness-serverless-matrix.json)，不能从普通执行成功外推。
+
+## 常见拒绝含义
+
+| 原因 | 修复方向 |
+| --- | --- |
+| unsupported_harness | 使用实际注册的准确版本 |
+| incompatible_model | 更换匹配的协议连接或 Harness，不做隐式协议转换 |
+| harness_tools_unsupported | 选择支持 Tools 的 Harness |
+| sandbox_oci_image_unsupported | 选择有 OCI 能力的 Provider |
+| sandbox_private_image_unsupported | 核对私有镜像路径与权限 |
+| missing_capability | 对照需要的能力与各层声明 |
+| network_policy_unsupported | 保留策略需求，选择能执行它的 Provider |
+| connection_not_ready / tool_not_ready | 正确验证并启用所需连接 |
+
+例如 Codex 的 `codex-v1` 使用 Responses；把它与 Messages 连接配对会被拒绝。不能靠把连接名称改成“OpenAI”来改变实际协议。
+
+预检成功后仍可能遇到配额、实际模型行为、云网络和初始化问题。保留原请求和资源 ID，按[恢复指南](/zh-CN/build/recovery)处理。下一步：[模型配置](/zh-CN/integrations/models)、[协议表](/zh-CN/integrations/model-protocols)。依据：[组合解析](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/compatibility.ts)。
+
+## 比较三条有明确范围的路线
+
+| 路线 | 有证据的起点 | 必须保留的限制 |
+| --- | --- | --- |
+| 首次任务与两轮项目 | [11 月 20 日教程](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-project-docs-cloud.json)：Vercel + 内置 Pi 1.5.2 + 已配置 Messages/DeepSeek-V4-Flash，Python、TypeScript 独立执行 | 覆盖所记录项目和预览，不覆盖外部 Tool 审批、网络允许列表或所有模型端点。 |
+| 公有 OCI OpenCode | [E2B OCI 增量](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-e2b-oci-preparation.md)：固定 OpenCode digest、Python/Chat 与 TypeScript/Messages | 需要镜像构建与所属模板清理；不证明私有镜像、Responses 或全部 SDK/协议交叉组合。 |
+| 强制域名允许列表 | [E2B API 网络旅程](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-network-api-journey.md)：TypeScript 与已注册确定性探针 Harness | 证明成对允许/拒绝 HTTPS 探测；未调用模型，不证明 Python 或完整 Agent 旅程对等。 |
+
+三条路线服务不同需求；网络探针是网络要求的证据，不是编码 Agent 的直接替代。选型记录中保留所选 Harness version/digest 和模型协议。矩阵空白或缺少目标场景都表示未验证，不能推断支持。
+
+依据：[执行组合](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/execution-combinations.md)、[模型协议](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/model-protocols.md)、[已验证组合](/zh-CN/integrations/verified-combinations)。下一步：[Sandbox 能力](/zh-CN/integrations/sandboxes)、[Harness 选择](/zh-CN/integrations/harnesses)、[模型连接](/zh-CN/integrations/models)。

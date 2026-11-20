@@ -1,0 +1,76 @@
+---
+title: "Configure Sandbox resources and network policy"
+---
+
+Declare requirements before creating a Session, then preflight the combination. Structural compatibility does not prove that a live cloud network policy has been enforced.
+
+## Supported resource fields
+
+Session `resources` currently accepts `timeout_seconds` and `idle_timeout_seconds`, not arbitrary CPU/memory fields. Timeout is 60–3600 seconds, default 600; idle is 15–3600, default 60. Effective idle eligibility is capped at timeout minus ten seconds. Provider templates, sizes, and quotas belong to the relevant Sandbox connection schema.
+
+Do not interpret timeout as identical wall-clock billing behavior across Providers. Persistent-resource deadlines and suspension strategies differ; see [lifecycle semantics](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/serverless-sessions.md).
+
+## Preflight an allowlist
+
+`credential_host` / `credentialHost` must be the hostname of the current protected credential ingress URL, without scheme, port, or path. Replace the illustrative target domain with your authorized destination.
+
+```python
+definition = dict(
+    harness={'id': 'pi', 'version': '1.5.2'},
+    sandbox_connection_id=sandbox_connection_id,
+    model_connection_id=model_connection_id,
+    resources={'timeout_seconds': 600, 'idle_timeout_seconds': 60},
+    network={'mode': 'allowlist', 'allowed_hosts': [credential_host, 'example.com']},
+    required_capabilities=['network_allowlist'],
+)
+check = client.preflight_session(**definition)
+if not check['ready']:
+    raise RuntimeError('Preflight did not establish readiness')
+session = client.create_session(**definition)
+```
+
+```typescript
+const definition = {
+  harness: { id: 'pi', version: '1.5.2' },
+  sandbox_connection_id: sandboxConnectionId,
+  model_connection_id: modelConnectionId,
+  resources: { timeout_seconds: 600, idle_timeout_seconds: 60 },
+  network: { mode: 'allowlist' as const, allowed_hosts: [credentialHost, 'example.com'] },
+  required_capabilities: ['network_allowlist'],
+};
+const check = await client.preflightSession(definition);
+if (!check.ready) throw new Error('Preflight did not establish readiness');
+const session = await client.createSession(definition);
+```
+
+Unsupported Providers reject `network_policy_unsupported`. Missing credential ingress produces `credential_proxy_not_allowed_by_network_policy`. Do not silently fall back to unrestricted networking. Recheck policy if a temporary ingress hostname changes.
+
+## Know which layer enforces what
+
+Sandbox egress policy constrains the cloud environment. Tool operation selection constrains business actions. Protected model/HTTP bindings constrain control-plane proxy destinations. Tool requests can originate in the control plane, so Sandbox allowlists do not establish filtering of every Tool destination.
+
+`required_capabilities` requests capabilities; it does not grant new ones to adapters. Preflight also checks Harness/model protocols, Tools, initialization, and OCI compatibility. The combination's `verification.status` is currently unverified: preflight is not a fresh cloud acceptance run.
+
+## Account for every required destination
+
+Build the allowlist from the actual execution path: protected credential ingress, Harness installation/download endpoints where applicable, package sources needed by the project, and authorized task destinations. The model upstream may be contacted by the control plane through protected access; adding only that upstream hostname does not replace the Sandbox's need to reach credential ingress. The ingress check currently requires the exact hostname in the list, not a URL or a presumed wildcard match.
+
+Keep the distinction between control-plane preflight and Provider-specific hostname semantics. Preflight does not test DNS resolution, redirects, registry downloads or enforcement against an unlisted destination. A project can pass structural preflight and then fail installing dependencies because a required host is blocked. Diagnose the denied destination before changing policy; do not silently switch to unrestricted mode to make a tutorial pass.
+
+Use a two-sided probe with destinations you control or are authorized to access. Confirm the denied destination is reachable from a permitted comparison environment; otherwise a timeout may only indicate a dead endpoint. Record where the probe ran, the effective policy, connection/version, request outcome and cleanup. A DNS failure or proxy failure alone is not sufficient evidence of the intended policy boundary.
+
+If a temporary credential-ingress hostname changes, reassess existing Sessions' pinned allowlists and create new Sessions where the intended policy differs. A newly passing preflight does not modify an existing Session. Preserve old resources for reconciliation until cleanup is confirmed.
+
+## Verify live enforcement
+
+From a supported dedicated Sandbox, probe an allowed destination and a disallowed destination. Confirm success and rejection respectively, plus working model credential access. Record real observations and exact Provider/Harness versions. Accepted JSON alone does not prove enforcement.
+
+Distinguish invalid schema, unsupported capability, blocked ingress, quota, and transport faults. Retain resource identifiers and confirm cleanup. Sources: [request schema](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts), [compatibility resolver](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/compatibility.ts). Next: [Tools](/en/build/tools), [recovery](/en/build/recovery).
+
+## Read an actual allowed/denied probe
+
+The [November 15 public API network journey](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-network-api-journey.md) used the TypeScript SDK and normal worker to run a deterministic registered Harness inside real E2B Sandboxes. With unrestricted networking, both `example.com` and `example.org` returned HTTP 200. With the documented allowlist, `example.com` returned 200 while `example.org` returned HTTP 000 and curl exit 35. The unchanged probe bypassed proxy environment variables to measure Sandbox egress; it exported its observations and confirmed both resource deletions.
+
+That paired baseline supports the recorded allow/deny conclusion; exit 35 by itself would only identify a TLS/connect failure. The Harness did not call a model. This record does not prove current Pi model access, Python parity, every hostname/IP/IPv6/wildcard behavior or exhaustive bypass resistance. Use [current Sandbox capabilities](/en/integrations/sandboxes) and the [initialization contract](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/session-initialization.md) when choosing today's combination; keep unsupported preflight rejection separate from actual network enforcement evidence.
+
+Next: [Sandbox capabilities](/en/integrations/sandboxes), [capabilities and evidence](/en/concepts/capabilities-and-evidence), [configuration reference](/en/reference/configuration). Provider details: [Sandbox integration contract](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/sandbox-providers.md).

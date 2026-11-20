@@ -1,0 +1,448 @@
+---
+title: "Python SDK 参考"
+---
+
+当前软件包名为 `hexagon-agent-sdk`，版本 `0.1.0`，导入名为 `hexagon`，要求 Python 3.10+。在确认公开分发可用之前，从当前 checkout 安装：
+
+```sh
+python3 -m venv .venv
+. .venv/bin/activate
+python3 -m pip install ./sdk/python
+```
+
+客户端使用同步标准库 HTTP，不是异步客户端；调用与事件迭代会阻塞当前线程。软件包版本不能区分全部开发快照，应记录安装产物及服务端 revision。参见[包元数据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/python/pyproject.toml)。
+
+## 客户端与身份
+
+```python
+import os
+from hexagon import Hexagon, HexagonError
+
+# 已启动本地控制平面，通过私有工作区文件发现身份。
+client = Hexagon.local()
+
+# 远程控制平面的替代方式，仅在受信任后端使用。
+# client = Hexagon(os.environ['HEXAGON_API_URL'],
+#                  os.environ['HEXAGON_API_TOKEN'], timeout=90)
+```
+
+`base_url` 不包含 `/v1`，客户端会追加该前缀。构造函数不发请求验证凭据。`timeout` 默认 90 秒，用于 HTTP 操作及读取，不是 Run 执行期限。
+
+`local(data_directory=None, base_url=None, timeout=90)` 读取本地发现和 owner 文件。显式数据目录选择该工作区，否则查找工作区及配置的或用户级描述文件。可选 base_url 用于核对端点一致性，不会把 local 转成远程认证。私有文件和回环检查可能在请求前失败，见 [local.py](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/python/hexagon/local.py)。local 请求禁止重定向；显式客户端采用 urllib 默认重定向行为，因此应配置真实可信 origin，不依赖跳转。
+
+没有客户端级无参数 close 或异步上下文管理器。`client.close(session_id)` 关闭 Session 并执行资源生命周期，不是释放 HTTP 客户端。普通响应内部使用上下文管理器；保留了部分消费的生成器时应显式关闭它，但停止观察不取消 Run。
+
+## 公共方法清单
+
+下表从 Python AST 提取真实签名和请求表达式，保留 keyword-only 参数与默认值。路径显示 SDK 表达式，其中 `{...}` 是实现插入并编码的值。除构造函数、二进制下载、事件生成器和 HTTP 204 外，返回值是直接解析的 JSON（通常为 dict），不会转换成模型对象。列表 envelope 原样保留，例如 `events()['events']`、`artifacts()['artifacts']`，不自动翻页。
+
+
+
+| 签名（省略 self/cls） | HTTP 映射／返回方式 | 调用上下文 |
+| --- | --- | --- |
+| `local(*, data_directory=None, base_url=None, timeout=90)` | Local discovery → Hexagon instance / 本地发现 | [契约与错误](/zh-CN/operate/local-workspace) · [示例](/zh-CN/reference/python#客户端与身份) |
+| `__init__(base_url, token, timeout=90)` | Hexagon instance; no HTTP request / 无请求 | [契约与错误](/zh-CN/operate/local-workspace) · [示例](/zh-CN/reference/python#客户端与身份) |
+| `request(method, path, body=None, headers=None)` | JSON-decoded value; 204 → None | [契约与错误](/zh-CN/reference/http) · [示例](/zh-CN/reference/monitoring) |
+| `create_preview(session_id, port, ttl_seconds=600)` | `POST` `f"/sessions/{quote(session_id, safe='')}/previews"` | [契约与错误](/zh-CN/reference/artifacts-previews) · [示例](/zh-CN/build/private-preview) |
+| `revoke_preview(preview_id)` | `DELETE` `f"/previews/{quote(preview_id, safe='')}"` | [契约与错误](/zh-CN/reference/artifacts-previews) · [示例](/zh-CN/build/private-preview) |
+| `register_harness(*, image, **configuration)` | `POST` `'/harnesses'` | [契约与错误](/zh-CN/reference/harness-registration) · [示例](/zh-CN/integrations/harnesses/oci) |
+| `register_harness_package(**package)` | `POST` `'/harness-packages'` | [契约与错误](/zh-CN/reference/harness-registration) · [示例](/zh-CN/integrations/harnesses/source-package) |
+| `catalog()` | `GET` `'/catalog'` | [契约与错误](/zh-CN/reference/harness-registration) · [示例](/zh-CN/reference/python#目录与-oauth-用户同意调用) |
+| `applications()` | `GET` `'/applications'` | [契约与错误](/zh-CN/reference/oauth) · [示例](/zh-CN/reference/python#目录与-oauth-用户同意调用) |
+| `configure_application_oauth(provider, **configuration)` | `PUT` `f"/applications/{quote(provider, safe='')}/oauth-client"` | [契约与错误](/zh-CN/reference/oauth) · [示例](/zh-CN/reference/python#目录与-oauth-用户同意调用) |
+| `authorize_connection(connection_id)` | `POST` `f"/connections/{quote(connection_id, safe='')}/authorize"` | [契约与错误](/zh-CN/reference/oauth) · [示例](/zh-CN/reference/python#目录与-oauth-用户同意调用) |
+| `authorization_flow(flow_id)` | `GET` `f"/authorization-flows/{quote(flow_id, safe='')}"` | [契约与错误](/zh-CN/reference/oauth) · [示例](/zh-CN/reference/python#目录与-oauth-用户同意调用) |
+| `cancel_authorization(flow_id)` | `DELETE` `f"/authorization-flows/{quote(flow_id, safe='')}"` | [契约与错误](/zh-CN/reference/oauth) · [示例](/zh-CN/reference/python#目录与-oauth-用户同意调用) |
+| `create_secret(*, name, value)` | `POST` `'/secrets'` | [契约与错误](/zh-CN/reference/secrets) · [示例](/zh-CN/reference/python#managed-secret-与应用-token-调用) |
+| `session_environment(session_id)` | `GET` `f"/sessions/{quote(session_id, safe='')}/environment"` | [契约与错误](/zh-CN/reference/session-access) · [示例](/zh-CN/reference/session-access) |
+| `session_authorization(session_id)` | `GET` `f"/sessions/{quote(session_id, safe='')}/authorization"` | [契约与错误](/zh-CN/reference/session-access) · [示例](/zh-CN/reference/session-access) |
+| `revoke_session_connection(session_id, connection_id)` | `DELETE` `f"/sessions/{quote(session_id, safe='')}/connections/{quote(connection_id, safe='')}"` | [契约与错误](/zh-CN/reference/session-access) · [示例](/zh-CN/reference/session-access) |
+| `list_secrets()` | `GET` `'/secrets'` | [契约与错误](/zh-CN/reference/secrets) · [示例](/zh-CN/reference/python#managed-secret-与应用-token-调用) |
+| `secret(secret_id)` | `GET` `f"/secrets/{quote(secret_id, safe='')}"` | [契约与错误](/zh-CN/reference/secrets) · [示例](/zh-CN/reference/python#managed-secret-与应用-token-调用) |
+| `update_secret(secret_id, **changes)` | `PATCH` `f"/secrets/{quote(secret_id, safe='')}"` | [契约与错误](/zh-CN/reference/secrets) · [示例](/zh-CN/reference/python#managed-secret-与应用-token-调用) |
+| `delete_secret(secret_id)` | `DELETE` `f"/secrets/{quote(secret_id, safe='')}"` | [契约与错误](/zh-CN/reference/secrets) · [示例](/zh-CN/reference/python#managed-secret-与应用-token-调用) |
+| `create_access(session, connection_id)` | `POST` `f"/sessions/{quote(session, safe='')}/access"` | [契约与错误](/zh-CN/reference/session-access) · [示例](/zh-CN/reference/session-access) |
+| `list_access(session)` | `GET` `f"/sessions/{quote(session, safe='')}/access"` | [契约与错误](/zh-CN/reference/session-access) · [示例](/zh-CN/reference/session-access) |
+| `revoke_access(grant_id)` | `DELETE` `f"/access/{quote(grant_id, safe='')}"` | [契约与错误](/zh-CN/reference/session-access) · [示例](/zh-CN/reference/session-access) |
+| `overview()` | `GET` `'/overview'` | [契约与错误](/zh-CN/reference/monitoring) · [示例](/zh-CN/reference/monitoring) |
+| `list_sessions(**query)` | `GET` `'/sessions?' + urlencode(query)` | [契约与错误](/zh-CN/reference/monitoring) · [示例](/zh-CN/reference/monitoring) |
+| `list_runs(**query)` | `GET` `'/runs?' + urlencode(query)` | [契约与错误](/zh-CN/reference/runs) · [示例](/zh-CN/reference/python#有界读取-run-摘要分页) |
+| `pending(limit=25, offset=0)` | `GET` `f'/pending?limit={limit}&offset={offset}'` | [契约与错误](/zh-CN/reference/monitoring) · [示例](/zh-CN/reference/monitoring) |
+| `approvals(run_id)` | `GET` `f"/runs/{quote(run_id, safe='')}/approvals"` | [契约与错误](/zh-CN/reference/approvals-tools) · [示例](/zh-CN/build/approvals) |
+| `connection_dependencies(connection_id)` | `GET` `f"/connections/{quote(connection_id, safe='')}/dependencies"` | [契约与错误](/zh-CN/reference/connections) · [示例](/zh-CN/reference/python#连接生命周期调用) |
+| `list_tokens()` | `GET` `'/tokens'` | [契约与错误](/zh-CN/reference/tokens) · [示例](/zh-CN/reference/python#managed-secret-与应用-token-调用) |
+| `create_token(label, expires_in_days=30)` | `POST` `'/tokens'` | [契约与错误](/zh-CN/reference/tokens) · [示例](/zh-CN/reference/python#managed-secret-与应用-token-调用) |
+| `rotate_token(token_id)` | `POST` `f"/tokens/{quote(token_id, safe='')}/rotate"` | [契约与错误](/zh-CN/reference/tokens) · [示例](/zh-CN/reference/python#managed-secret-与应用-token-调用) |
+| `revoke_token(token_id)` | `DELETE` `f"/tokens/{quote(token_id, safe='')}"` | [契约与错误](/zh-CN/reference/tokens) · [示例](/zh-CN/reference/python#managed-secret-与应用-token-调用) |
+| `deployment()` | `GET` `'/deployment'` | [契约与错误](/zh-CN/reference/deployment) · [示例](/zh-CN/reference/deployment) |
+| `update_deployment(config, expected_revision)` | `PUT` `'/deployment'` | [契约与错误](/zh-CN/reference/deployment) · [示例](/zh-CN/reference/deployment) |
+| `retry_ingress()` | `POST` `'/deployment/ingress/retry'` | [契约与错误](/zh-CN/reference/deployment) · [示例](/zh-CN/reference/deployment) |
+| `resource_operations(limit=50, offset=0)` | `GET` `f'/resource-operations?limit={limit}&offset={offset}'` | [契约与错误](/zh-CN/reference/resource-operations) · [示例](/zh-CN/operate/reconciliation) |
+| `resource_operation(operation_id)` | `GET` `f"/resource-operations/{quote(operation_id, safe='')}"` | [契约与错误](/zh-CN/reference/resource-operations) · [示例](/zh-CN/operate/reconciliation) |
+| `review_resource_operation(operation_id, action, note='')` | `POST` `f"/resource-operations/{quote(operation_id, safe='')}/review"` | [契约与错误](/zh-CN/reference/resource-operations) · [示例](/zh-CN/operate/reconciliation) |
+| `list_agents()` | `GET` `'/agents'` | [契约与错误](/zh-CN/reference/agents) · [示例](/zh-CN/build/agent-templates) |
+| `agent(agent_id)` | `GET` `f"/agents/{quote(agent_id, safe='')}"` | [契约与错误](/zh-CN/reference/agents) · [示例](/zh-CN/build/agent-templates) |
+| `revise_agent(agent_id, definition, expected_revision)` | `PUT` `f"/agents/{quote(agent_id, safe='')}"` | [契约与错误](/zh-CN/reference/agents) · [示例](/zh-CN/build/agent-templates) |
+| `archive_agent(agent_id)` | `POST` `f"/agents/{quote(agent_id, safe='')}/archive"` | [契约与错误](/zh-CN/reference/agents) · [示例](/zh-CN/build/agent-templates) |
+| `copy_agent(agent_id, name)` | `POST` `f"/agents/{quote(agent_id, safe='')}/copy"` | [契约与错误](/zh-CN/reference/agents) · [示例](/zh-CN/build/agent-templates) |
+| `preflight_agent(definition, bindings)` | `POST` `'/agents/preflight'` | [契约与错误](/zh-CN/reference/agents) · [示例](/zh-CN/build/agent-templates) |
+| `preflight_session(**definition)` | `POST` `'/sessions/preflight'` | [契约与错误](/zh-CN/reference/sessions) · [示例](/zh-CN/build/sandbox-policy) |
+| `list_connections()` | `GET` `'/connections'` | [契约与错误](/zh-CN/reference/connections) · [示例](/zh-CN/reference/python#连接生命周期调用) |
+| `connection(connection_id)` | `GET` `f"/connections/{quote(connection_id, safe='')}"` | [契约与错误](/zh-CN/reference/connections) · [示例](/zh-CN/reference/python#连接生命周期调用) |
+| `create_connection(**definition)` | `POST` `'/connections'` | [契约与错误](/zh-CN/reference/connections) · [示例](/zh-CN/reference/python#连接生命周期调用) |
+| `discover_mcp_tools(connection_id)` | `POST` `f"/connections/{quote(connection_id, safe='')}/discover-mcp"` | [契约与错误](/zh-CN/reference/connections) · [示例](/zh-CN/reference/python#连接生命周期调用) |
+| `connection_authorization(connection_id)` | `GET` `f"/connections/{quote(connection_id, safe='')}/authorization"` | [契约与错误](/zh-CN/reference/oauth) · [示例](/zh-CN/reference/python#目录与-oauth-用户同意调用) |
+| `disconnect_connection(connection_id)` | `POST` `f"/connections/{quote(connection_id, safe='')}/disconnect"` | [契约与错误](/zh-CN/reference/connections) · [示例](/zh-CN/reference/python#连接生命周期调用) |
+| `validate_connection(connection_id)` | `POST` `f"/connections/{quote(connection_id, safe='')}/validate"` | [契约与错误](/zh-CN/reference/connections) · [示例](/zh-CN/reference/python#连接生命周期调用) |
+| `update_connection(connection_id, **changes)` | `PATCH` `f"/connections/{quote(connection_id, safe='')}"` | [契约与错误](/zh-CN/reference/connections) · [示例](/zh-CN/reference/python#连接生命周期调用) |
+| `delete_connection(connection_id)` | `DELETE` `f"/connections/{quote(connection_id, safe='')}"` | [契约与错误](/zh-CN/reference/connections) · [示例](/zh-CN/reference/python#连接生命周期调用) |
+| `create_agent(*, env=None, **definition)` | `POST` `'/agents'` | [契约与错误](/zh-CN/reference/agents) · [示例](/zh-CN/build/agent-templates) |
+| `create_session(*, env=None, **definition)` | `POST` `'/sessions'` | [契约与错误](/zh-CN/reference/sessions) · [示例](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/first-session.py) |
+| `session_initialization(session_id)` | `GET` `f"/sessions/{quote(session_id, safe='')}/initialization"` | [契约与错误](/zh-CN/reference/sessions) · [示例](/zh-CN/build/agent-templates) |
+| `session(session_id)` | `GET` `f"/sessions/{quote(session_id, safe='')}"` | [契约与错误](/zh-CN/reference/sessions) · [示例](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/inspect-run.py) |
+| `upload(session_id, files)` | `POST` `f"/sessions/{quote(session_id, safe='')}/files"` | [契约与错误](/zh-CN/reference/sessions) · [示例](/zh-CN/build/project-context) |
+| `submit(session_id, text, idempotency_key, *, origin=None)` | `POST` `f"/sessions/{quote(session_id, safe='')}/runs"` | [契约与错误](/zh-CN/reference/runs) · [示例](/zh-CN/build/backend-integration) |
+| `run(run_id)` | `GET` `f"/runs/{quote(run_id, safe='')}"` | [契约与错误](/zh-CN/reference/runs) · [示例](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/inspect-run.py) |
+| `tool_calls(run_id)` | `GET` `f"/runs/{quote(run_id, safe='')}/tool-calls"` | [契约与错误](/zh-CN/reference/approvals-tools) · [示例](/zh-CN/build/tool-authorization) |
+| `deny_tool_authorization(run_id, call_id, request_hash)` | `POST` `f"/runs/{quote(run_id, safe='')}/tool-calls/{quote(call_id, safe='')}/deny-authorization"` | [契约与错误](/zh-CN/reference/approvals-tools) · [示例](/zh-CN/build/tool-authorization) |
+| `resolve_tool_call(run_id, call_id, **resolution)` | `POST` `f"/runs/{quote(run_id, safe='')}/tool-calls/{quote(call_id, safe='')}/resolve"` | [契约与错误](/zh-CN/reference/approvals-tools) · [示例](/zh-CN/reference/approvals-tools) |
+| `cancel(run_id)` | `POST` `f"/runs/{quote(run_id, safe='')}/cancel"` | [契约与错误](/zh-CN/reference/runs) · [示例](/zh-CN/build/recovery) |
+| `pause(session_id, scope='session')` | `POST` `f"/sessions/{quote(session_id, safe='')}/pause"` | [契约与错误](/zh-CN/reference/sessions) · [示例](/zh-CN/build/idle-and-wake) |
+| `resume(session_id)` | `POST` `f"/sessions/{quote(session_id, safe='')}/resume"` | [契约与错误](/zh-CN/reference/sessions) · [示例](/zh-CN/build/idle-and-wake) |
+| `session_activity(period='24h')` | `GET` `f'/sessions/activity?period={period}'` | [契约与错误](/zh-CN/reference/monitoring) · [示例](/zh-CN/reference/monitoring) |
+| `close(session_id)` | `POST` `f"/sessions/{quote(session_id, safe='')}/close"` | [契约与错误](/zh-CN/reference/sessions) · [示例](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/first-session.py) |
+| `decide(approval_id, approved)` | `POST` `f"/approvals/{quote(approval_id, safe='')}/decision"` | [契约与错误](/zh-CN/reference/approvals-tools) · [示例](/zh-CN/build/approvals) |
+| `events(run_id, after='0')` | `GET` `f"/runs/{quote(run_id, safe='')}/events?after={quote(str(after), safe='')}"` | [契约与错误](/zh-CN/reference/runs) · [示例](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/inspect-run.py) |
+| `artifacts(run_id)` | `GET` `f"/runs/{quote(run_id, safe='')}/artifacts"` | [契约与错误](/zh-CN/reference/artifacts-previews) · [示例](/zh-CN/build/artifacts) |
+| `download_artifact(artifact_id)` | `GET` `f"/artifacts/{quote(artifact_id, safe='')}/content"`; bytes | [契约与错误](/zh-CN/reference/artifacts-previews) · [示例](/zh-CN/build/artifacts) |
+| `stream(run_id, after='0')` | `GET` `f"/runs/{quote(run_id, safe='')}/stream?after={quote(str(after), safe='')}"`; generator[dict] | [契约与错误](/zh-CN/reference/runs) · [示例](/zh-CN/build/stream-events) |
+
+
+
+使用 `python3 tooling/generate-python-doc-index.py` 重新生成。它提取签名和请求映射，不生成服务端 schema 或权限定义。`**definition`、`**changes`、`**package`、`**resolution`、`**configuration` 转发服务端验证的 JSON 字段，详见[配置](/zh-CN/reference/configuration)、[限制](/zh-CN/reference/limits)及下方工作流。方法存在不代表调用者拥有管理权限。
+
+## 工作流与返回值处理
+
+| 方法组 | 输入与返回值使用 | 说明 |
+| --- | --- | --- |
+| catalog、applications、preflight_* | 查看能力、就绪与证据范围；预检返回 SessionPreflight 形状的 JSON | [选择集成](/zh-CN/integrations/choose) |
+| create/validate/update/delete_connection、connection_dependencies | Provider 配置与凭据或 Secret 引用；启用、删除前看验证及依赖 | [连接生命周期](/zh-CN/build/connection-lifecycle) |
+| register_harness／register_harness_package | OCI image 与源码 files 是不同格式，保留 id/version/digest | [OCI](/zh-CN/integrations/harnesses/oci)、[源码包](/zh-CN/integrations/harnesses/source-package) |
+| create/revise/copy/archive_agent | 不可变 revision，expected_revision 保护编辑 | [Agent 模板](/zh-CN/build/agent-templates) |
+| create_session、session、session_initialization | 直接 Harness 或保存 Agent，加连接 ID；保存 id 并核对快照 | [首个 Session](/zh-CN/start/first-session) |
+| upload | 相对路径到 bytes 的映射，客户端逐项 Base64 编码 | [项目上下文](/zh-CN/build/project-context) |
+| submit、run、cancel | 保存精确 input/origin/key 与 Run id，查询终态 | [后端集成](/zh-CN/build/backend-integration) |
+| stream、events | 字符串游标；分别返回生成器与 events envelope | [事件流](/zh-CN/build/stream-events) |
+| approvals、decide、tool_calls、deny_tool_authorization、resolve_tool_call | 审批布尔值不同于账户授权，对账使用原 call/hash | [审批](/zh-CN/build/approvals)、[恢复](/zh-CN/build/recovery) |
+| create_preview、revoke_preview、artifacts、download_artifact | 预览授权敏感，下载返回 bytes | [预览](/zh-CN/build/private-preview)、[产物](/zh-CN/build/artifacts) |
+| pause、resume、close、session_activity | 生命周期请求不直接证明 Provider 清理，period 仅接受 24h/7d | [空闲唤醒](/zh-CN/build/idle-and-wake) |
+| Secret、access、OAuth、Token 方法 | 敏感管理操作，保持租户边界，不记录返回凭据或 grant | [访问控制](/zh-CN/operate/access-control)、[凭据](/zh-CN/operate/credentials) |
+| deployment、update_deployment、retry_ingress、resource_operation* | revision 检查与持久操作调查，review 不证明资源不存在 | [配置](/zh-CN/reference/configuration)、[对账](/zh-CN/operate/reconciliation) |
+
+## 带上下文的最小调用序列
+
+片段要求已有客户端、就绪连接 ID、应用保存的 key 与持久化回调，不是包含完整清理的可执行程序；完整流程见[示例](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/first-session.py)。
+
+```python
+session = client.create_session(
+    harness={'id': 'pi', 'version': '1.5.2'},
+    sandbox_connection_id=sandbox_id, model_connection_id=model_id,
+)
+save_session_id(session['id'])
+client.upload(session['id'], {'README.txt': b'Project context\n'})
+run = client.submit(session['id'], saved_input, saved_key,
+                    origin={'request_id': business_request_id})
+save_run_id(run['id'])
+for event in client.stream(run['id'], saved_cursor or '0'):
+    if event.get('id'):
+        store_event_and_cursor_atomically(run['id'], event)
+result = client.run(run['id'])
+```
+
+创建前先保存创建意图，Session 创建不继承 Run 幂等性。流中断后从已提交游标恢复，流结束后仍查询最终状态。授权审批等待通过对应用户流程处理，不在事件处理器中无条件批准。资源对账结束前保留失败记录。
+
+## 类型、错误与覆盖边界
+
+`hexagon` 导入了 `SessionPreflight`，其他 TypedDict 位于 [contracts.py](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/python/hexagon/contracts.py)。它们描述 JSON 形状，不验证运行时数据，也不把 dict 转成对象。多数方法没有返回类型注解，不能推断存在更完整的强类型接口。
+
+HTTP 错误转成 `HexagonError(status, code)`，缺省码为 `http_error`。网络、超时、JSON 解码、本地发现可能产生其他异常。stream 遇到截断或意外 EOF 抛 ConnectionError，收到 `stream.end` 正常结束，没有无限自动重连。session_activity 对非法 period 本地抛 ValueError。重试前看[错误参考](/zh-CN/reference/errors)。
+
+`request(method, path, body=None, headers=None)` 可访问已实现但没有便捷方法的 JSON 路由，例如某个 Session 的 Run 列表。它追加 `/v1`，不创造端点也不绕过权限。浏览器预览传输、凭据代理流量与 OAuth 浏览器跳转不是通用 JSON SDK 操作。SDK 没有完整 HTTP schema 模型层或内置持久业务 journal。
+
+已逐个审阅公开方法的源码清单、所链接示例的调用点及返回/错误契约映射。示例复用初始化上下文和 HTTP 规范；存在调用点不等于所有操作均已执行。安装包检查和实云旅程保持原有证据范围与日期；源码、类型、确定性与实云证据的区别见[测试指南](/zh-CN/contribute/testing)。
+
+## Managed Secret 与应用 Token 调用
+
+以下是彼此独立的辅助函数，需要已初始化的 **owner** 客户端。定义函数不会发送请求；只调用你实际需要的操作。同租户资源 ID 来自私有管理记录，凭据值来自你的凭据存储。示例向调用方传播错误，不自动重试写入。TypeScript 片段使用前文的 `Hexagon` 导入。
+
+### 保存和检查 Provider 凭据
+
+```python
+def inspect_secrets(client, secret_id):
+    metadata = client.list_secrets()['secrets']
+    detail = client.secret(secret_id)
+    return metadata, detail
+
+
+def create_managed_secret(client, name, value):
+    created = client.create_secret(name=name, value=value)
+    return {'id': created['id'], 'version': created['version']}
+
+
+def replace_managed_secret_value(client, secret_id, new_value):
+    changed = client.update_secret(secret_id, value=new_value)
+    return {'id': changed['id'], 'version': changed['version']}
+
+
+def delete_unused_managed_secret(client, secret_id):
+    # Server rechecks dependencies; a preceding GET cannot reserve deletion.
+    client.delete_secret(secret_id)  # HTTP 204 -> None
+```
+
+`inspect_secrets` / `inspectSecrets` 返回元数据和依赖信息，不返回已保存的值。其中 Session 依赖数组有数量上限，不是完整历史审计。创建返回的 ID/version 应持久化；名称不是去重键。
+
+替换值会使引用连接失效：连接变为 disabled、draft，需要重新验证后再显式启用。返回的 Secret version 是状态观察，不是乐观锁条件。超时后不要自动重复调用此函数，应先检查原 Secret 和连接状态。删除可能返回 `secret_in_use`；停用连接不会解除引用。成功删除没有 JSON 响应。这些操作都不会撤销外部 Provider 的凭据。完整定义见 [Secret 契约](/zh-CN/reference/secrets)。
+
+### 签发、轮换和撤销后端凭据
+
+```python
+def application_token_metadata(client):
+    return [row for row in client.list_tokens()['tokens']
+            if row['role'] == 'application']
+
+
+def issue_application_token(client, label):
+    return client.create_token(label, expires_in_days=30)
+
+
+def rotate_application_token(client, old_token_id):
+    return client.rotate_token(old_token_id)
+
+
+def revoke_application_token(client, token_id):
+    receipt = client.revoke_token(token_id)
+    return {'id': receipt['id'], 'revoked_at': receipt['revoked_at']}
+```
+
+创建和轮换辅助函数返回**包含明文的对象**，字段为 `id`、`token`、`label`、`role`、`expires_at`、`created_at`。应立即将 `token` 转存至后端的凭据存储，并在私有管理记录中保留 ID。不要打印整个对象、返回给浏览器，或放入异常诊断。如果写入凭据存储失败，私下保留回执并对账该凭据；重新执行辅助函数会发起另一项操作，不能找回第一次的明文。
+
+元数据列表包含已到期和已撤销的应用 Token；按 role 过滤不表示结果都是有效凭据。轮换返回**新的 ID**，立即使旧 Token 失效，并保留原到期时间。没有重叠有效窗口，重放旧轮换也无法取回替代凭据。撤销返回包含 `revoked_at` 的 JSON，与 Secret 删除的空响应不同；同一应用 Token 可以重复撤销，但不会取消已接受的 Run。
+
+写入前私下记录操作意图和目标。创建或轮换响应丢失时需要通过元数据调查，名称和 label 本身不足以唯一确认结果。响应丢失处理见 [Token 契约](/zh-CN/reference/tokens)，部署和凭据验证见[身份运维指南](/zh-CN/operate/access-control)。这些示例说明 SDK 调用方式；语法或类型检查不证明真实凭据签发、外部 Provider 撤销或完整轮换上线成功。
+
+## 连接生命周期调用
+
+以下辅助函数彼此独立，需要已初始化的 owner 客户端；定义函数不会创建或修改连接。Vercel 创建示例需要真实的 project/team 配对，以及来自私有凭据存储的 Token。调用前记录创建意图，取得连接 ID 后先持久化，再进入验证步骤。[Vercel 配置指南](/zh-CN/integrations/sandboxes/vercel)说明 Provider 专属要求；使用其他 Provider 时，先阅读对应指南再替换完整定义。
+
+```python
+def inspect_connection(client, connection_id):
+    return {
+        'catalog': client.list_connections()['connections'],
+        'connection': client.connection(connection_id),
+        'dependencies': client.connection_dependencies(connection_id),
+    }
+
+
+def create_vercel_connection(client, project_id, team_id, token):
+    created = client.create_connection(
+        kind='sandbox', provider='vercel', name='Vercel workspace',
+        credential=token,
+        config={'project_id': project_id, 'team_id': team_id, 'vcpus': 2},
+    )
+    return created['id']
+
+
+def validate_and_enable_connection(client, connection_id):
+    checked = client.validate_connection(connection_id)
+    if checked['status'] != 'ready':
+        return {'enabled': False, 'stage': 'validation',
+                'code': (checked.get('validation') or {}).get('code')}
+    enabled = client.update_connection(connection_id, enabled=True)
+    return {'enabled': enabled['enabled'], 'stage': 'enable',
+            'status': enabled['status'], 'version': enabled['version']}
+
+
+def disable_connection(client, connection_id):
+    changed = client.update_connection(connection_id, enabled=False)
+    return {'id': changed['id'], 'enabled': changed['enabled']}
+
+
+def delete_unused_connection(client, connection_id):
+    client.delete_connection(connection_id)  # HTTP 204 -> None
+
+
+def discover_remote_mcp(client, connection_id):
+    discovered = client.discover_mcp_tools(connection_id)
+    return {'id': discovered['id'], 'version': discovered['version'],
+            'status': discovered['status'], 'enabled': discovered['enabled']}
+
+
+def disconnect_tool_credentials(client, connection_id):
+    disconnected = client.disconnect_connection(connection_id)
+    return {'id': disconnected['id'], 'enabled': disconnected['enabled'],
+            'provider_revoked': disconnected['provider_revoked']}
+```
+
+按当前阶段选择函数，不要把整个代码块当作创建、发现、断开、删除的连续流程运行：
+
+| 阶段 | 检查的结果与下一步 |
+| --- | --- |
+| 检查 | 返回连接元数据和依赖样本。多次读取是独立观察，不是事务或删除预约。每个依赖数组最多 100 项；空列表不构成客户端删除授权。 |
+| 创建 | 返回一个连接 ID，此时尚未验证或启用。同名重复创建也可能产生新记录。 |
+| 验证并启用 | HTTP 成功但 `status: invalid` 时，函数返回 `enabled: false`，不尝试启用。只有验证 ready 才进入单独的启用 PATCH；还要检查最终返回状态。 |
+| 停用 | 阻止符合边界的新工作，不会取消所有已派发调用、改写已固定的 Session 定义或删除云资源。 |
+| 删除 | 先处理活动工作并确认依赖 Session 已关闭。服务端独立检查依赖；`connection_in_use` 是错误，不是手动删除数据库记录的理由。成功无 JSON 响应。 |
+| 发现 MCP | 仅适用于 `tool` / `mcp-remote` 连接。发现会更新工具配置，使连接回到 draft、disabled；私下检查新配置，再验证并显式启用。 |
+| 断开 Tool | 仅适用于 Tool 连接。清除本地凭据关联并取消待处理 OAuth 流程。`provider_revoked: false` 表示没有撤销外部账户；也不会删除共享 Secret。 |
+
+验证可能访问 Provider、刷新 OAuth 凭据，模型验证也可能产生用量。并发配置变更可能返回 `connection_changed_during_validation`；再次尝试前重新读取连接，核对预期配置。验证和启用不是一个原子请求，也没有客户端比较并交换保护，应在应用中协调管理变更。
+
+更新 `config` 会替换整个配置对象。凭据或配置变更会重置就绪状态，不应与 `enabled: true` 合并发送。即使重复停用、断开或发送空 PATCH，也可能推进版本。示例向调用方传播 HTTP 和网络错误，不自动重试；响应丢失后检查原 ID 和状态。检查函数可能返回私有账户元数据，不能直接作为日志输出。
+
+准确字段与错误见[连接响应契约](/zh-CN/reference/connections)，既有 Session 的处理见[连接变更指南](/zh-CN/build/connection-lifecycle)，用户同意见 [OAuth](/zh-CN/reference/oauth)。这些示例经过本地语法和类型检查，不代表本轮完成真实 Provider 验证或云任务执行。
+
+## 目录与 OAuth 用户同意调用
+
+这些辅助函数需要已初始化的 owner 客户端。目录查询用于检查已声明的集成和应用操作要求，不会验证你的账户，也不能证明执行组合可用。先选择支持 OAuth 的应用，按预期操作创建 Tool 连接，再使用 Provider 已注册的 client ID/secret 和匹配的回调 URL。回调路径必须为 `/oauth/callback`，详见 [OAuth 配置约束](/zh-CN/reference/oauth)。
+
+```python
+def read_integration_catalogs(client):
+    return {'execution': client.catalog(), 'applications': client.applications()}
+
+
+def configure_oauth_client(client, provider, client_id, client_secret, redirect_uri):
+    return client.configure_application_oauth(
+        provider, client_id=client_id, client_secret=client_secret,
+        redirect_uri=redirect_uri,
+    )
+
+
+def begin_consent(client, connection_id):
+    flow = client.authorize_connection(connection_id)
+    return {'id': flow['id'], 'authorization_url': flow['authorization_url'],
+            'expires_in': flow['expires_in']}
+
+
+def inspect_consent(client, connection_id, flow_id):
+    flow = client.authorization_flow(flow_id)
+    if flow['connection_id'] != connection_id:
+        raise ValueError('Authorization flow belongs to a different connection')
+    result = {'flow': flow}
+    if flow['status'] == 'completed':
+        result['authorization'] = client.connection_authorization(connection_id)
+    return result
+
+
+def cancel_pending_consent(client, flow_id):
+    return client.cancel_authorization(flow_id)
+```
+
+将这些函数作为后端用户同意流程的独立阶段调用：
+
+1. 初始化集成或明确变更配置时，配置 OAuth 客户端。不要在每次状态轮询时重复配置，否则可能使正在进行的流程失效。返回的 `{configured, provider, client_id, redirect_uri}` 只确认配置，不代表用户同意。
+2. 发起一次用户同意流程，私下持久化返回的 flow ID 及其连接、业务用户关联，再仅向预期用户展示 `authorization_url`。URL 包含流程 state，不应写入日志，也不要向浏览器传 owner Token。用户在 Provider 页面完成同意，SDK 不自动操作该页面。
+3. 用保存的 flow ID 调用 `inspect_consent` / `inspectConsent`。每次只读取一次流程，完成后再读取一次连接授权状态。应用自行安排有上限的轮询；函数不休眠、不循环，也不发起第二次流程。浏览器跳转本身不能证明成功。
+4. 用户放弃时，针对保存的 flow 调用取消函数。返回的是流程对象，不是空响应。取消只改变 pending 流程；若回调先完成，返回状态仍可能是 completed。
+
+| 流程结果 | 应用动作 |
+| --- | --- |
+| `pending` | 在截止时间内继续观察同一流程，不反复发起用户同意。 |
+| `completed` | 检查返回的授权状态和当前连接就绪情况。完成是历史事实，后续撤销或配置变更可能已要求重新授权。 |
+| `failed` | 读取 `error_code`，说明失败原因并处理问题，再明确发起新的用户同意流程。 |
+| `cancelled` / `expired` | 停止轮询本次流程；只有用户确实希望再次授权时才创建新流程。 |
+| 未知状态或连接不匹配 | 不判为成功，保留原 ID 并调查；辅助函数会在查询授权前拒绝连接不匹配的流程。 |
+
+连接授权有独立的 `state` 值：`oauth`、`manual`、`disconnected`、`reauthorization_required`、`refreshing`、`refresh_unknown`，与流程 `status` 不同。`oauth` 和 `refresh_available` 描述已存储的生命周期信息；读取不会刷新 Token，也不实时检查 Provider 撤销。刷新结果不确定时需要调查或明确重新授权，不能重放可能已轮换的 refresh token。
+
+再次发起同意会取消该连接的 pending 流程。因此发起响应丢失后，不能盲目再次调用来恢复；保留结果不确定的事实，在适当时明确替换原尝试。取消流程不会撤销既有 Provider 凭据、取消 Run 或决定 Tool 审批。`app_oauth_setup_required`、`app_oauth_unsupported`、`app_oauth_flow_not_found` 和鉴权错误通过 SDK 传播，网络错误另行处理。详见 [OAuth 响应与错误](/zh-CN/reference/oauth)和[应用集成指南](/zh-CN/integrations/apps)。
+
+这些函数是由调用方提供凭据和 ID 的 SDK 上下文示例。本地代码检查不证明浏览器用户同意、Token 交换或 Provider 账户验证成功。
+
+Agent 列表、详情、预检、修订、复制、归档和固定初始化查询示例见[准备并提交模板修订](/zh-CN/build/agent-templates)。示例保留最初观察的 revision，并说明环境保留和响应丢失处理。
+
+六个 Session 环境、授权和 access grant 方法的上下文示例见 [SDK 访问示例](/zh-CN/reference/session-access)，区分明文读取、Token 签发、单 grant 撤销和 Session 绑定撤销。
+
+运维 SDK 示例覆盖[概览、Session/pending 分页、活动与 health](/zh-CN/reference/monitoring)，以及[部署 revision 更新和入口重试/停止](/zh-CN/reference/deployment)，区分状态观察、保存配置与运行中进程操作。
+
+显式[暂停/恢复示例](/zh-CN/build/idle-and-wake)与[已验证 Tool 结果登记](/zh-CN/reference/approvals-tools)说明生命周期意图、部分响应丢失，以及保持请求体不变的对账重放。
+
+## 按资源查阅响应契约
+
+生成的签名说明客户端如何调用；精确响应投影、状态码、角色、状态前提和副作用应查看对应 HTTP 契约。大部分管理方法直接返回解码后的 JSON；调用没有抛异常，仍可能包含 invalid 的连接验证结果或 reconciliation_error，不能据此认定业务成功。
+
+| 资源 | 契约 |
+| --- | --- |
+| Runs、事件与取消 | [Runs、事件与取消](/zh-CN/reference/runs) |
+| Session 创建、文件和生命周期 | [Session 创建、文件和生命周期](/zh-CN/reference/sessions) |
+| Session 环境、授权与访问凭据 | [Session 环境、授权与访问凭据](/zh-CN/reference/session-access) |
+| 产物内容与私有预览 | [产物内容与私有预览](/zh-CN/reference/artifacts-previews) |
+| 审批与 Tool 恢复 | [审批与 Tool 恢复](/zh-CN/reference/approvals-tools) |
+| 连接、验证与使用记录 | [连接、验证与使用记录](/zh-CN/reference/connections) |
+| 应用与 OAuth | [应用与 OAuth](/zh-CN/reference/oauth) |
+| Managed Secrets | [Managed Secrets](/zh-CN/reference/secrets) |
+| 应用 Token | [应用 Token](/zh-CN/reference/tokens) |
+| Agent 模板与修订 | [Agent 模板与修订](/zh-CN/reference/agents) |
+| 目录与 Harness 注册 | [目录与 Harness 注册](/zh-CN/reference/harness-registration) |
+| 资源操作对账 | [资源操作对账](/zh-CN/reference/resource-operations) |
+| 监控与集合查询 | [监控与集合查询](/zh-CN/reference/monitoring) |
+| 本地部署配置 | [本地部署配置](/zh-CN/reference/deployment) |
+
+产物二进制下载和事件流使用上文说明的特殊返回路径。DELETE 并非统一空响应：Token 撤销返回 JSON，预览/access/Secret/连接删除使用 204，OAuth flow 取消返回 flow 对象。构建通用应用封装时必须保留这些差异。
+
+## 查询已有 Run，不提交新工作
+
+激活本页创建的 `.venv` 并安装检出版本 SDK 后，在仓库根目录运行[完整诊断示例](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/inspect-run.py)。将两个 ID 替换为同租户的已有资源；`--help` 可以检查命令入口，不会发现工作区或查询 API：
+
+```sh
+python examples/documentation/inspect-run.py --help
+python examples/documentation/inspect-run.py --session YOUR_SESSION_ID --run YOUR_RUN_ID --after 0 --max-pages 20
+```
+
+程序核对 Run/Session 关联，读取 Session 状态和有页数上限的事件，重新查询 Run 并列出产物 ID/大小/摘要。报告不包含任务文本、事件 payload、最终输出或产物名称，资源 ID 仍需私有保存。它不会提交、审批、取消或关闭任务。事件 ID 保持十进制字符串，比较使用任意精度整数，不转换成有精度损失的数字。
+
+Last_observed_cursor 是诊断观察位置，不是应用消费者检查点：程序只计数，没有持久保存事件内容。Reached_empty_event_page 只说明该次查询暂时没有后续页，不表示 Run 完成。状态、事件和产物是分开的读取，不是原子快照。达到页数上限可使用返回游标继续诊断，但不能据此跳过应用尚未处理的事件。
+
+本地语法/类型与假客户端检查不证明真实 API 或云行为。解释结果请结合 [Run 契约](/zh-CN/reference/runs)与[恢复指南](/zh-CN/build/recovery)。
+
+[示例安装、阶段与恢复说明](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/README.zh-CN.md)。
+
+## 在两套 SDK 之间迁移
+
+| 事项 | Python | TypeScript |
+| --- | --- | --- |
+| 创建客户端 | `Hexagon.local()` 同步返回客户端 | `await Hexagon.local()` |
+| HTTP 调用 | 阻塞调用，不直接放入异步服务的事件循环 | 返回 Promise；依赖前一步的操作需要 await |
+| 上传输入 | `{相对路径: bytes}`，SDK 编码 Base64 | `{path, content_base64}` 数组，调用方编码字节 |
+| 事件流 | 同步生成器，用 `for`；保留但不再消费的生成器应关闭 | AsyncGenerator，用 `for await`；可选 AbortSignal 结束观察 |
+| 下载结果 | `bytes` | `Uint8Array` |
+| HTTP 204 | `None` | `undefined` |
+| 事件游标 | 数字字符串；可用 `int` 无损比较 | 数字字符串；用 `BigInt`，不用 `Number` |
+| 可选查询字段 | 省略未用关键字参数；`None` 可能被序列化为文本 | 省略未用属性；显式 `undefined` 可能变成文本 |
+| 分页 | 调用方读取响应 envelope 并翻页 | 调用方读取响应 envelope 并翻页 |
+
+两套 SDK 都不会自动重试写入或保存恢复状态。更换语言不会改变租户权限、资源归属或已有 Session 的身份。跨客户端恢复同一提交时，保持 input、origin 和幂等键不变。
+
+## 有界读取 Run 摘要分页
+
+以下辅助函数要求已有可信后端客户端，读取的是租户级摘要端点，不是单 Session 的 Run 列表。返回 `next_offset` 非空表示达到页数预算，在观察到末尾之前停止。错误向调用方抛出；函数不发起写请求。
+
+```python
+def read_run_summary_pages(client, *, max_pages=10):
+    if not isinstance(max_pages, int) or isinstance(max_pages, bool) or max_pages < 1:
+        raise ValueError("max_pages must be a positive integer")
+    rows, offset = [], 0
+    for _ in range(max_pages):
+        page = client.list_runs(limit=100, offset=offset)
+        rows.extend(page["runs"])
+        next_offset = page["next_offset"]
+        if next_offset is None:
+            return {"runs": rows, "next_offset": None}
+        if not isinstance(next_offset, int) or isinstance(next_offset, bool) or next_offset <= offset:
+            raise ValueError("invalid pagination progress")
+        offset = next_offset
+    return {"runs": rows, "next_offset": offset}
+```
+
+这里的 `runs` 是摘要，需要完整 input/output 时再调用 `client.run(id)`（TypeScript 加 `await`）。并发插入会移动 offset，因此本函数不是稳定导出，也不证明读取了每个 Run。返回的 next offset 是继续分页的提示，不是持久事件游标。事件重放应使用原 Run ID 和事件 `after` 契约。见[列表语义](/zh-CN/reference/runs)与[有界诊断示例](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/README.md)。
+
+接下来可阅读[完整首个 Session](/zh-CN/start/first-session)、[后端集成](/zh-CN/build/backend-integration)或[事件与状态参考](/zh-CN/reference/events-and-states)。

@@ -1,0 +1,145 @@
+---
+title: "Add a Tool or application connector"
+---
+
+Application connectors run upstream requests in the control plane using tenant-owned Connections. The shared Tool broker owns authorization, approval, request identity and uncertain outcomes. Sandbox and Harness integrations consume the existing Tool contract; they do not need application-specific code or account credentials.
+
+Read [application architecture](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md), [the broker](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/broker.ts), and [acceptance](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/acceptance.md) before changing behavior.
+
+## Choose the integration surface
+
+| Need | Implementation path |
+| --- | --- |
+| Named application with a fixed operation catalog | AppDefinition in integrations/apps; shared application registry and broker |
+| Your service with fixed JSON operations | Existing [HTTP Tools](/en/integrations/http-tools) configuration; add a new adapter only if the contract cannot express it |
+| An existing remote MCP server | Existing [Remote MCP](/en/integrations/mcp) discovery and binding workflow |
+| Protected HTTP access from guest code | HTTP Connection access policy; this is distinct from broker-mediated Tool approval |
+
+Do not build a second credential store or bypass approval by moving application requests into the guest. Keep source attribution and licenses when adapting existing request mappings; current reused mappings retain their provenance under third_party/activepieces.
+
+## Define a bounded read and write operation
+
+[types.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/apps/types.ts) defines AppDefinition, AppOperation and RequestSpec. Each operation supplies a strict object input schema, a semantic `write` flag and a fixed request mapping. Encode path identifiers, bound strings and pagination, reject unknown properties, and keep host/method selection outside model arguments. A POST can be a read, as in Notion search; classify side effects by semantics rather than HTTP verb.
+
+This illustrative excerpt belongs in an integrations/apps module. The `.invalid` service is deliberately unavailable; implement and test against your own controlled service before registration:
+
+```ts
+import { operation, id, string, encode } from './types.js';
+
+export const reportOperations = {
+  read_report: operation(
+    'Read one report.', false, { report_id: id }, ['report_id'],
+    a => ({ url: `https://reports.example.invalid/reports/${encode(a.report_id)}`,
+            method: 'GET' }),
+  ),
+  create_report: operation(
+    'Create a report after approval.', true,
+    { title: string, text: string }, ['title', 'text'],
+    a => ({ url: 'https://reports.example.invalid/reports', method: 'POST',
+            body: { title: a.title, text: a.text } }),
+  ),
+};
+```
+
+Wrap these operations in an AppDefinition with id, name, category, credential_url and a read-only `verify` request. Add it to the applications list in [registry.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/apps/registry.ts). A working reference is Todoist's `get_task` / `create_task` in [productivity.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/apps/productivity.ts).
+
+The current registry defaults to non-write operations. Explicitly selected writes receive approval and `replay: 'never'`. Its broker-facing method is derived from `write`; the actual upstream HTTP method comes from RequestSpec. Do not assume those are identical when auditing dispatch. Each Session binding still limits which connection and operation the Harness may use.
+
+## Add authentication and scoped verification
+
+Default authentication is Bearer. Use AppDefinition's auth hooks only where the provider requires a different header, compound credential or token exchange. Keep secrets out of operation arguments, schemas, result text, URLs and diagnostic output. The shared request path rejects redirects, bounds results, and redacts known credential values; that is not a substitute for reviewing provider response content and preventing secret leakage at the source.
+
+API keys use managed credential storage. OAuth uses the existing [OAuth module](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/apps/oauth.ts), encrypted token envelopes and tenant/deployment app configuration. Declare actual endpoints, scopes and client authentication rules. Reuse the expiring one-use transaction bound to tenant, connection version, provider and redirect URI; do not implement an ad hoc callback or return tokens to the browser. Account/permission changes invalidate previous approvals. Token refresh has separate concurrency and version semantics.
+
+A successful identity request does not prove every selected operation is permitted. Add operation scopes, safe permission probes or metadata checks where available; otherwise leave the result unknown. Never validate write permissions by silently sending a message or creating a real object. Real acceptance writes need an explicitly authorized disposable target. Local disconnection does not establish provider-side grant revocation.
+
+Check tenant ownership at connection, Secret, OAuth transaction, Session binding and Tool-call lookup boundaries. An upstream object ID is not proof that a caller owns the Hexagon resource referring to it.
+
+## Preserve approval and unknown-outcome semantics
+
+The broker persists a call and request hash before dispatch, rejects the same call ID with different arguments, and pins dispatched connection/version and execution policy. Authorization establishes usable account access; approval permits a particular side effect. Neither replaces the other.
+
+Use the shared error classification. In the current application transport, 401 requests reauthentication; most other 4xx responses except 408 become rejected results; 5xx, transport failures and ambiguous response processing can leave the outcome unknown. Application-level error envelopes also need interpretation: a Linear mutation with GraphQL errors can have taken effect even with `data: null`. Do not classify every HTTP 200 as success or every error body as proof of no write.
+
+For a lost write response, stop and retain the original call. Query remote records using safe read operations or the provider UI. Then follow [Tool reconciliation](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/tool-reconciliation.md): resolve with the exact `request_hash`, observed outcome, result text and evidence. Resolution records an operator conclusion and does not send another upstream request. Repeating an identical resolution is idempotent; conflicting or stale decisions fail. If the remote result cannot be established, keep it unknown or cancel the Run; do not fabricate success or issue another create.
+
+## Similar waits require different decisions
+
+| Observation | Meaning | Behavior the integration must preserve |
+| --- | --- | --- |
+| Run waiting_authorization and Tool call awaiting authorization | Account access is insufficient | Use shared reauthorization or denial for this invocation; changing call ID is not recovery |
+| Run waiting_approval with a pending approval | This specific effect still needs a decision | Do not dispatch before approval; bind the decision to original request identity and policy |
+| Run waiting_approval with Tool call unknown | The upstream operation may have happened but its result is uncertain | Investigate and resolve the original operation; approving again is not a safe retry |
+
+Run state alone cannot distinguish approval from an unknown outcome. Inspect Tool call state, approval_id, execution_policy and resolution, and query the approval record where needed. An executing call after worker failure also requires a decision based on its persisted policy, not an assumption that no request was sent.
+
+The broker has rules for replayable reads and explicit `idempotency_key` policies. Named application writes currently use `replay: never`. An upstream POST used for reading can be represented as GET in the broker's semantic policy; do not blindly copy upstream HTTP methods into replay decisions. If the invocation's pinned connection_version differs from the current version, an unknown result cannot be replayed through the new configuration. Extending policy requires verifying upstream deduplication constraints; adding a field does not establish exactly-once effects.
+
+## Completed does not necessarily mean upstream success
+
+A completed Tool call has a deliverable result, which can carry `isError: true`. `AppRequestError` produces a completed error result, as does authorization denial. A manual resolution with `outcome: failed` also completes the call and delivers failure content to the Harness.
+
+Assert call state, `isError` / error code, external write count and expected Run continuation together. Checking completed alone mistakes permission denial or reconciled failure for business success.
+
+## Repeated and concurrent reconciliation
+
+Resolve takes the same invocation lock as the broker. An in-flight request returns `tool_call_in_flight`, even if the worker lease has expired. The first decision requires an eligible active Run, an unknown call and its exact request_hash.
+
+An identical saved decision can return idempotently; that check precedes the active-state requirement for a first decision. This does not let an old terminal Run accept a new decision. Different text, evidence or outcome conflicts with the prior resolution. Cancellation-race tests must distinguish returning an existing decision from submitting a new one rather than asserting that every resolve after cancellation fails.
+
+Sources: [ToolBroker](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/broker.ts), [reconciliation transaction](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/reconciliation.ts), and [application request classification](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/apps/registry.ts). See [approval and Tool recovery contracts](/en/reference/approvals-tools) for HTTP requests and errors.
+
+## Test the concrete read/write pair
+
+Use fake transport plus database-backed broker tests. For the example above, maintain an in-memory report store and a request counter in the test fixture. Return a known report for reads; let the write fixture store a report and deliberately lose its response to exercise uncertainty.
+
+| Case | Required assertions |
+| --- | --- |
+| Read mapping | Fixed host/path/method, encoded ID, no unexpected body, schema rejects extra fields |
+| Write before approval | No upstream request and zero new reports |
+| Denied authorization or approval | Zero writes; original invocation does not bypass the denial |
+| Approved write | Exactly one report; result is delivered to the original call |
+| Repeated identical decision/call | No duplicate report; changed arguments under the same ID conflict |
+| Lost response after storing | Call remains unknown; broker reconstruction does not repeat the write |
+| Verified resolution | Exact request hash required; one stored outcome and no extra upstream dispatch |
+| Credential rotation or cancellation | Stale approval/resolution rejected as applicable; late response cannot restart a cancelled Run |
+| Tenant mismatch | Foreign connection, Secret and call inaccessible; zero provider requests |
+| Authentication and payload limits | Reauthentication, permission rejection, oversized/malformed results and redaction tested separately |
+
+Existing regression entry points are:
+
+```sh
+npx vitest run integrations/apps/registry.test.ts modules/tools/applications.test.ts modules/tools/authorization-denial.test.ts modules/tools/cancellation.test.ts
+```
+
+Use an isolated `TEST_DATABASE_URL` as described in [testing](/en/contribute/testing). Add assertions for the new provider rather than treating existing suite success as its coverage. OAuth changes also require state replay/expiry, refresh concurrency and permission-change tests.
+
+### Reuse the repository fixtures before adding another example
+
+The report mapping above explains the extension seam; it is not a prerequisite to build a second application solely to test the broker. Reuse the existing concrete fixtures at the appropriate layer:
+
+| Required behavior | Existing implementation / assertions |
+| --- | --- |
+| Bounded read/write request mapping and semantic write classification | [Application registry tests](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/apps/registry.test.ts) validate catalog schemas, request mappings, approval metadata, redirect refusal and unknown-effect classification |
+| Approval before dispatch, one write after approval, repeated call without another write | [Application broker tests](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/applications.test.ts) exercise Todoist, Linear, Feishu and Lark against fake transports with a real test database |
+| Response lost or ambiguous after a write; restart does not replay it | The same broker suite reconstructs ToolBroker against the persisted call and requires the write count to remain unchanged |
+| Authorization denied with no external write, tenant boundary and repeated decision | [Authorization-denial tests](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/authorization-denial.test.ts) use both SDKs and a controlled local HTTP service |
+| Cancellation prevents later dispatch or continuation | [Cancellation tests](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/cancellation.test.ts) cover the related broker/Run boundary |
+
+These suites are existing executable examples of the shared contracts, not proof that a newly added provider works. Add only the new provider’s mapping/authentication differences and any missing contract case. Database-dependent suites skip when `TEST_DATABASE_URL` is absent; a skipped test cannot support an acceptance claim. Keep real-account status separate as described below.
+
+## Keep mapping tests separate from dispatch tests
+
+For `read_report`, an ID containing `/` must remain one encoded path segment; extra arguments must fail schema validation before any request. For `create_report`, inspect the fixed POST URL and JSON body independently of approval. A mapping test can prove those request shapes without an account, but it cannot prove that the broker waits, rejects a tenant mismatch or avoids a second write.
+
+For the lost-response fixture, insert the report into the fake upstream store before throwing. Reconstruct the broker against the same database and keep the upstream store and counter. Read back the report using its business reference, then resolve the original call using its saved request_hash. Assert the upstream write counter remains one before and after resolution. Starting a new empty database or upstream store would make this test unable to detect replay. Real-account verification remains a separate step.
+
+## Finish the user journey and evidence
+
+Update application discovery, operation descriptions, credential instructions and Console forms as needed. Follow the [Console contract](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/console-design.md): complete en/zh-CN catalogs, accessible application-owned controls, keyboard support, account selection and credential clearing. Review both languages and OAuth cancel/return behavior. Keep Agent Tools separate from platform Sandbox settings.
+
+Run both SDKs against the public API and a real cloud Agent using the actual read operation. Exercise an authorized disposable write, approval, response-loss recovery where controllable, and confirmed cleanup. Record exact account permission scope without publishing account secrets or private content. External messages require explicit authorization; this guide does not authorize sending them. If no account is available, report contract coverage and real-account verification as separate statuses.
+
+Add the provider/operation guidance to [application integrations](/en/integrations/apps), update scoped evidence, and preserve failed attempts. A connector test pass cannot justify a blanket real-account badge.
+
+Next: [application integrations](/en/integrations/apps), [reconciliation](/en/operate/reconciliation), [testing and evidence](/en/contribute/testing).

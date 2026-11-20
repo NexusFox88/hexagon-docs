@@ -1,0 +1,65 @@
+---
+title: "对账和清理不确定的云资源与 Tool 操作"
+---
+
+远程操作可能已经生效，但响应未返回。unknown 表示需要调查结果，不能自动解释为失败、未创建或已删除。
+
+使用管理身份查询资源操作，保留 Session、operation、Provider resource / operation ID 和时间。真实 ID 留在本地私有证据，公开问题报告只附脱敏摘要。
+
+## 查询与复核
+
+```python
+page = client.resource_operations(limit=50)
+operation = client.resource_operation(operation_id)
+# 已核实需要针对原操作再次查询 / 对账后，显式执行：
+result = client.review_resource_operation(operation_id, 'reconcile', 'Recheck original operation')
+```
+
+```typescript
+const page = await client.resourceOperations(50);
+const operation = await client.resourceOperation(operationId);
+// 完成复核后，针对原操作显式执行：
+const result = await client.reviewResourceOperation(operationId, 'reconcile', 'Recheck original operation');
+```
+
+列表含 next_offset，继续读取才是完整集合。复核仅适用于 unknown 操作；`reconcile` 会调用对应生命周期逻辑，可能涉及云操作，不是纯只读按钮。返回 `reconciliation_error` 时保留记录并继续调查，不把 HTTP 成功当资源已处理。
+
+`acknowledge` 暂停自动复核并保留 unknown；`reopen` 恢复自动检查。人工备注不证明结果，不能用 acknowledged 取代清理确认。
+
+## 三类典型事件
+
+**创建响应丢失。** 依据原操作 ID、准确名称或 Provider handle 查询。一个可信匹配可用于恢复绑定；多个匹配需要调查归属；零匹配可能受异步创建、分页或最终一致性影响。仅看到空列表不足以证明未创建，不能直接换名称创建第二个资源。
+
+**删除响应丢失。** 查询原资源和关联端点。只有同时满足 Provider 删除契约并确认不存在后，生命周期才能完成清理；存在则按原删除意图继续。不确定时保留 closing。计算停止、快照保留和预览端点删除是不同对象，必须覆盖所有平台拥有的关联资源。
+
+**Tool 写入响应丢失。** 使用调用 ID 和 request_hash 到外部服务核对，确定成功或失败后提交 `resolve_tool_call` / `resolveToolCall`。这是交付已验证结果，不再发送工具请求。证据应说明比对了什么记录；无证据就保留 unknown。
+
+## 按证据选择下一步
+
+| 操作 | 已有证据 | 决策与停止条件 |
+| --- | --- | --- |
+| 创建响应丢失 | 零个精确匹配 | 除非 Provider 给出权威未分配证据，否则保留 unknown；空列表不足以证明 |
+| 创建响应丢失 | 一个精确且归属正确的匹配 | 对账原意图，绑定前确认归属与可用状态 |
+| 创建响应丢失 | 多个匹配 | 私有保留所有候选并调查归属，不随意选一个 |
+| 删除响应丢失 | 已有回执 | 检查该 operation 的目标、类型、终态，再确认所需资源缺失 |
+| 删除响应丢失 | 资源缺失但回执丢失 | 按 Provider 契约处理；Boat 不能仅凭缺失推断 purge 完成 |
+| Tool 写入响应丢失 | 远端记录与请求哈希匹配 | 用实际证据解决原调用为 completed，不再次写入 |
+| Tool 写入响应丢失 | 远端结果仍不确定 | 保留 unknown 或取消 Run；取消不证明写入未发生 |
+
+Boat 需要原目标的删除 operation 完成，并确认资源不存在。E2B OCI 不能止于计算资源缺失，还须删除 Session 所有的执行模板。Fly Machines 要检查专属 App，而不只看其中的 Machine。这说明不能统一使用“404 就等于清理完成”的规则。
+
+复核动作的效果不同：`acknowledge` 保留 unknown 并暂停自动复核；`reopen` 恢复自动检查；`reconcile` 立即按操作与 Session 状态调用对应生命周期分支。HTTP 成功响应仍可能含 `reconciliation_error`，操作后应重读 operation、关联资源与 Session。不要把反复点击 reconcile 当作无界重试。
+
+Tool 对账必须包含原 `request_hash`、`outcome`、结果 `text` 与证据。证据是调用者的审计陈述，不是自动远端验证。相同重复结论具有幂等性，冲突结论会失败。broker 锁内仍执行的调用，或终态/取消中的 Run，不能接受新结论。操作前阅读[结果对账契约](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/tool-reconciliation.md)。
+
+## 何时停止自动处理
+
+身份或归属不明确、多条候选、Provider 暂不可达、异步操作未终结时，保存可复查记录并按策略退避。不能通过删除连接、修改数据库状态或新建 Session 隐藏未决云资源。
+
+取消 Run 不能撤回已派发写入。close 可以反复针对同一资源对账，但未知外部结果仍须记录。确认任务输出成功也不能作为全局无孤儿资源的证明。
+
+## 完成标准
+
+每项原操作都有可核对终局或明确保留的未决结论。清理应验证准确资源及关联端点不存在，Session 状态与之相符；Tool 对账保留请求 hash、外部事实和审计结果。不同失败场景独立验证，不能只跑正常 close。
+
+依据：[资源复核](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/operations.ts)、[Tool 对账协议](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/tool-reconciliation.md)。下一步：[诊断](/zh-CN/operate/observability)、[故障排查](/zh-CN/operate/troubleshooting)、[HTTP API](/zh-CN/reference/http)。

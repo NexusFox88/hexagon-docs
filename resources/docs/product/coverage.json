@@ -1,0 +1,1139 @@
+{
+  "scope": "All 82 planned assets, both languages; draft is not completed acceptance",
+  "items": [
+    {
+      "id": "E01",
+      "title": "文档首页",
+      "target": "/",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual homepage/README semantic review; literal excerpt and current example hashes match dated dual-SDK evidence. Local targets checked. Clean-checkout and rendered/publication acceptance remain open.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-entry-changelog-review.json",
+        "testing/evidence/2026-11-20-homepage-readme-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "E02",
+      "title": "仓库 README",
+      "target": "README.md",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Current isolated source-copy install and S04 cloud example are evidenced. Final root README navigation/assets and new canonical clone entry remain batch-3 review; no claim of a fresh remote clone.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-homepage-readme-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch2.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "E03",
+      "title": "编程 Agent 集成阅读指南",
+      "target": "/agents",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Reviewed full integration order, durable pseudocode and unknown-outcome branches. Added exact resource contract map and journal interpretation in both languages. Structure passed; no hosted endpoint/publication or executable-pseudocode claim.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-agent-reading-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "E04",
+      "title": "更新记录与升级提示",
+      "target": "/changelog",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Reviewed dated changes against source/evidence, migration 016 and local build metadata. Added scoped November 20 dual-SDK tutorial verification checkpoints; example hashes match recorded executions. Task-book content reviewed; no new cloud/migration/render acceptance or publication.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-entry-changelog-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "S01",
+      "title": "Hexagon 是什么",
+      "target": "/start/overview",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Reviewed positioning, four observable outcomes, filter-feature journey, Harness definition and Console/SDK responsibilities. Added outcome/boundary table in both languages. Structural checks passed; current page visual verification remains open. Current bilingual diagram desktop review and narrow-container checks completed in local Mermaid preview; final-site rendering remains separate.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-overview-review.json",
+        "testing/evidence/2026-11-20-current-diagram-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "S02",
+      "title": "适用场景、选择依据与产品边界",
+      "target": "/start/use-cases",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Expanded three concrete user scenarios and responsibility-based adoption comparison, explicit memory/protocol/preview boundaries and required next steps. Bilingual task-book content reviewed; final structural check passed after correcting self-host links. No benchmark or new runtime test claimed.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-use-cases-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "S03",
+      "title": "安装并启动本地控制平面",
+      "target": "/start/install",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Fresh current source copy without node_modules, new data directory/database: npm ci, doctor/start/status, Python install, TypeScript build, both SDK discovery, restart/config retention and stop passed. Existing host prerequisites and unconfigured ingress explicitly recorded; no clean-OS claim.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-installation-content-review.json",
+        "testing/evidence/2026-11-20-docs-bilingual-worked-change-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch2.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "S04",
+      "title": "创建你的第一个 Agent Session",
+      "target": "/start/first-session",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Fresh independent Python/TypeScript first-session programs passed on Vercel / built-in Pi 1.5.2 / configured Messages DeepSeek-V4-Flash endpoint: completion, artifact integrity/content, closed Session, completed deletion record, retained byte equality. Exact-combination scope only; overall article review remains draft. Tutorial content reviewed against current program hashes and existing independent cloud receipts. Initial project fixture reproduced expected failure; observe/export semantics corrected and contract links added. No new cloud run.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-first-session-docs-cloud.json",
+        "testing/evidence/2026-11-20-tutorial-content-review.json",
+        "testing/evidence/2026-11-20-first-session-answer-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "S05",
+      "title": "理解刚才发生的事",
+      "target": "/start/what-happened",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Aligned tutorial explanation to both current example programs and hash-matched cloud record. Added output/journal mapping, exact retention-check scope and short successful-path sequence. Structural checks passed; diagram visual review remains pending. Current bilingual diagram desktop review and narrow-container checks completed in local Mermaid preview; final-site rendering remains separate.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-what-happened-review.json",
+        "testing/evidence/2026-11-20-current-diagram-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "S06",
+      "title": "完成一个真实项目任务",
+      "target": "/start/project-task",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Fresh independent Python and TypeScript two-turn cloud/project/browser journeys passed on Vercel/Pi 1.5.2/configured Messages DeepSeek-V4-Flash: four completed Runs, unchanged fixed tests and native execution receipts, six exports per Run, filtering/Reset browser checks, post-close preview denial, completed deletion records and artifact retention. External authorization/approval excluded; article-level completion still subject to review. Tutorial content reviewed against current program hashes and existing independent cloud receipts. Initial project fixture reproduced expected failure; observe/export semantics corrected and contract links added. No new cloud run.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-project-docs-cloud.json",
+        "testing/evidence/2026-11-20-tutorial-content-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "B01",
+      "title": "将 Agent 接入你的后端",
+      "target": "/build/backend-integration",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Existing durable SQLite backend CLI closes submit/query/artifact/cleanup loop with 14 offline assertions, including restart and same intent. Exact same-key Run creation additionally verified by real HTTP/PostgreSQL record. Service-owned credentials and user mapping are explicit; production auth platform is outside original scope.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-backend-intents-example.json",
+        "testing/evidence/2026-11-20-backend-guide-review.json",
+        "testing/evidence/2026-11-20-current-diagram-review.json",
+        "testing/evidence/2026-11-20-backend-artifact-delivery-review.json",
+        "testing/evidence/2026-11-20-backend-cleanup-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch1.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch2.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "B02",
+      "title": "给任务提供文件与上下文",
+      "target": "/build/project-context",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual upload/context task-book review with worked invalid-path/base64/aggregate examples. Actual schema and aggregate rejection branch passed locally; unchanged full project programs match dated dual-SDK cloud evidence. No new cloud/database transaction or global rendering acceptance.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-project-context-editorial.json",
+        "testing/evidence/2026-11-20-project-input-guide-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "B03",
+      "title": "在同一个 Session 中连续工作",
+      "target": "/build/multi-turn",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Reviewed same-Session/new-intent/retry/queue and cross-SDK handoff semantics. Corrected new-Run wording and added scoped multi-turn/cross-language evidence plus planned next steps. No fresh cloud or interoperability execution; global article gates separate.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-multi-turn-editorial.json",
+        "testing/evidence/2026-11-20-multi-turn-guide-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "B04",
+      "title": "将 Run 事件显示到你的应用",
+      "target": "/build/stream-events",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Actual loopback SSE/browser disconnect replay completed 12 unique rows on same synthetic Run, kept execution state independent and reconciled final query. SQLite checkpoint and real cloud SDK replay evidence remain separate scoped layers; no single integrated cloud-browser rerun claimed.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-event-checkpoint-example.json",
+        "testing/evidence/2026-11-20-event-delivery-guide-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch1.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch2.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "B05",
+      "title": "为 Agent 绑定 Tools 与 MCP",
+      "target": "/build/tools",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Reviewed Tool selection/binding, six required/optional readiness cases, pinned operations and per-call permissions. Added dated real read-only MCP example, approval bridge and integration next steps. No fresh cloud or PostgreSQL run; global gates separate.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-tool-flow-editorial.json",
+        "testing/evidence/2026-11-20-tool-binding-guide-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "B06",
+      "title": "处理工具授权与重新授权",
+      "target": "/build/tool-authorization",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual authorization/approval recovery source-reviewed, with manual credential repair and lost-decision response paths. Historical success/refusal/write-count/cancellation evidence scope explicit. Python snippets parsed and structure passed; no fresh external execution or global release acceptance.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-tool-flow-editorial.json",
+        "testing/evidence/2026-11-20-authorization-approval-guide-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "B07",
+      "title": "在你的产品中加入人工审批",
+      "target": "/build/approvals",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual authorization/approval recovery source-reviewed, with manual credential repair and lost-decision response paths. Historical success/refusal/write-count/cancellation evidence scope explicit. Python snippets parsed and structure passed; no fresh external execution or global release acceptance.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-tool-flow-editorial.json",
+        "testing/evidence/2026-11-20-authorization-approval-guide-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "B08",
+      "title": "获取、保留和交付任务产物",
+      "target": "/build/artifacts",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Reviewed artifact/preview boundaries, added worked retention and failure/access cases and scoped dated evidence. Local Runtime snapshot/symlink test and corrected structure check passed. No fresh two-file model exercise, browser or expiry run; global gates separate.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-delivery-preview-editorial.json",
+        "testing/evidence/2026-11-20-artifact-preview-guide-review.json",
+        "testing/evidence/2026-11-20-recovery-diagram-and-artifact-manifest-review.json",
+        "testing/evidence/2026-11-20-artifact-retention-docs-cloud.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "B09",
+      "title": "安全地预览 Agent 创建的 Web 应用",
+      "target": "/build/private-preview",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Reviewed artifact/preview boundaries, added worked retention and failure/access cases and scoped dated evidence. Local Runtime snapshot/symlink test and corrected structure check passed. No fresh two-file model exercise, browser or expiry run; global gates separate.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-delivery-preview-editorial.json",
+        "testing/evidence/2026-11-20-artifact-preview-guide-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "B10",
+      "title": "让空闲 Session 休眠并自动唤醒",
+      "target": "/build/idle-and-wake",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Eight scoped dual-SDK real idle/wake records verify files/native conversation and closed cleanup; arbitrary process and memory retention each explicitly unverified, not inferred from provider strategy.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-configuration-lifecycle-editorial.json",
+        "testing/evidence/2026-11-20-idle-recovery-guide-review.json",
+        "testing/evidence/2026-11-20-sdk-lifecycle-resolution-examples-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch2.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "B11",
+      "title": "处理断线、重试、取消与不确定结果",
+      "target": "/build/recovery",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Reviewed idle activity clock and preservation dimensions plus recovery completion/escalation conditions. Source/evidence scope and next steps explicit; structure passed. No fresh idle/cloud/fault execution; process/memory measurements and global gates remain separate.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-recovery-network-editorial.json",
+        "testing/evidence/2026-11-20-idle-recovery-guide-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "B12",
+      "title": "使用可复用的 Agent 配置",
+      "target": "/build/agent-templates",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual configuration guide reviewed with concrete revision/lifecycle/network evidence and planned next steps. Structure passed; historical evidence scope explicit, no new cloud or database run; template example and global gates remain open. Added contextual Agent prepare/preflight/apply/copy/archive and snapshot helpers; bilingual code, syntax/types and fake-client intent/conflict checks pass. No real template or A/B/C cloud mutation.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-configuration-lifecycle-editorial.json",
+        "testing/evidence/2026-11-20-configuration-guides-review.json",
+        "testing/evidence/2026-11-20-sdk-agent-examples-review.json",
+        "testing/evidence/2026-11-20-template-revisions-docs-cloud.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "B13",
+      "title": "更换连接并管理既有 Session",
+      "target": "/build/connection-lifecycle",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual configuration guide reviewed with concrete revision/lifecycle/network evidence and planned next steps. Structure passed; historical evidence scope explicit, no new cloud or database run; template example and global gates remain open.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-configuration-lifecycle-editorial.json",
+        "testing/evidence/2026-11-20-configuration-guides-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "B14",
+      "title": "配置 Sandbox 资源与网络策略",
+      "target": "/build/sandbox-policy",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual configuration guide reviewed with concrete revision/lifecycle/network evidence and planned next steps. Structure passed; historical evidence scope explicit, no new cloud or database run; template example and global gates remain open.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-recovery-network-editorial.json",
+        "testing/evidence/2026-11-20-configuration-guides-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "I01",
+      "title": "选择 Sandbox、Harness、模型与 Tools 的组合",
+      "target": "/integrations/choose",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual selection/capability/evidence entry review; eleven registry flags inspected and snapshot counts recomputed, runnable derivation added. Exact route evidence and four status meanings explicit. No fresh live validation; global gates separate.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-combination-evidence-sync.json",
+        "testing/evidence/2026-11-20-first-session-docs-cloud.json",
+        "testing/evidence/2026-11-20-project-docs-cloud.json",
+        "testing/evidence/2026-11-20-integration-entry-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "I02",
+      "title": "Sandbox 能力总览",
+      "target": "/integrations/sandboxes",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual selection/capability/evidence entry review; eleven registry flags inspected and snapshot counts recomputed, runnable derivation added. Exact route evidence and four status meanings explicit. No fresh live validation; global gates separate.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-integration-entry-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "I03",
+      "title": "接入 E2B",
+      "target": "/integrations/sandboxes/e2b",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual provider task-book review; explicit resource identities, preparation/restore conditions and scoped historical evidence. Six actual schema checks passed; structure passed. No new provider/model calls; global gates separate.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-e2b-modal-guide-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "I04",
+      "title": "接入 Modal",
+      "target": "/integrations/sandboxes/modal",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual provider task-book review; explicit resource identities, preparation/restore conditions and scoped historical evidence. Six actual schema checks passed; structure passed. No new provider/model calls; global gates separate.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-e2b-modal-guide-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "I05",
+      "title": "接入 Blaxel",
+      "target": "/integrations/sandboxes/blaxel",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual provider task-book review, scoped concurrent-preview and standby evidence, explicit cleanup/unknown billing boundaries. Eight schema checks and structure passed; no new live provider or global acceptance.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-blaxel-sprites-guide-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "I06",
+      "title": "接入 Fly Sprites",
+      "target": "/integrations/sandboxes/fly-sprites",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual provider task-book review, scoped concurrent-preview and standby evidence, explicit cleanup/unknown billing boundaries. Eight schema checks and structure passed; no new live provider or global acceptance.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-blaxel-sprites-guide-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "I07",
+      "title": "接入 Upstash Box",
+      "target": "/integrations/sandboxes/upstash-box",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual persistent resource/private transport/lifecycle review. Upstash worked buffer/input distinctions and Vercel readiness table added. Three deterministic relay tests and structure passed; no new live provider execution.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-upstash-vercel-guide-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "I08",
+      "title": "接入 Vercel Sandbox",
+      "target": "/integrations/sandboxes/vercel",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual persistent resource/private transport/lifecycle review. Upstash worked buffer/input distinctions and Vercel readiness table added. Three deterministic relay tests and structure passed; no new live provider execution.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-combination-evidence-sync.json",
+        "testing/evidence/2026-11-20-first-session-docs-cloud.json",
+        "testing/evidence/2026-11-20-project-docs-cloud.json",
+        "testing/evidence/2026-11-20-upstash-vercel-guide-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "I09",
+      "title": "接入 Agent37",
+      "target": "/integrations/sandboxes/agent37",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Actual failed /tmp stop/start probe retained with missing-file output and confirmed cleanup, plus later managed-workspace dual-SDK recovery success. Reserved /health vs Runtime /_hexagon/health distinction documented. PID-file loss does not prove process death.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-agent37-boat-freestyle-guide-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch2.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "I10",
+      "title": "接入 Boat",
+      "target": "/integrations/sandboxes/boat",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "noEnv requests, deletion receipts and cloud cleanup are evidenced. Actual account-level environment-marker noninheritance remains unobserved; source flag cannot prove provider enforcement.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-agent37-boat-freestyle-guide-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch2.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "I11",
+      "title": "接入 Freestyle VMs",
+      "target": "/integrations/sandboxes/freestyle",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Real uploaded seven-file project, verified receipt, fixed-test preservation, Harness test-report artifact, independent both-SDK tests and confirmed deletion; separate dual-SDK idle/wake records prove scoped file/conversation retention. Arbitrary execution users/memory not generalized.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-agent37-boat-freestyle-guide-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch2.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "I12",
+      "title": "接入 Fly Machines",
+      "target": "/integrations/sandboxes/fly-machines",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual current-source and scoped historical-evidence review; 20 mock-provider connector tests passed. No new cloud execution. Task-book groups reviewed; global editorial/release acceptance separate.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-fly-instabox-guide-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "I13",
+      "title": "接入 Instabox",
+      "target": "/integrations/sandboxes/instabox",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual current-source and scoped historical-evidence review; 20 mock-provider connector tests passed. No new cloud execution. Task-book groups reviewed; global editorial/release acceptance separate.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-fly-instabox-guide-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "I14",
+      "title": "选择并配置 Harness",
+      "target": "/integrations/harnesses",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual Harness guide review; exact template status inspected, 24 local tests passed and one database test skipped. I15/I16 complete execution acceptance remains partial; global publication gates separate.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-harness-guides-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "I15",
+      "title": "注册并运行 OCI Harness",
+      "target": "/integrations/harnesses/oci",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Exact documented OpenCode digest matches successful independent Python/TypeScript Modal cloud records with artifact checks and cleanup. Current DB preflight rejects unsupported providers before Session/resource-operation creation; recipes are not claimed published.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-harness-distribution-editorial.json",
+        "testing/evidence/2026-11-20-harness-guides-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch2.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "I16",
+      "title": "使用自定义 source-package Harness",
+      "target": "/integrations/harnesses/source-package",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Minimal Python package full real journey retained; current DB immutable-version/reconstruction and strict parser checks pass. Source differences limited to optional initialization context/system; historical execution applies only to unchanged no-initialization path, not the new digest in full.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-harness-distribution-editorial.json",
+        "testing/evidence/2026-11-20-harness-guides-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch2.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "I17",
+      "title": "连接你自己的模型端点",
+      "target": "/integrations/models",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual model/protocol review, exact dated endpoint table, scoped historical dual-SDK evidence and 10 local mock-upstream tests. No new cloud/model calls; global article acceptance separate.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-model-integration-editorial.json",
+        "testing/evidence/2026-11-20-model-guides-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "I18",
+      "title": "理解模型协议兼容性",
+      "target": "/integrations/model-protocols",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual model/protocol review, exact dated endpoint table, scoped historical dual-SDK evidence and 10 local mock-upstream tests. No new cloud/model calls; global article acceptance separate.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-model-integration-editorial.json",
+        "testing/evidence/2026-11-20-model-guides-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "I19",
+      "title": "接入应用连接器",
+      "target": "/integrations/apps",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "37 application entries retain exact scope and evidence labels. Current deployment has zero configured OAuth clients/connections; one real authorized consent example awaits the already-requested test app/account choice.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-application-directory-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch1.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch2.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "I20",
+      "title": "连接受保护的 HTTP API",
+      "target": "/integrations/http-tools",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Existing read/write real application journey and credential-isolation records combined with current real-DB broker/access tests: approval before dispatch, refusal/cancellation, duplicate settlement and lost-write-response no replay. Mock-transport fault checks distinguished from cloud execution.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-http-mcp-editorial.json",
+        "testing/evidence/2026-11-20-http-mcp-guide-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch2.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "I21",
+      "title": "连接 Remote MCP 服务",
+      "target": "/integrations/mcp",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Current official MCP client exercised controlled real HTTP initialize/paginated discovery/call plus legacy SSE fixture. Protocol/transport scopes and permission/expiry/schema/unknown-write risks documented; historical public cloud calls separately scoped.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-http-mcp-editorial.json",
+        "testing/evidence/2026-11-20-http-mcp-guide-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch1.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch2.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "I22",
+      "title": "已验证的执行组合",
+      "target": "/integrations/verified-combinations",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual selection/capability/evidence entry review; eleven registry flags inspected and snapshot counts recomputed, runnable derivation added. Exact route evidence and four status meanings explicit. No fresh live validation; global gates separate.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-combination-evidence-sync.json",
+        "testing/evidence/2026-11-20-first-session-docs-cloud.json",
+        "testing/evidence/2026-11-20-project-docs-cloud.json",
+        "testing/evidence/2026-11-20-integration-entry-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "C01",
+      "title": "Session、Run 与 Agent 模板",
+      "target": "/concepts/sessions-runs-agents",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual source review of object identities, active Run constraint, original input/origin/key recovery, template revision/archival and lifecycle decisions. Added concrete task narrative and counterexamples. Structural check passed; relationship diagram rendering remains pending. Current concept gallery generated 26 SVGs; sampled Chinese responsibility label fixed. Narrow worker sequence failed readability under auto-shrink; final responsive rendering remains open. Current bilingual diagram desktop review and narrow-container checks completed in local Mermaid preview; final-site rendering remains separate.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-session-concept-review.json",
+        "testing/evidence/2026-11-20-concept-diagram-render.json",
+        "testing/evidence/2026-11-20-current-diagram-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "C02",
+      "title": "控制平面、Runtime、Harness 与 Sandbox",
+      "target": "/concepts/execution-architecture",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Expanded both languages with project-task responsibility and local/hosted diagrams, resource/credential ownership, model/Tool boundaries and source-linked next steps. Reviewed worker, Runtime, access, broker and artifact implementation. Structural check passed; rendering and global release gates remain pending. Current concept gallery generated 26 SVGs; sampled Chinese responsibility label fixed. Narrow worker sequence failed readability under auto-shrink; final responsive rendering remains open.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-execution-architecture-review.json",
+        "testing/evidence/2026-11-20-concept-diagram-render.json",
+        "testing/evidence/2026-11-20-architecture-recovery-visual-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "C03",
+      "title": "初始化、预检与配置固定",
+      "target": "/concepts/initialization",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Source-reviewed initialization stages, three preflight sequences, required/optional Tool bindings, and Agent revision versus connection version in both languages. Four existing pure compatibility tests passed; no new live preflight/cloud execution; rendered diagram review pending. Current concept gallery generated 26 SVGs; sampled Chinese responsibility label fixed. Narrow worker sequence failed readability under auto-shrink; final responsive rendering remains open.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-initialization-concept-review.json",
+        "testing/evidence/2026-11-20-concept-diagram-render.json",
+        "testing/evidence/2026-11-20-initialization-diagram-visual-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "C04",
+      "title": "持久事件与故障恢复",
+      "target": "/concepts/events-and-recovery",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Reviewed client/worker/Runtime recovery and startup-stage distinctions. Added bilingual startup boundary table. Fourteen TypeScript tests and one Python interruption test passed locally; no cloud fault injection or diagram rendering. Current concept gallery generated 26 SVGs; sampled Chinese responsibility label fixed. Narrow worker sequence failed readability under auto-shrink; final responsive rendering remains open.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-events-recovery-editorial.json",
+        "testing/evidence/2026-11-20-recovery-concept-review.json",
+        "testing/evidence/2026-11-20-concept-diagram-render.json",
+        "testing/evidence/2026-11-20-architecture-recovery-visual-review.json",
+        "testing/evidence/2026-11-20-recovery-diagram-and-artifact-manifest-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "C05",
+      "title": "工作区、对话、产物与持久化边界",
+      "target": "/concepts/persistence",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Reviewed six data classes and lifecycle retention matrix, artifact/export distinction, database/key recovery, and scoped existing cloud receipts matching current example hashes. Added evidence and loss scenarios in both languages. One local filesystem test passed; no new cloud or restore run; global release checks pending.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-persistence-editorial.json",
+        "testing/evidence/2026-11-20-persistence-concept-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "C06",
+      "title": "凭据、授权与信任边界",
+      "target": "/concepts/security-boundaries",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Reviewed credential paths, identity limits, approval versus authentication, environment visibility and revocation semantics. Added six-action revocation matrix and explicit Session/Run grant distinction in both languages. Structure passed; no new runtime or diagram visual verification. Current concept gallery generated 26 SVGs; sampled Chinese responsibility label fixed. Narrow worker sequence failed readability under auto-shrink; final responsive rendering remains open.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-security-boundaries-editorial.json",
+        "testing/evidence/2026-11-20-security-concept-review.json",
+        "testing/evidence/2026-11-20-concept-diagram-render.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "C07",
+      "title": "能力声明、兼容性与验证证据",
+      "target": "/concepts/capabilities-and-evidence",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Reviewed six evidence scopes, two required counterexamples and terminology against I22. Added explicit resolver capability-ownership rules and bounded real tutorial evidence interpretation. Existing program hashes and four-journey/six-Run/one-combination counts checked; no new cloud run. Global release checks remain pending.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-capabilities-editorial.json",
+        "testing/evidence/2026-11-20-capabilities-concept-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "C08",
+      "title": "Serverless Session 的生命周期",
+      "target": "/concepts/serverless-lifecycle",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Reviewed lifecycle domains, four preservation strategies, idle/wake/expiry and unknown invocation boundaries. Added persisted idle-clock and checkpoint/restore identity examples. Fixed links and structural check passed; no new cloud tests or diagram rendering. Current concept gallery generated 26 SVGs; sampled Chinese responsibility label fixed. Narrow worker sequence failed readability under auto-shrink; final responsive rendering remains open. Current bilingual diagram desktop review and narrow-container checks completed in local Mermaid preview; final-site rendering remains separate.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-serverless-lifecycle-editorial.json",
+        "testing/evidence/2026-11-20-serverless-concept-review.json",
+        "testing/evidence/2026-11-20-concept-diagram-render.json",
+        "testing/evidence/2026-11-20-current-diagram-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "O01",
+      "title": "管理本地工作区",
+      "target": "/operate/local-workspace",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual operational/source review; 9 local tests passed, historical compiled local cloud/restore evidence scoped. Hosted topology and new diagram rendering remain unverified; no user service restart.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-deployment-guides-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "O02",
+      "title": "自托管控制平面",
+      "target": "/operate/self-host",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "One actual local compiled deployment path includes production dependency installation, real cloud tasks, restart/restore/history and cleanup; current source installation independently passed. No hosted/Kubernetes/HA claim.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-deployment-guides-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch2.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "O03",
+      "title": "配置网络入口、代理与受保护凭据通道",
+      "target": "/operate/networking",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Cloud credential path and separation of management/access listeners evidenced; actual rotated-connection Vercel task also passed. Final request-flow diagram readability remains G06 batch-3 review.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-deployment-guides-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch2.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "O04",
+      "title": "管理身份、权限与应用 Token",
+      "target": "/operate/access-control",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Matching-source actual HTTP token role/rotation/revocation checks and application submission reused; fresh isolated HTTP tenant suite rejects foreign reads/streams/mutations and all connection bindings with zero remote access.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-identity-credentials-guide-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch2.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "O05",
+      "title": "管理和轮换受保护凭据",
+      "target": "/operate/credentials",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Dedicated model connection credential replaced, invalidated, revalidated and enabled; new real Vercel/Pi task passed. Session closed, create/delete completed, test connection removed, original shared connection version unchanged. No upstream key or master-key rotation claim.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-identity-credentials-guide-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch2.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "O06",
+      "title": "观察运行并诊断故障",
+      "target": "/operate/observability",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Current read-only query correlates a real failed Run, persisted Harness execution-stage events and same-Session create/restore/delete operations; source-filter regression rejects arbitrary diagnostic data. Bilingual hypothetical case replaced.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-observability-reconciliation-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch2.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "O07",
+      "title": "对账和清理不确定的云资源与 Tool 操作",
+      "target": "/operate/reconciliation",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual diagnostic/reconciliation source review; two filter tests passed. Provider-specific deletion correction and evidence-based decision tables. No new failed-Run cloud investigation or remote reconciliation; global gates remain.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-observability-reconciliation-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "O08",
+      "title": "升级版本与迁移数据",
+      "target": "/operate/upgrades",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Verified install/restore process and build chronology documented, but exact final-build cloud pair is not attested: tasks precede beta-delivery. No published-version requirement added; exact source/destination execution binding remains incomplete.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-upgrade-backup-guide-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch2.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "O09",
+      "title": "备份和恢复控制平面",
+      "target": "/operate/backup-restore",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual source review of upgrade/backup boundaries and interrupted restore states; historical isolated restore/cloud evidence linked. No new restore executed; exact published upgrade-pair acceptance remains partial.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-upgrade-backup-guide-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "O10",
+      "title": "管理容量、配额与成本",
+      "target": "/operate/capacity-and-cost",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual capacity/diagnostic source review; explicit hypothetical occupancy calculations and scoped historical ingress recovery. No new benchmark, tariff lookup or cloud fault injection.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-capacity-editorial.json",
+        "testing/evidence/2026-11-20-capacity-troubleshooting-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "O11",
+      "title": "按症状排查问题",
+      "target": "/operate/troubleshooting",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual capacity/diagnostic source review; explicit hypothetical occupancy calculations and scoped historical ingress recovery. No new benchmark, tariff lookup or cloud fault injection.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-troubleshooting-editorial.json",
+        "testing/evidence/2026-11-20-capacity-troubleshooting-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "R01",
+      "title": "HTTP API 参考",
+      "target": "/reference/http",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "All 79 routes mapped to exact normative fields, roles, errors, effects and cURL examples. Seven actual HTTP records were source-hash revalidated; remaining families have explicit source review. This proves reference coverage, not 79 cloud journeys.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-runs-http-reference-review.json",
+        "testing/evidence/2026-11-20-session-http-followup-review.json",
+        "testing/evidence/2026-11-20-run-replay-reference-review.json",
+        "testing/evidence/2026-11-20-sdk-connection-examples-review.json",
+        "testing/evidence/2026-11-20-sdk-access-examples-review.json",
+        "testing/evidence/2026-11-20-sdk-operations-examples-review.json",
+        "testing/evidence/2026-11-20-sdk-lifecycle-resolution-examples-review.json",
+        "testing/evidence/2026-11-20-credential-http-contract-review.json",
+        "testing/evidence/2026-11-20-monitoring-http-contract-review.json",
+        "testing/evidence/2026-11-20-resource-review-http-contract-review.json",
+        "testing/evidence/2026-11-20-run-observation-http-contract-review.json",
+        "testing/evidence/2026-11-20-artifact-http-contract-review.json",
+        "testing/evidence/2026-11-20-preview-management-http-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch1.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "R02",
+      "title": "Python SDK 参考",
+      "target": "/reference/python",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "76 public method contexts/contracts reviewed in batch 1; independent Python first/project and full historical application journeys retained at exact scope, with current installed-SDK discovery/import and shared HTTP/parser checks. No per-method cloud rerun required.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-sdk-pagination-reference-review.json",
+        "testing/evidence/2026-11-20-sdk-credential-examples-review.json",
+        "testing/evidence/2026-11-20-sdk-connection-examples-review.json",
+        "testing/evidence/2026-11-20-sdk-oauth-examples-review.json",
+        "testing/evidence/2026-11-20-sdk-agent-examples-review.json",
+        "testing/evidence/2026-11-20-sdk-access-examples-review.json",
+        "testing/evidence/2026-11-20-sdk-operations-examples-review.json",
+        "testing/evidence/2026-11-20-sdk-lifecycle-resolution-examples-review.json",
+        "testing/evidence/2026-11-20-sdk-example-callsite-inventory.json",
+        "testing/evidence/2026-11-20-sdk-method-navigation-review.json",
+        "testing/evidence/2026-11-20-doc-example-setup-syntax-review.json",
+        "testing/evidence/2026-11-20-product-doc-code-syntax.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch1.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch2.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "R03",
+      "title": "TypeScript SDK 参考",
+      "target": "/reference/typescript",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "76 public method contexts/contracts and response type gaps reviewed; independent TypeScript first/project and full historical application journeys scoped separately, current package build/discovery and shared HTTP checks passed. No universal browser/edge claim.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-sdk-pagination-reference-review.json",
+        "testing/evidence/2026-11-20-sdk-credential-examples-review.json",
+        "testing/evidence/2026-11-20-sdk-connection-examples-review.json",
+        "testing/evidence/2026-11-20-sdk-oauth-examples-review.json",
+        "testing/evidence/2026-11-20-sdk-agent-examples-review.json",
+        "testing/evidence/2026-11-20-sdk-access-examples-review.json",
+        "testing/evidence/2026-11-20-sdk-operations-examples-review.json",
+        "testing/evidence/2026-11-20-sdk-lifecycle-resolution-examples-review.json",
+        "testing/evidence/2026-11-20-sdk-example-callsite-inventory.json",
+        "testing/evidence/2026-11-20-sdk-method-navigation-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch1.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch2.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "R04",
+      "title": "配置与环境变量",
+      "target": "/reference/configuration",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Reviewed process/local saved/Session/provider scopes and readers; added bilingual precedence and full-replacement examples, protected-upstream settings and error behavior; seven direct configuration evaluations and eight existing deterministic/local tests passed. No service restart, clean installation or hosted cloud acceptance performed; editorial acceptance remains draft. Standard proxy variables now have type/optionality/sensitivity/restart and local/hosted precedence entries; three additional local precedence cases passed. Direct dispatcher/tunnel behavior remains source-reviewed.",
+      "reviewed_at": "2026-11-20",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-configuration-reference-review.json"
+      ]
+    },
+    {
+      "id": "R05",
+      "title": "事件、状态与转换",
+      "target": "/reference/events-and-states",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Current-source state/event reference coverage reviewed: 45 lifecycle table query sites, migration defaults, dynamic/parameterized writes, Runtime states and 36 bilingual event samples. No all-transition live acceptance or final rendering claim.",
+      "reviewed_at": "2026-11-20",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-events-reference-review.json",
+        "testing/evidence/2026-11-20-event-example-inventory.json",
+        "testing/evidence/2026-11-20-state-transitions-reference-review.json",
+        "testing/evidence/2026-11-20-event-emitter-review.json",
+        "testing/evidence/2026-11-20-lifecycle-transition-reference-review.json",
+        "testing/evidence/2026-11-20-state-transition-coverage-review.json"
+      ]
+    },
+    {
+      "id": "R06",
+      "title": "错误码与处理建议",
+      "target": "/reference/errors",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Added ten concrete error branches with status/source/action, corrected submission source pointers, and bilingual lost-response/stale-approval/export-failure cases. Ten literal branch checks and six durable-intent simulation tests passed. Public error catalog and full recovery acceptance remain scoped/draft. Full common-code table now source-matched: 41 rows, both languages aligned. Added successful-response failure semantics and corrected upload-window/immutable-registration actions; no remote fault injection.",
+      "reviewed_at": "2026-11-20",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-errors-reference-review.json"
+      ]
+    },
+    {
+      "id": "R07",
+      "title": "限制、默认值与支持范围",
+      "target": "/reference/limits",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Source-reviewed bounds; corrected upload Base64 validation scope and effective idle threshold. Added UTF-16/UTF-8/Base64 arithmetic, aggregate sizing, upload timing and error-stage guidance in both languages. Eight local evaluations and six existing deterministic tests passed; exhaustive boundaries, HTTP body-limit execution and cloud capacity not tested. All 30 numeric rows now have linked implementation symbols and configurability/rejection guidance; registry metadata and network-policy limits added. Source coverage is not exhaustive boundary/load testing.",
+      "reviewed_at": "2026-11-20",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-limits-reference-review.json",
+        "testing/evidence/2026-11-20-limits-source-map.json"
+      ]
+    },
+    {
+      "id": "R08",
+      "title": "CLI 与本地管理命令",
+      "target": "/reference/cli",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual CLI reference includes failure/partial-progress actions, separate service/PostgreSQL timeout semantics and meaning of verified backup/restore output. Seven actual isolated launcher cases passed without database/service/cloud activity; operational start/restore acceptance remains separate.",
+      "reviewed_at": "2026-11-20",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-cli-reference-review.json"
+      ]
+    },
+    {
+      "id": "R09",
+      "title": "术语表",
+      "target": "/reference/glossary",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Bilingual glossary definitions/boundaries/link targets aligned; added explicit Agent revision and seven related terms, six operation/identity distinctions and translation conventions. 44 term labels/order/links match and targets exist; runtime claims rely on linked contracts, not new execution.",
+      "reviewed_at": "2026-11-20",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-glossary-reference-review.json"
+      ]
+    },
+    {
+      "id": "D01",
+      "title": "搭建开发环境并提交第一个改动",
+      "target": "/contribute/development",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "The existing bilingual no-cloud documentation edit exercise and actual structural-check result meet the original small-change requirement. Clean installation belongs to S03; no additional clean-room rehearsal is required for D01.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-contributor-entry-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch1.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "D02",
+      "title": "代码地图与模块边界",
+      "target": "/contribute/codebase",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Developer setup/code-map source review and seven deployment-setting tests plus five pure environment assertions passed. Clean-environment full setup and rendered diagram review remain outstanding.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-codebase-editorial.json",
+        "testing/evidence/2026-11-20-contributor-entry-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "D03",
+      "title": "添加一个 Sandbox 连接器",
+      "target": "/contribute/sandbox-connectors",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Existing skeleton/Boat references plus current zero/multiple/lost-response lifecycle assertions pass without second allocation; documentation requires provider-specific tests and dual-SDK cloud cleanup before elevating support, not creation of a new provider in this writing task.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-sandbox-contributor-editorial.json",
+        "testing/evidence/2026-11-20-extension-guides-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch1.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch2.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "D04",
+      "title": "添加一个 Harness 适配器",
+      "target": "/contribute/harness-adapters",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Shared minimal custom-package real journey covers two turns, Tool, artifacts and queued cancellation; current parser/failed-result and package tests pass, model protocol/OCI/package contracts linked. No all-interruption-race claim.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-harness-contributor-editorial.json",
+        "testing/evidence/2026-11-20-extension-guides-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch2.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "D05",
+      "title": "添加 Tool 或应用连接器",
+      "target": "/contribute/tool-connectors",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Existing read/write broker fixtures, real DB/HTTP dual-SDK refusal, duplicate/uncertain-write and cancellation tests pass. Guide links canonical fixtures and explicitly excludes real-account certification.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-tool-contributor-editorial.json",
+        "testing/evidence/2026-11-20-extension-guides-review.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch1.json",
+        "testing/evidence/2026-11-20-docs-closeout-batch2.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "D06",
+      "title": "运行测试与记录真实验收",
+      "target": "/contribute/testing",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Contribution workflow/source review; missing-database gate rejection and skipped-test distinction rechecked. Structure passed; D07 full snippet/translation exercise and global publication gates remain open.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-test-gates-docs.json",
+        "testing/evidence/2026-11-20-contribution-workflow-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "D07",
+      "title": "编写、校验和翻译文档",
+      "target": "/contribute/documentation",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Contribution workflow/source review; missing-database gate rejection and skipped-test distinction rechecked. Structure passed; D07 full snippet/translation exercise and global publication gates remain open. Added complete exact-method contract/example navigation map (76 entries per SDK incl. constructor), checked target call text and stable regeneration; no runtime or rendered-table acceptance. Fixed Python diagnostic environment continuity; fresh temporary SDK install/import/help passes. Added non-executing Markdown syntax checker: 114 Python and 114 TypeScript blocks pass; not runtime or minimum-version acceptance. Completed actual bilingual command/source/status change exercise; 96-pair normalized destination structure and current anchors checked. D07 task-book groups proven, global translation/render/publication gates separate.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-documentation-workflow.json",
+        "testing/evidence/2026-11-20-concept-diagram-render.json",
+        "testing/evidence/2026-11-20-contribution-workflow-review.json",
+        "testing/evidence/2026-11-20-doc-link-gate-review.json",
+        "testing/evidence/2026-11-20-current-diagram-review.json",
+        "testing/evidence/2026-11-20-sdk-method-navigation-review.json",
+        "testing/evidence/2026-11-20-doc-example-setup-syntax-review.json",
+        "testing/evidence/2026-11-20-product-doc-code-syntax.json",
+        "testing/evidence/2026-11-20-docs-bilingual-worked-change-review.json",
+        "testing/evidence/2026-11-20-docs-bilingual-link-structure.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    },
+    {
+      "id": "D08",
+      "title": "提出设计变更并提交贡献",
+      "target": "/contribute/proposals-and-prs",
+      "zh_CN": "draft",
+      "en": "draft",
+      "verification": "Contribution workflow/source review; missing-database gate rejection and skipped-test distinction rechecked. Structure passed; D07 full snippet/translation exercise and global publication gates remain open.",
+      "review_evidence": [
+        "testing/evidence/2026-11-20-proposals-editorial.json",
+        "testing/evidence/2026-11-20-contribution-workflow-review.json"
+      ],
+      "reviewed_at": "2026-11-20"
+    }
+  ]
+}

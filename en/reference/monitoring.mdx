@@ -1,0 +1,158 @@
+---
+title: "Monitoring and collection HTTP contract"
+---
+
+These read models describe persisted control-plane state. They are not direct Provider inspections, billing measurements or proof of successful model execution. All `/v1` routes require authentication and tenant scoping. Health, Run collection and Session list/activity permit application tokens; overview, pending and Fleet require an owner.
+
+## Health
+
+`GET /v1/health` queries the database and returns process_id, boolean active_runs, api/database readiness, credentials, credential_access and execution. Optional health services can report not_configured. If credentials.state is unavailable, the route returns **503**; otherwise its normal response is **200**. Database errors use the server error handler. Inspect the fields, not just the HTTP status: the handler does not turn every degraded execution/access condition into 503.
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" "$HEXAGON_API_URL/v1/health"
+```
+
+`GET /health/live` is a separate unauthenticated liveness route returning `{status:"alive"}`. It does not query dependencies. Use readiness and lifecycle diagnostics for operational decisions rather than treating liveness as full health.
+
+## Session collection
+
+`GET /v1/sessions` returns **200**, `{sessions:[...],offset,next_offset}`. Limit defaults 25 (integer 1–100), offset defaults 0 (nonnegative integer), search defaults empty (≤200 characters), state defaults empty (≤40). Nonempty state is an exact Session-state filter. Search matches case-insensitive substrings of Session ID, Agent ID and definition name. Sort is created_at DESC, id DESC. Next offset is null at the observed end; concurrent inserts can shift pages.
+
+```sh
+curl --fail-with-body --silent --show-error --get \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  --data-urlencode 'limit=25' --data-urlencode 'offset=0' --data-urlencode 'state=open' \
+  "$HEXAGON_API_URL/v1/sessions"
+```
+
+Rows contain id, agent_id, agent_revision, definition, env_names, state, sandbox, created_at, updated_at, harness, runtime_state and nullable latest_run. Latest_run contains id/state/input_preview (first 240 database text characters), selected by Run created_at DESC/id DESC. Runtime state comes from the recorded binding. This projection differs from single-Session GET and Fleet; do not infer a universal Session response type across all routes. Environment values are not returned.
+
+## Task activity
+
+`GET /v1/sessions/activity` accepts period `24h` (default) or `7d`. It returns **200** with active_sessions, idle_sessions, paused_sessions, period, buckets and checked_at.
+
+```sh
+curl --fail-with-body --silent --show-error --get \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" --data-urlencode 'period=24h' \
+  "$HEXAGON_API_URL/v1/sessions/activity"
+```
+
+| Metric | Definition |
+| --- | --- |
+| active_sessions | Open/paused/pausing/resuming Sessions with a nonterminal Run |
+| idle_sessions | Open Sessions without a nonterminal Run |
+| paused_sessions | Sessions currently paused, regardless of queued work |
+| buckets[].active_sessions | Distinct Session IDs whose Runs overlap that interval |
+
+The categories are not necessarily disjoint: a paused Session with newly submitted work can be active and paused. Each bucket has start and active_sessions. The 24h period has hourly rolling buckets; 7d has daily rolling buckets anchored to query time, not calendar midnight. Terminal Run overlap ends at updated_at; nonterminal overlap extends to current time. These counts cover the tenant's full data rather than the current Session list page. They measure task activity, not CPU utilization, HTTP traffic or billed compute.
+
+## Overview
+
+`GET /v1/overview` returns **200**, counters plus checked_at:
+
+- ready_connections: undeleted, enabled, ready connection rows.
+- open_sessions: state open, not all nonclosed Sessions.
+- active_runs: all nonterminal Runs.
+- pending_approvals: pending approval rows.
+- pending_authorizations: Tool calls waiting_authorization.
+- unknown_operations: all unknown resource operations, including acknowledged ones.
+- active_agents: unarchived Agent templates.
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" "$HEXAGON_API_URL/v1/overview"
+```
+
+## Pending work
+
+`GET /v1/pending` returns **200**, `{items:[...],offset,next_offset}`. It uses the same limit/offset bounds as collection queries. Although shared parsing accepts search/state, the current SQL does not apply those two filters. Do not present them as supported filtering behavior on this endpoint.
+
+```sh
+curl --fail-with-body --silent --show-error --get \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  --data-urlencode 'limit=25' --data-urlencode 'offset=0' \
+  "$HEXAGON_API_URL/v1/pending"
+```
+
+Rows contain id, kind, state, session_id, nullable run_id and created_at, ordered oldest first by created_at/id. Kinds are approval (pending), authorization (Tool waiting_authorization), tool_outcome (Tool unknown), resource (resource unknown and review_state not acknowledged). An acknowledged unknown operation therefore remains in the overview count but disappears from this queue. These are stored pending rows; read the corresponding operation before acting, since the associated Run or decision may have changed.
+
+## Fleet snapshot
+
+`GET /v1/fleet` returns **200**, `{sessions:[...]}`, at most the latest 200 Sessions by creation time. There is no pagination contract. Each entry contains id, agent_id, definition, env_names, state, sandbox, created_at, updated_at, runtime_state, latest_run and resource_operations.
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" "$HEXAGON_API_URL/v1/fleet"
+```
+
+Fleet reports runtime_state=stopped for closed Sessions; otherwise it uses the persisted binding state. Latest_run has id/state/updated_at, selected by creation time descending. Each resource operation has id, kind, state, provider_resource_id, reason (only populated for unknown/rejected) and updated_at. Resource operations are ordered by creation time/ID; no records yield an empty array. This is not a live Provider poll and cannot prove that all remote resources are absent. Its 200-Session bound must not be used to certify global cleanup.
+
+Malformed query values return `400 invalid_request`. Owner-only route access with an application token returns `403 owner_token_required`; missing identity returns 401. Use [resource operations](/en/reference/resource-operations) and [Runs](/en/reference/runs) for object-specific investigation. Sources: [query implementation](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/queries.ts), [Fleet projection](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts), [HTTP routes](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts). The [monitoring contract review](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-monitoring-http-contract-review.json) passed 36 checks through current handlers and real PostgreSQL in a newly migrated isolated schema. It covered roles, tenant isolation, pagination, search/state semantics, pending categories, activity overlap, Fleet bounds and readiness responses. The schema was removed afterward. These are controlled recorded-state fixtures, not a cloud monitoring or network transport acceptance run.
+
+## SDK examples: read separate operational views
+
+Use an initialized owner client because overview and pending are owner-only. These helpers are read-only and retain each collection envelope, including its own `next_offset`. Defining the functions does not issue requests. The TypeScript snippets use the `Hexagon` import from SDK setup.
+
+```python
+def read_operations_page(client, session_offset=0, pending_offset=0):
+    return {
+        'overview': client.overview(),
+        'sessions': client.list_sessions(limit=25, offset=session_offset, state='open'),
+        'pending': client.pending(limit=25, offset=pending_offset),
+        'activity': client.session_activity('24h'),
+    }
+
+
+def read_authenticated_health(client):
+    return client.request('GET', '/health')
+```
+
+```typescript
+async function readOperationsPage(
+  client: Hexagon, sessionOffset = 0, pendingOffset = 0,
+) {
+  return {
+    overview: await client.overview(),
+    sessions: await client.listSessions({ limit: 25, offset: sessionOffset, state: 'open' }),
+    pending: await client.pending(25, pendingOffset),
+    activity: await client.sessionActivity('24h'),
+  };
+}
+
+async function readAuthenticatedHealth(client: Hexagon) {
+  return await client.request('GET', '/health');
+}
+```
+
+
+`read_operations_page` / `readOperationsPage` returns four separately queried observations, not one consistent snapshot. Pass the Session page's `next_offset` back as `session_offset` / `sessionOffset`, and the pending page's cursor independently as `pending_offset` / `pendingOffset`. A null cursor means that collection reached its observed end; do not reuse a Session offset for pending work or infer total tenant counts from either page. Concurrent changes can shift offset pages.
+
+This example selects open Sessions only; it does not include every nonclosed Session. The overview's unknown-operation count can include acknowledged operations that the pending queue omits, and activity categories can overlap. Do not add those counts together as a single fleet size. Pending rows are prompts for investigation: fetch the underlying approval, Tool call or resource operation and recheck current state before taking action. Do not turn this read helper into an automatic approval loop.
+
+Generic `request` receives `/health`, because the SDK supplies `/v1`; passing `/v1/health` would duplicate that prefix. It returns JSON on success, while health 503 becomes an SDK exception and is not returned by this helper as a normal status object. A 200 can still contain degraded execution/access fields. These read calls do not prove live Provider state or global cleanup. Ordinary authentication, role, validation, network and decode failures propagate; the combined helper stops at the first failed read and has no partial-result recovery built in.
+
+
+## Compare views without inventing a total
+
+Consider this recorded-state example: A is open with a running Run, B is paused with a queued Run, C is open without an active Run, and D is closed with a completed Run from the last hour. There are also two unknown resource operations, one acknowledged and one awaiting review.
+
+| Observation | Expected value | Why |
+| --- | --- | --- |
+| Overview `open_sessions` | 2 | A and C only; paused B is not open |
+| Activity `active_sessions` | 2 | A and B have nonterminal Runs |
+| Activity `idle_sessions` | 1 | C is open without active work |
+| Activity `paused_sessions` | 1 | B is counted here as well as active |
+| Last hourly bucket | 3 | A/B work overlaps the interval, and D's completed Run also overlapped it |
+| Overview `unknown_operations` | 2 | Includes the acknowledged operation |
+| Pending resource rows | 1 | Excludes the acknowledged operation |
+
+Do not add active, idle and paused to estimate total Sessions, or compare a historical bucket directly with a current active count. Acknowledgement changes the investigation queue, not the recorded uncertainty or remote resource state. Fetch the underlying record before deciding what to do.
+
+## Interpret empty and unhealthy responses
+
+- `state` is bounded text, not an enum in collection query parsing. An unrecognized state can return `200` with an empty list; it is not proof that no tasks exist. In contrast, an invalid activity `period` such as `30d` returns `400 invalid_request`.
+- Search is a case-insensitive literal substring. `%` and `_` are not SQL wildcard operators here. Use URL encoding so the server receives the intended search text.
+- A collection `next_offset: null` describes the observed end of that query. Fleet has no next cursor and silently caps its result at 200 Sessions; neither observation establishes global resource cleanup.
+- A closed Session's Fleet `runtime_state` is forced to `stopped`, while the Session collection exposes the recorded Runtime binding state. Read each projection's definition before treating differing fields as a new live observation.
+- Credential-unavailable Health returns `503` with the health object, including `credentials.state`, rather than the usual `{error:{code}}` envelope. `curl --fail-with-body` retains that body while returning failure. The current SDK generic request maps this response to status 503 with code `http_error`; it does not return the health fields through the helper above. A separate liveness `200` does not override readiness failure.

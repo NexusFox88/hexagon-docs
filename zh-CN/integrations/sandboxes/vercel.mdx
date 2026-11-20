@@ -1,0 +1,116 @@
+---
+title: "接入 Vercel Sandbox"
+---
+
+本页使用 Vercel 的持久 Sandbox 执行 Hexagon Harness，不涉及将应用发布成 Vercel 网站。Session 管理任务和工作区；平台私有预览不等于公开部署。
+
+## 凭据与项目绑定
+
+准备有目标 team/project 访问和 Sandbox 操作权限的 Vercel Token。连接 config 必须同时提供真实 project_id 与 team_id，不能使用项目显示名或浏览器当前团队代替。
+
+| 字段 | 约束 |
+| --- | --- |
+| project_id | `prj_` 后接字母或数字 |
+| team_id | `team_` 后接字母或数字 |
+| vcpus | 默认 2；允许 1 或 2—32 内的偶数整数 |
+
+字段名是 vcpus；schema 不接受自行添加 image、memory_mb 等字段。Token 留在控制平面，不能作为普通 Agent env 注入。下面是本地管理客户端示例，hosted 初始化见[自托管](/zh-CN/operate/self-host)。重复运行会创建新连接，应保存 ID 后复用。
+
+```python
+import os
+from hexagon import Hexagon
+client = Hexagon.local()
+connection = client.create_connection(
+    kind="sandbox", provider="vercel", name="Vercel workspace",
+    credential=os.environ["VERCEL_TOKEN"],
+    config={"project_id": os.environ["VERCEL_PROJECT_ID"],
+            "team_id": os.environ["VERCEL_TEAM_ID"], "vcpus": 2},
+)
+checked = client.validate_connection(connection["id"])
+if checked["status"] != "ready":
+    raise RuntimeError("Inspect Vercel connection diagnostics")
+client.update_connection(connection["id"], enabled=True)
+```
+
+```typescript
+import { Hexagon } from '@hexagon/agent-sdk';
+const client = await Hexagon.local();
+const credential = process.env.VERCEL_TOKEN;
+const projectId = process.env.VERCEL_PROJECT_ID;
+const teamId = process.env.VERCEL_TEAM_ID;
+if (!credential || !projectId || !teamId) throw new Error('Set Vercel account configuration');
+const connection = await client.createConnection({
+  kind: 'sandbox', provider: 'vercel', name: 'Vercel workspace', credential,
+  config: { project_id: projectId, team_id: teamId, vcpus: 2 },
+});
+const checked = await client.validateConnection(connection.id);
+if (checked.status !== 'ready') throw new Error('Inspect Vercel connection diagnostics');
+await client.updateConnection(connection.id, { enabled: true });
+```
+
+验证只列举指定 team/project 的 Sandbox，不证明完整任务或恢复成功。验证 ready 后单独启用。更改 Token、项目或资源配置后重新验证与启用，已有 Session 保留固定配置。
+
+## 执行和私有预览
+
+将 connection.id 用于[首个 Session](/zh-CN/start/first-session)的 sandbox_connection_id，选择兼容 Harness 与模型。分别以 Python / TypeScript 完成任务、实际产物检查和关闭。连接器创建 persistent=true 的 Sandbox，不暴露公开 ports；如果资源不是持久类型或存在公共 routes，会拒绝不符合预期的资源。
+
+预览经鉴权命令通道访问内部端口，由[Hexagon 预览授权](/zh-CN/build/private-preview)控制。浏览器不持有 Vercel Token；不要为了访问任务中的开发服务器额外创建公开路由。服务监听、命令通道、Runtime 健康与用户授权需要分别诊断。
+
+## 网络和原生凭据注入
+
+当前能力包括 native_credential_auth：连接器为控制平面的受限访问地址配置网络层凭据注入，按路径添加委托 Token；原始模型和 Tool 账户密钥仍在控制平面。访问代理继续检查请求方法、路径、Run 状态、版本与撤销，不因 Provider 注入就绕过平台授权。
+
+这项内部机制不等于向应用开放 network_allowlist。当前连接器不声明普通 Sandbox allowlist 或 OCI，创建要求 unrestricted。需要出站域名限制的应用应选择支持该能力的 Provider，而不是给 Vercel 配置增加未支持字段。
+
+## 空闲、停止与恢复
+
+平台暂停调用持久 Sandbox stop，下一轮通过 resume 恢复，应用只需向原 Session submit。文件系统和受管理对话数据保留，Runtime 重新准备；任意进程、内存和网络连接没有连续性保证，预览服务可能需要重新启动。
+
+只读检查使用 resume=false，不应为了查看状态唤醒资源。持久 Sandbox 的 stopped 映射为 paused，**不是已删除**。活动 Run，包括等待授权或审批的 Run，不是可随意暂停的空闲工作区。
+
+按[空闲与唤醒](/zh-CN/build/idle-and-wake)单独验证两轮、文件和对话。至少一轮在空闲前写入已知内容，下一轮读取并核对；记录精确 Harness、模型协议和两个 SDK 的结果。单轮完成不能证明恢复正确。
+
+## 关闭与未知结果
+
+关闭调用删除并请求 deleteOrphanSnapshots，之后再次查询确认资源不存在。删除请求被接受、stopped 或平台本地进程退出都不代表清理完成。控制平面负责持久期限，停止运行会影响它负责的及时清理。
+
+创建使用由原 operation ID 派生的精确名字。对账先按 namePrefix 列举并按完整名字过滤，不能把其他同前缀资源绑定到本 Session。网络或鉴权失败不等于不存在；只有明确 404 按不存在处理。恢复或删除未知时保留原资源记录，见[对账指南](/zh-CN/operate/reconciliation)。
+
+| 症状 | 排查 |
+| --- | --- |
+| 验证失败 | Token、team_id/project_id 配对、实际访问权限 |
+| 创建失败 | 账户额度、vcpus、资源策略不匹配 |
+| vercel_sandbox_not_running | 是否处于暂停；由正常 Session 唤醒流程恢复 |
+| vercel_unexpected_public_route | 资源是否被外部改为含公开路由，不绕过检查 |
+| 恢复后预览失败 | 文件保留与服务运行分开检查 |
+| vercel_deletion_unconfirmed | 保留原名字，重新核查删除与快照清理 |
+
+## 已验证的范围
+
+使用以下记录区分任务执行与恢复。每条记录只适用于对应程序、组合和日期。
+
+| 记录 | 实际结果 | 范围限制 |
+| --- | --- | --- |
+| [首个 Session，2026-11-20](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-first-session-docs-cloud.json) | Python 与 TypeScript 独立执行，内置 Pi 1.5.2 与已配置的 Messages / DeepSeek-V4-Flash 端点完成 Run；产物文本与哈希匹配；Session 已关闭，删除操作已完成 | 每个 SDK 一轮；没有空闲唤醒或预览断言 |
+| [项目任务，2026-11-20](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-project-docs-cloud.json) | 每个 SDK 在同一 Session 完成两轮、实际固定测试、私有预览中的筛选与 Reset 浏览器检查；关闭后旧预览被拒绝，产物字节仍可读取 | 不证明进程存活、授权自然过期、外部 Tools 或审批 |
+| [空闲唤醒记录，2026-11-19](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-harness-serverless-matrix.json) | Vercel/OpenCode/MiniMax-M3 记录包括空闲、唤醒、文件、原生 Session、对话和关闭：Python 使用 Chat Completions，TypeScript 使用 Messages | 属于历史 OpenCode 证据，不能当作 Pi/DeepSeek 的恢复结果或全部 SDK/协议交叉组合 |
+
+当前连接器源码另行支持 stop/resume、查看状态不唤醒、Runtime 命令传输和确认删除的机制说明。文件系统连续性与进程运行是不同主张：恢复记录不承诺任意进程在暂停后存活。教程使用已有的已验证连接，不证明从全新账户配置凭据的过程。按[安装指南](/zh-CN/start/install)准备环境、配置本页连接，再在自己的环境执行关联教程；确认删除前保留 journal。
+
+浏览器访问 Hexagon 预览路由；根据连接器和传输实现，Provider 凭据留在控制平面。浏览器行为检查本身不是对所有凭据边界的审计。历史组合仍见[执行矩阵](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/execution-matrix.md)，这些限定范围内的成功都不证明账户级全局清理。
+
+依据：[Vercel 连接器](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/sandboxes/vercel.ts)、[私有传输](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/sandboxes/vercel-transport.ts)。下一步：[Sandbox 总览](/zh-CN/integrations/sandboxes)、[凭据边界](/zh-CN/concepts/security-boundaries)。
+
+## 分开判断账户、资源与任务就绪
+
+| 检查 | 能证明什么 | 不能证明什么 |
+| --- | --- | --- |
+| schema 接受 project/team ID | 标识形态和支持的 CPU 字段 | Token 对这些真实资源有权限 |
+| 连接验证能列举 Sandbox | 作用域内账户请求成功 | 分配配额、任务执行或清理 |
+| Run 完成并导出已核对文件 | 该任务执行及导出结果 | 空闲恢复或后台 Web 服务仍健康 |
+| stopped 资源仍可查询 | 资源保留，可以不唤醒地观察 | 已删除、无存储费用或任意进程保留 |
+| 产品关闭且 Provider 确认不存在 | 所追踪资源已处置 | 全账户无孤立资源或公开网站已部署 |
+
+新的 team/project 绑定是连接变更，不会迁移已有 Sandbox。保留原资源身份及对账所需权限，使用教程 journal 恢复观察；重建连接或 Session 不是响应丢失时的默认处理。
+
+依据：[执行架构](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/architecture.md)。下一步：[私有预览](/zh-CN/build/private-preview)、[空闲唤醒](/zh-CN/build/idle-and-wake)、[部署网络](/zh-CN/operate/networking)。

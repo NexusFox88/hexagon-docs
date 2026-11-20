@@ -1,0 +1,536 @@
+{
+  "scope": "Fresh independent dual-SDK two-turn project tutorial on Vercel + built-in Pi 1.5.2 + configured Messages endpoint / DeepSeek-V4-Flash. Actual cloud code changes, unchanged fixed tests with native execution receipts, five first-turn browser cases per SDK, two Reset cases per SDK, closure, post-close preview denial and all retained artifact bytes. Does not establish external Tool authorization/approval, all providers, natural preview expiry, clean installation or global orphan cleanup.",
+  "program_sha256": {
+    "examples/documentation/project-task.py": "ec732116b669b62fc9ac7a545e9ecea2637ac88e494ea13660971b442617f05a",
+    "examples/documentation/project-task.ts": "311cebd29173a98a81a26a82905319db4b7f8b1c817837b22e87077709b78890",
+    "examples/documentation/project-task-prompts.json": "e72e6e00d109a3e688205ab81182bb892ab45b2c6fd394f406c3a6c259495a9a"
+  },
+  "journeys": [
+    {
+      "sdk": "python",
+      "session_state": "closed",
+      "journal_phase": "closed_and_downloads_checked",
+      "distinct_runs": true,
+      "runs": [
+        {
+          "turn": "first",
+          "state": "completed",
+          "same_session": true,
+          "fixed_test_unchanged": true,
+          "test_execution_receipts": [
+            {
+              "exit_code": 0,
+              "is_error": false,
+              "matched_test_output": true,
+              "start_record_present": true
+            }
+          ],
+          "artifacts": [
+            {
+              "name": "acceptance.mjs",
+              "size": 937,
+              "metadata_matches": true,
+              "retained_bytes_equal": true
+            },
+            {
+              "name": "app.mjs",
+              "size": 1322,
+              "metadata_matches": true,
+              "retained_bytes_equal": true
+            },
+            {
+              "name": "filter.mjs",
+              "size": 341,
+              "metadata_matches": true,
+              "retained_bytes_equal": true
+            },
+            {
+              "name": "index.html",
+              "size": 1096,
+              "metadata_matches": true,
+              "retained_bytes_equal": true
+            },
+            {
+              "name": "style.css",
+              "size": 1544,
+              "metadata_matches": true,
+              "retained_bytes_equal": true
+            },
+            {
+              "name": "test-report.txt",
+              "size": 313,
+              "metadata_matches": true,
+              "retained_bytes_equal": true
+            }
+          ],
+          "uploaded_bytes_verified_event": true
+        },
+        {
+          "turn": "followup",
+          "state": "completed",
+          "same_session": true,
+          "fixed_test_unchanged": true,
+          "test_execution_receipts": [
+            {
+              "exit_code": 0,
+              "is_error": false,
+              "matched_test_output": true,
+              "start_record_present": true
+            }
+          ],
+          "artifacts": [
+            {
+              "name": "acceptance.mjs",
+              "size": 937,
+              "metadata_matches": true,
+              "retained_bytes_equal": true
+            },
+            {
+              "name": "app.mjs",
+              "size": 1511,
+              "metadata_matches": true,
+              "retained_bytes_equal": true
+            },
+            {
+              "name": "filter.mjs",
+              "size": 341,
+              "metadata_matches": true,
+              "retained_bytes_equal": true
+            },
+            {
+              "name": "index.html",
+              "size": 1151,
+              "metadata_matches": true,
+              "retained_bytes_equal": true
+            },
+            {
+              "name": "style.css",
+              "size": 1544,
+              "metadata_matches": true,
+              "retained_bytes_equal": true
+            },
+            {
+              "name": "test-report.txt",
+              "size": 622,
+              "metadata_matches": true,
+              "retained_bytes_equal": true
+            }
+          ],
+          "uploaded_bytes_verified_event": true
+        }
+      ],
+      "browser_checks": {
+        "first": [
+          {
+            "test": {
+              "query": "",
+              "status": "all",
+              "ids": [
+                "1",
+                "2",
+                "3",
+                "4"
+              ]
+            },
+            "state": {
+              "ids": [
+                "1",
+                "2",
+                "3",
+                "4"
+              ],
+              "count": "4 tasks",
+              "errorVisible": false,
+              "emptyVisible": false
+            }
+          },
+          {
+            "test": {
+              "query": "  api  ",
+              "status": "all",
+              "ids": [
+                "1",
+                "3"
+              ]
+            },
+            "state": {
+              "ids": [
+                "1",
+                "3"
+              ],
+              "count": "2 tasks",
+              "errorVisible": false,
+              "emptyVisible": false
+            }
+          },
+          {
+            "test": {
+              "query": "API",
+              "status": "done",
+              "ids": [
+                "1"
+              ]
+            },
+            "state": {
+              "ids": [
+                "1"
+              ],
+              "count": "1 tasks",
+              "errorVisible": false,
+              "emptyVisible": false
+            }
+          },
+          {
+            "test": {
+              "query": "missing",
+              "status": "all",
+              "ids": []
+            },
+            "state": {
+              "ids": [],
+              "count": "0 tasks",
+              "errorVisible": false,
+              "emptyVisible": true
+            }
+          },
+          {
+            "test": {
+              "query": "发布",
+              "status": "all",
+              "ids": [
+                "4"
+              ]
+            },
+            "state": {
+              "ids": [
+                "4"
+              ],
+              "count": "1 tasks",
+              "errorVisible": false,
+              "emptyVisible": false
+            }
+          }
+        ],
+        "followup": [
+          {
+            "from": "API",
+            "state": {
+              "query": "",
+              "status": "all",
+              "ids": [
+                "1",
+                "2",
+                "3",
+                "4"
+              ],
+              "count": "4 tasks",
+              "errorVisible": false,
+              "emptyVisible": false
+            }
+          },
+          {
+            "from": "missing",
+            "state": {
+              "query": "",
+              "status": "all",
+              "ids": [
+                "1",
+                "2",
+                "3",
+                "4"
+              ],
+              "count": "4 tasks",
+              "errorVisible": false,
+              "emptyVisible": false
+            }
+          }
+        ],
+        "closed": {
+          "text": "{\"error\":{\"code\":\"preview_unauthorized\"}}",
+          "hasTaskForm": false
+        }
+      },
+      "resource_operations": [
+        {
+          "kind": "delete",
+          "state": "completed"
+        },
+        {
+          "kind": "create",
+          "state": "completed"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "sdk": "typescript",
+      "session_state": "closed",
+      "journal_phase": "closed_and_downloads_checked",
+      "distinct_runs": true,
+      "runs": [
+        {
+          "turn": "first",
+          "state": "completed",
+          "same_session": true,
+          "fixed_test_unchanged": true,
+          "test_execution_receipts": [
+            {
+              "exit_code": 0,
+              "is_error": false,
+              "matched_test_output": true,
+              "start_record_present": true
+            },
+            {
+              "exit_code": 0,
+              "is_error": false,
+              "matched_test_output": true,
+              "start_record_present": true
+            }
+          ],
+          "artifacts": [
+            {
+              "name": "acceptance.mjs",
+              "size": 937,
+              "metadata_matches": true,
+              "retained_bytes_equal": true
+            },
+            {
+              "name": "app.mjs",
+              "size": 1322,
+              "metadata_matches": true,
+              "retained_bytes_equal": true
+            },
+            {
+              "name": "filter.mjs",
+              "size": 381,
+              "metadata_matches": true,
+              "retained_bytes_equal": true
+            },
+            {
+              "name": "index.html",
+              "size": 1096,
+              "metadata_matches": true,
+              "retained_bytes_equal": true
+            },
+            {
+              "name": "style.css",
+              "size": 1544,
+              "metadata_matches": true,
+              "retained_bytes_equal": true
+            },
+            {
+              "name": "test-report.txt",
+              "size": 355,
+              "metadata_matches": true,
+              "retained_bytes_equal": true
+            }
+          ],
+          "uploaded_bytes_verified_event": true
+        },
+        {
+          "turn": "followup",
+          "state": "completed",
+          "same_session": true,
+          "fixed_test_unchanged": true,
+          "test_execution_receipts": [
+            {
+              "exit_code": 0,
+              "is_error": false,
+              "matched_test_output": true,
+              "start_record_present": true
+            },
+            {
+              "exit_code": 0,
+              "is_error": false,
+              "matched_test_output": true,
+              "start_record_present": true
+            }
+          ],
+          "artifacts": [
+            {
+              "name": "acceptance.mjs",
+              "size": 937,
+              "metadata_matches": true,
+              "retained_bytes_equal": true
+            },
+            {
+              "name": "app.mjs",
+              "size": 1508,
+              "metadata_matches": true,
+              "retained_bytes_equal": true
+            },
+            {
+              "name": "filter.mjs",
+              "size": 381,
+              "metadata_matches": true,
+              "retained_bytes_equal": true
+            },
+            {
+              "name": "index.html",
+              "size": 1151,
+              "metadata_matches": true,
+              "retained_bytes_equal": true
+            },
+            {
+              "name": "style.css",
+              "size": 1544,
+              "metadata_matches": true,
+              "retained_bytes_equal": true
+            },
+            {
+              "name": "test-report.txt",
+              "size": 556,
+              "metadata_matches": true,
+              "retained_bytes_equal": true
+            }
+          ],
+          "uploaded_bytes_verified_event": false
+        }
+      ],
+      "browser_checks": {
+        "first": [
+          {
+            "test": {
+              "query": "",
+              "status": "all",
+              "ids": [
+                "1",
+                "2",
+                "3",
+                "4"
+              ]
+            },
+            "state": {
+              "ids": [
+                "1",
+                "2",
+                "3",
+                "4"
+              ],
+              "count": "4 tasks",
+              "errorVisible": false,
+              "emptyVisible": false
+            }
+          },
+          {
+            "test": {
+              "query": "  api  ",
+              "status": "all",
+              "ids": [
+                "1",
+                "3"
+              ]
+            },
+            "state": {
+              "ids": [
+                "1",
+                "3"
+              ],
+              "count": "2 tasks",
+              "errorVisible": false,
+              "emptyVisible": false
+            }
+          },
+          {
+            "test": {
+              "query": "API",
+              "status": "done",
+              "ids": [
+                "1"
+              ]
+            },
+            "state": {
+              "ids": [
+                "1"
+              ],
+              "count": "1 tasks",
+              "errorVisible": false,
+              "emptyVisible": false
+            }
+          },
+          {
+            "test": {
+              "query": "missing",
+              "status": "all",
+              "ids": []
+            },
+            "state": {
+              "ids": [],
+              "count": "0 tasks",
+              "errorVisible": false,
+              "emptyVisible": true
+            }
+          },
+          {
+            "test": {
+              "query": "发布",
+              "status": "all",
+              "ids": [
+                "4"
+              ]
+            },
+            "state": {
+              "ids": [
+                "4"
+              ],
+              "count": "1 tasks",
+              "errorVisible": false,
+              "emptyVisible": false
+            }
+          }
+        ],
+        "followup": [
+          {
+            "from": "API",
+            "state": {
+              "query": "",
+              "status": "all",
+              "ids": [
+                "1",
+                "2",
+                "3",
+                "4"
+              ],
+              "count": "4 tasks",
+              "errorVisible": false,
+              "emptyVisible": false
+            }
+          },
+          {
+            "from": "missing",
+            "state": {
+              "query": "",
+              "status": "all",
+              "ids": [
+                "1",
+                "2",
+                "3",
+                "4"
+              ],
+              "count": "4 tasks",
+              "errorVisible": false,
+              "emptyVisible": false
+            }
+          }
+        ],
+        "closed": {
+          "text": "{\"error\":{\"code\":\"preview_unauthorized\"}}",
+          "hasTaskForm": false
+        }
+      },
+      "resource_operations": [
+        {
+          "kind": "delete",
+          "state": "completed"
+        },
+        {
+          "kind": "create",
+          "state": "completed"
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "private_evidence": ".local/docs-project-{python,typescript}/ and .local/docs-readiness/project-*",
+  "passed": true
+}

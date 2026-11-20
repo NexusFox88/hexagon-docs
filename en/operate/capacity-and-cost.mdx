@@ -1,0 +1,86 @@
+---
+title: "Manage capacity, quotas, and cost"
+---
+
+Track control-plane/database resources, Sandbox compute/storage, model requests, and potentially billable Tools separately. Completed Runs or sleeping Sessions do not prove that every billing component has stopped.
+
+## Measure workload
+
+Record task volume, active duration, peak concurrency, turns per Session, artifact size, and retention. These are capacity methods, not Provider price quotes:
+
+- Steady-state active work is approximately arrival rate times mean active duration; account separately for bursts and tails.
+- Daily artifact growth is approximately completed Runs times mean exported bytes, plus events, inputs, history, and indexes.
+- Model/Tool usage follows actual requests and upstream metering; retries and verification can also consume usage.
+- Stopped compute may retain disks, snapshots, or associated endpoints.
+
+For example, 60 tasks/hour at 120 seconds of activity implies roughly two active tasks under smooth arrivals. It does not prove capacity for only two resources: arrivals burst, and provisioning/model latency has tails. Calibrate against real peak load and waiting time.
+
+## A reproducible workload estimate
+
+These are assumptions, not measurements or price quotes: accept work for eight hours daily at a smooth 60 Runs/hour; each Run executes for 120 seconds on average, captures 4 MiB of artifacts, and retains them for 30 days. Initially exclude failed attempts, authorization waits, startup, idle and cleanup overhead; add them back for real planning.
+
+| Quantity | Calculation | Result and purpose |
+| --- | --- | --- |
+| Daily Runs | 60 × 8 | 480 as daily workload |
+| Average simultaneous execution demand | 60 × 120 / 3600 | 2 as service demand under smooth arrivals, not measured deployment capacity |
+| Total daily effective execution | 480 × 120 / 3600 | 16 resource-hours, not Provider billing hours |
+| Daily artifact growth | 480 × 4 MiB | 1920 MiB, or 1.875 GiB |
+| Artifact bytes over 30 days | 1.875 × 30 GiB | 56.25 GiB before indexes, events, inputs, backups and replicas |
+
+Ten simultaneous arrivals are not represented by an average of two. Approval waits can extend resource retention beyond effective execution. Measure arrival volume and distributions of queueing, startup, execution and confirmed cleanup time, including tails, before setting admission limits and capacity.
+
+## Add overhead without counting it twice
+
+For a sensitivity estimate, assume every daily Run allocates a distinct resource, startup takes 30 seconds, each resource remains allocated for another 60 seconds after execution, and 10% of Runs need one additional 120-second attempt on that same resource. Assume these intervals do not overlap for a given resource:
+
+| Additional component | Assumed daily resource occupancy |
+| --- | --- |
+| Startup | 480 × 30 / 3600 = 4 hours |
+| Retention after execution | 480 × 60 / 3600 = 8 hours |
+| Additional attempts | 48 × 120 / 3600 = 1.6 hours |
+| Total with 16 hours of baseline execution | 29.6 resource-hours |
+
+This is occupancy under a hypothetical resource lifecycle, not a bill or a recommendation to retry failures. An unknown attempt requires reconciliation before deciding whether another attempt is safe. Additional allocation on retry would add its own startup and retention. Reuse across Runs changes this calculation: measure the union of allocated intervals per resource, then sum across resources; do not charge the same warm interval to every Run. Apply the Provider's actual metering and rounding separately. Retained storage, model requests, Tools and the control plane still need their own usage records.
+
+## Default worker capacity
+
+The current default startup creates one `ExecutionWorker`. Its loop claims a Run and waits for that `execute` call to return before claiming another. Database leases and fencing enable takeover and reject stale writes; they do not establish verified horizontal scaling for an arbitrary multiprocess deployment.
+
+In the idealized example, one serial execution slot handles at most about 30 tasks/hour at 120 seconds each, before overhead. Sustained input of 60/hour therefore accumulates waiting work. This is an assumption-based capacity warning, not a benchmark. More Sessions alone do not prove higher throughput. One active Run per Session and simultaneous execution capacity for the whole deployment are separate limits. Multi-worker deployment requires validation of shared configuration, database, credential ingress, resource locking and failover.
+
+## Observe and respond
+
+| Observation | First check | Safe action and completion signal |
+| --- | --- | --- |
+| Growing queued work | Arrival rate, worker busy/readiness and Run waiting time | Bound admission and investigate execution capacity; verify reduced waiting with successful completion |
+| `sandbox_quota_exceeded` | Explicitly rejected creation operation and Provider account quota | Address quota or concurrency pressure; the failed Run is not automatically requeued |
+| `sandbox_creation_unconfirmed` / unknown | Original operation ID, recorded resource ID and Provider outcome | Reconcile the original operation rather than creating another Session to blindly repeat allocation |
+| Model or Tool rate limit | Actual upstream error and request volume, separate from cloud allocation quota | Apply policy at the confirmed failure boundary; more Sandboxes do not increase upstream allowance |
+| Persistent closing | Deletion operation, snapshots / associated endpoints and unknown outcomes | Verify the Provider-specific deletion completion evidence, including associated resources; retain private resource identifiers |
+| Rapid database growth | Artifact bytes, events, inputs, indexes and backups | Archive under a verified retention plan; downloading a copy does not delete the original record |
+
+`/v1/overview` counts nonterminal active_runs. `/v1/sessions/activity` measures task activity and its categories can overlap. Neither measures CPU or bills. Fleet is a persisted snapshot capped at the latest 200 Sessions and cannot prove account-wide cleanup. Combine complete paginated records with Provider checks; see the [monitoring contract](/en/reference/monitoring).
+
+This page does not quote changing unit prices. In your budget record, capture the official Provider/model pricing page, lookup date, account plan, region, billing unit and storage/network components, then apply measured usage. Do not add unlike units or exclude failed attempts and cleanup waits from usage.
+
+## Concurrency and account limits
+
+A Session permits one active Run. Application queues, worker scheduling, and Provider allocation quotas are different limits. Splitting work into Sessions does not increase account quotas or preserve a shared workspace automatically.
+
+Check current official account settings for sizes and trial limits. This page does not turn historical account constraints into permanent rules or quote dynamic prices. Use actual allocation failures and quota observations before changing concurrency.
+
+## Idle and expiry
+
+Idle timeout controls eligibility for a supported strategy, not a universal billing switch. Provider standby timing is independent; storage can remain billable. Control-plane downtime prevents guaranteed timely platform-managed deletion.
+
+Close unused Sessions and confirm all owned resources. Monitor unknown/closing states. Stopping local processes is not proof of ended cloud usage. Approval waits remain active work and need an application handling policy.
+
+## Operational controls
+
+Bound incoming concurrency, persist recoverable IDs, observe duration/wait causes, archive necessary output, and close completed workspaces. Preserve idempotency on retry and reconcile unknown creation to avoid duplicates.
+
+Measure startup, active execution, output volume, recovery, and cleanup confirmation on a small real workload for each combination. Include failed attempts. Compare optimizations using the same task and success criteria rather than dropping acceptance steps.
+
+Next: [wake](/en/build/idle-and-wake), [reconciliation](/en/operate/reconciliation), [Sandbox capabilities](/en/integrations/sandboxes). Sources: [Serverless](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/serverless-sessions.md), [resource interface](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts).
+
+See [limits](/en/reference/limits) for numeric contracts; the arithmetic above is an estimate, not a configured platform limit.

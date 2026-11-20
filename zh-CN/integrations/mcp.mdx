@@ -1,0 +1,117 @@
+---
+title: "连接 Remote MCP 服务"
+---
+
+Remote MCP 将远程服务的工具发现和调用接入 Hexagon ToolBroker。当前支持 Streamable HTTP（默认）与 legacy SSE，使用官方 MCP SDK 初始化、分页 tools/list 和 tools/call，不需要把服务改写成 HTTP JSON Tool。
+
+## 范围与前提
+
+准备可访问的公共 HTTPS MCP endpoint、账户授权和一个用于验收的可控工具。配置 endpoint 不接受用户名、密码、query 或 fragment，凭据单独提交。authentication 可为 none、bearer 或 header；header 模式使用 header_name，默认 x-api-key。公开服务显式设置 none，不需要虚构 Token。
+
+本接口不开放 stdio、本机进程启动、resources/prompts 订阅、sampling 或 elicitation，也不自动注册任意 MCP OAuth 客户端或刷新 Token。OAuth-only 服务需要外部获得适用的 Bearer Token，并自行续期。不能从“支持 MCP”推断所有扩展可用。
+
+## 发现、选择和启用
+
+先在你控制的服务中准备一个返回已知内容的工具，环境变量 MCP_TOOL_NAME 填其精确名称。下面保留默认 approval=true；发现后应审阅工具名称、描述和 schema，再保存选择。工具描述是外部数据，不能作为新增权限的指令。
+
+以下是本地管理客户端示例，凭据来自私有环境；hosted 初始化见[自托管](/zh-CN/operate/self-host)。每次运行创建连接，保存 ID 后复用。
+
+```python
+import os
+from hexagon import Hexagon
+client = Hexagon.local()
+connection = client.create_connection(
+    kind="tool", provider="mcp-remote", name="Controlled MCP service",
+    credential=os.environ["MCP_TOKEN"],
+    config={"endpoint": os.environ["MCP_ENDPOINT"],
+            "transport": "streamable-http", "authentication": "bearer"},
+)
+connection = client.discover_mcp_tools(connection["id"])
+selected = {key: tool for key, tool in connection["config"]["tools"].items()
+            if tool["name"] == os.environ["MCP_TOOL_NAME"]}
+if len(selected) != 1:
+    raise RuntimeError("Expected exactly one selected tool")
+client.update_connection(connection["id"],
+    config={**connection["config"], "tools": selected})
+if client.validate_connection(connection["id"])["status"] != "ready":
+    raise RuntimeError("Inspect MCP verification diagnostics")
+client.update_connection(connection["id"], enabled=True)
+```
+
+```typescript
+import { Hexagon } from '@hexagon/agent-sdk';
+const client = await Hexagon.local();
+const { MCP_TOKEN: credential, MCP_ENDPOINT: endpoint, MCP_TOOL_NAME: name } = process.env;
+if (!credential || !endpoint || !name) throw new Error('Set MCP configuration');
+let connection = await client.createConnection({
+  kind: 'tool', provider: 'mcp-remote', name: 'Controlled MCP service', credential,
+  config: { endpoint, transport: 'streamable-http', authentication: 'bearer' },
+});
+connection = await client.discoverMcpTools(connection.id);
+const selected = Object.fromEntries(Object.entries(connection.config.tools)
+  .filter(([, tool]) => (tool as { name: string }).name === name));
+if (Object.keys(selected).length !== 1) throw new Error('Expected one selected tool');
+await client.updateConnection(connection.id, { config: { ...connection.config, tools: selected } });
+if ((await client.validateConnection(connection.id)).status !== 'ready')
+  throw new Error('Inspect MCP verification diagnostics');
+await client.updateConnection(connection.id, { enabled: true });
+```
+
+选择过程沿用发现返回的 key，不要自行把 remote name 当操作 ID。平台将名字映射为稳定 mcp_ 哈希键，保留原始远端名称；重复工具或冲突会失败，不静默覆盖。不同连接在 Session 中使用不同 binding alias。
+
+发现最多 100 个工具、20 页，响应有 2 MiB 限制；输入 schema 必须为能在本地编译的同步 object schema。接口验证会重新发现并比较已选工具，不执行实际业务调用。名称、描述或 schema 变化时返回 mcp_schema_changed，重新发现、审阅、验证、启用后创建新的 Session，不能让旧 Session 自动获得新增操作。
+
+## 从 Session 调用
+
+按 [Tools 指南](/zh-CN/build/tools)将 connection.id 绑定到 `tools: {research: connection_id}`，使用支持 Tools 的 Harness，并完成 Session 预检。默认必需工具的授权在初始化时检查；可选工具仍需调用时授权。
+
+提交明确任务：调用所选工具读取专用测试对象，并报告其已知内容。保留 approval=true 时先检查等待审批，再按[审批指南](/zh-CN/build/approvals)批准；拒绝分支应确认远端没有实际调用。只读 annotation 不会自动关闭审批，需要由管理员明确审阅策略。
+
+核对 Tool 调用记录和实际结果，不能只看最终自然语言回答。修改或过期的凭据按[授权指南](/zh-CN/build/tool-authorization)处理；原始 Token 留在控制平面，不进入 Sandbox env。
+
+## 解释结果与工具变化
+
+MCP 可以返回有效结果，同时包含 `isError: true`。Hexagon 已取得结果，因此调用记录可为 completed；应检查 Tool 调用中的 `is_error` 和实际结果，不能把 completed 等同于业务成功。有效的 Tool 错误与派发后响应丢失不同，后者的远端结果可能仍未知。
+
+保留经过审查的选定工具定义。远端新增工具，不会授权既有 Session 调用它。选定工具的名称、描述或 schema 变化需要重新发现并审查；不要通过修改本地 hash key 来伪装为旧工具、绕过变化检测。审批策略与远端只读 annotation 独立，annotation 不授权取消人工同意。
+
+| 情况 | 处理 |
+| --- | --- |
+| `mcp_discovery_required` | 先发现工具并明确保留选定集合，再验证。 |
+| `mcp_schema_changed` | 审查发现结果差异、更新并验证配置，再用新 Session 承载目标定义。 |
+| 认证被拒绝 | 修复绑定账户凭据，继续观察原 Run 的授权流程。 |
+| 派发前握手失败 | 适配器可重连一次，持续失败会返回连接错误。 |
+| tools/call 开始后传输失败 | 调查原调用与外部结果，不用再次调用作为探针。 |
+| 有效结果包含 isError | 向任务/应用呈现工具错误，不声称业务操作成功。 |
+
+## 网络与重试边界
+
+连接时检查 DNS 结果，拒绝私有或混合地址，拒绝重定向与跨 origin SSE POST 目标。伪 IP DNS 可能被拒绝，不能为方便而关闭检查。管理员可按现有受信出站代理与精确主机名单机制配置网络，见[部署网络](/zh-CN/operate/networking)。
+
+每次调用前重新校验工具定义。tools/call 尚未开始前允许一次连接重试；一旦开始派发，丢失响应不能自动重放，即使服务把操作标为只读。所有 MCP 操作的 replay 策略为 never。
+
+远端写入可能已完成但返回丢失，需保存原调用与请求 hash，在服务端核对后通过[对账](/zh-CN/operate/reconciliation)记录结论。取消 Run 不撤销外部写入；重新发现也不解决未知副作用。不要生成新的调用来“试一下”原操作是否成功。
+
+## 一个具体的发现到调用实例
+
+历史公开服务实例使用 `https://mcp.deepwiki.com/mcp`、`authentication: none`、Streamable HTTP，选中的远程工具名为 `read_wiki_structure`，查询仓库为 `modelcontextprotocol/typescript-sdk`。公开服务省略 credential，不要原样套用前面的 bearer 示例；选择工具时保留发现返回的 key。管理员仍须审阅发现的 schema 与审批策略，再启用连接。
+
+11 月 18 日记录分别使用 TypeScript 的 Vercel/Pi 1.5.2 Session 和 Python 的 Vercel/OpenCode 1.2.27 Session，模型均为已配置的 SiliconFlow international DeepSeek-V4-Flash。它核对了实际完成的调用与返回的文档主题，并确认清理。操作人员明确关闭了该只读工具的审批，因此这条记录不能证明拒绝审批分支或远程写入，也不能证明今天的服务可用性。
+
+| 传输证据 | 协议/版本范围 | 实际检查 |
+| --- | --- | --- |
+| 本地 Streamable HTTP fixture | 初始化响应 `2025-03-26` | 带鉴权初始化、分页发现与实际 SDK `tools/call` 往返 |
+| 本地 legacy SSE fixture | 初始化响应 `2024-11-05` | header 鉴权、同源消息端点上的工具发现 |
+| 历史公开 DeepWiki | SDK 协商；引用摘要没有记录协商后的版本 | 实际 Streamable HTTP 发现与云端调用；legacy `/sse` 返回 410 |
+
+仓库依赖为 `@modelcontextprotocol/sdk` 1.32.2。不能把 fixture 选择的协议版本抄成公开服务的验证版本；SDK 版本与协商后的协议版本是两个不同字段。
+
+## 验证与协议版本
+
+协议由 SDK 初始化协商；配置未提供任意 protocolVersion 开关。记录测试时的 SDK 依赖版本、服务协商版本、传输、工具/schema 和实际场景，不能声称所有协议版本均已通过。
+
+[2026-11-18 验收记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-18-mcp-lark-responses.md)包含公共 DeepWiki Streamable HTTP 经双 SDK 和真实云 Harness 的范围。其 legacy SSE endpoint 当时返回 410；SSE 支持另由确定性协议服务验证，两种证据不能混写为公共服务均实测通过。本页没有重新访问该服务或执行云任务。
+
+正式接入应分别验证发现到调用、权限不足、Token 过期、schema 变化、拒绝前零调用、写入丢失响应的对账和 Session 清理。你的自有服务即使与历史服务使用同一传输，也需要独立验收。
+
+依据：[MCP adapter](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/mcp/remote.ts)、[原始契约](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/remote-mcp.md)。下一步：[Tools 绑定](/zh-CN/build/tools)、[授权](/zh-CN/build/tool-authorization)、[Tool 连接器开发](/zh-CN/contribute/tool-connectors)。

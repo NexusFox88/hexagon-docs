@@ -1,0 +1,104 @@
+---
+title: "Choose and configure a Harness"
+---
+
+A Harness executes Agent logic, model interaction, conversation, and Tools. Runtime supervises its process; the control plane manages tasks, authorization, and cloud resources.
+
+| Distribution | Selection | Boundary |
+| --- | --- | --- |
+| Built-in | Exact catalog id/version | Installer adapter; no implied OCI requirement |
+| OCI | Register image, use returned id/version | Requires OCI capability and pinned digest |
+| Legacy source package | Dedicated package API | Compatibility source distribution, not image registration |
+
+Built-in Pi 1.5.2 and OpenCode 1.2.27 currently declare conversation, Tools, initialization, and all three model protocols. Query catalog() for the actual deployment.
+
+## Minimal built-in selection
+
+These preflight excerpts reuse an initialized client and enabled connection IDs from the [first Session](/en/start/first-session). They do not register an image or allocate a Sandbox. Choose one exact selector; replacing Pi with OpenCode changes the Harness, not the model protocol.
+
+```python
+selector = {"id": "pi", "version": "1.5.2"}
+# Alternative: {"id": "opencode", "version": "1.2.27"}
+definition = dict(harness=selector,
+                  sandbox_connection_id=sandbox_connection_id,
+                  model_connection_id=model_connection_id)
+check = client.preflight_session(**definition)
+if not check['ready']:
+    raise RuntimeError('Review the preflight diagnostics')
+```
+
+```typescript
+const selector = { id: 'pi', version: '1.5.2' };
+// Alternative: { id: 'opencode', version: '1.2.27' }
+const definition = { harness: selector,
+  sandbox_connection_id: sandboxConnectionId,
+  model_connection_id: modelConnectionId };
+const check = await client.preflightSession(definition);
+if (!check.ready) throw new Error('Review the preflight diagnostics');
+```
+
+Continue with the tutorial's durable create/submit/observe/close flow. A ready preflight checks configuration compatibility; it does not install the CLI, call the model or prove that a task succeeds. Keep the Harness selector fixed for an existing Session. To compare engines, create separate Sessions and compare actual task results, Tools, artifacts and cleanup.
+
+## Template index
+
+See the [image catalog](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/harness-images.md) for source/version and published-image versus recipe status. Names here do not establish complete cloud acceptance.
+
+The following repository snapshot is dated November 20, 2026. “Adapter contract” means local invocation/result tests, not a container execution pass. “Scoped cloud records” means exact image + command + protocol entries in the [verification registry](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/verification.ts); consult their model, SDK and scenario fields before selecting a combination. An empty entry means no matching catalog evidence, not that the program cannot run.
+
+| Template | Distribution in catalog | Contract evidence | Cloud evidence attached to template |
+| --- | --- | --- | --- |
+| [Codex](#codex) 0.169.0 | Pinned community image + recipe | Managed CLI adapter | Scoped Modal / Fly records |
+| [Hermes](#hermes) 2026.9.24 | Pinned upstream image + recipe | Managed CLI adapter | Scoped Modal / Fly records |
+| [OpenClaw](#openclaw) 2026.11.5 | Pinned upstream image + recipe | Managed CLI adapter | Scoped Modal / Fly records |
+| [DeepSeek](#deepseek-harness) 0.2.2-rc.1 | Recipe; no registry image in template | DeepSeek adapter | No matching catalog evidence |
+| [OpenCode](#opencode) 1.2.27 | Pinned upstream image + recipe | Runtime adapter | Scoped Modal / Fly records |
+| [Aider](#aider) 0.86.2 | Pinned upstream image + recipe | Runtime adapter; conversation only | Scoped Modal / Fly records; no connected Tools |
+| [Pi](#pi) 1.5.2 | Recipe; no registry image in template | Runtime adapter | No matching OCI template evidence; built-in evidence is separate |
+| [Claude Code](#claude-code) 2.1.327 | Recipe; no registry image in template | Runtime adapter | No matching catalog evidence |
+| [Python Agent](#python-agent) 1.0.0 | Recipe; no registry image in template | JSON result contract | No matching OCI template evidence; source-package evidence is separate |
+
+Contract sources: [Runtime adapter tests](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/runtime-adapter.test.ts), [managed CLI tests](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/managed-cli.test.ts), [package result tests](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/harness-packages.test.ts). These checks are narrower than image build, cloud startup or a complete user journey. Lifecycle behavior also depends on the [Sandbox](/en/integrations/sandboxes): native conversation IDs do not guarantee that arbitrary processes or memory survive idle.
+
+### Codex
+
+codex-v1 uses Responses, MCP-bridged Tools, and native continuation. Verify the registered image source/digest and execution evidence.
+
+### Hermes
+
+hermes-v1 uses Chat Completions, MCP Tools, and native continuation.
+
+### OpenClaw
+
+openclaw-v1 declares all three protocols and MCP Tools. Evidence for one protocol does not certify the others.
+
+### DeepSeek Harness
+
+deepseek-v1 currently uses Messages and a build recipe. Do not declare unsupported initialization. Build, distribution, and cloud execution are separate steps.
+
+### OpenCode
+
+opencode-v1 declares all three protocols and Tools. Built-in and OCI OpenCode have different distribution/Provider requirements.
+
+### Aider
+
+aider-v1 uses Messages and restored history. Its current adapter has no connected Tools and does not accept initialization capability.
+
+### Pi
+
+pi-v1 supports three protocols and extension-based Tools. A buildable recipe is not automatically a published image.
+
+### Claude Code
+
+claude-code-v1 uses Messages and MCP Tools. Respect actual permissions rather than assuming root-incompatible bypass modes.
+
+### Python Agent
+
+hexagon-json-v1 is a Messages-based example with mailbox Tools and custom continuation. Custom code owns correct conversation persistence.
+
+## Select and verify
+
+Match [model protocols](/en/integrations/model-protocols), Tools/initialization needs, and Sandbox OCI/private-image/recovery capabilities. Verify two turns, Tools, artifacts, cancellation, cleanup, and idle recovery when required.
+
+Capabilities cannot create missing adapter behavior. Registering Tools for Aider cannot implement them, and changing a version label cannot change image behavior.
+
+Next: [OCI](/en/integrations/harnesses/oci), [source packages](/en/integrations/harnesses/source-package), [model protocols](/en/integrations/model-protocols). Sources: [protocols](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/protocols.ts), [registration](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/images.ts).

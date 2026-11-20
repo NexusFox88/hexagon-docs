@@ -1,0 +1,133 @@
+---
+title: "获取、保留和交付任务产物"
+---
+
+Artifact 是从 Run 工作区导出的文件快照。它归控制平面存储管理，能够在 Session 的云资源关闭后继续下载。
+
+本页接续[首个 Session](/zh-CN/start/first-session)。你需要已授权的 Run ID 和客户端。
+
+## 要求任务导出文件
+
+在指令中要求 Agent 把交付文件放入其收到的 Run artifact directory。当前工作区路径为 `artifacts/<run-id>/`，每轮独立。不要仅要求“保存到项目目录”，否则文件可能存在但没有被导出。
+
+worker 在 Harness 退出后导出产物，再完成对应 Run。超出限制会显式失败，不会默默丢弃超限文件。最终回答声称创建了文件不等于导出成功；查询实际 Artifact 列表。
+
+## 下载与校验
+
+Python：
+
+```python
+from pathlib import Path
+import hashlib
+import json
+import tempfile
+output = Path(tempfile.mkdtemp(prefix='hexagon-downloads-'))
+items = client.artifacts(run_id)['artifacts']
+manifest = []
+for index, item in enumerate(items):
+    data = client.download_artifact(item['id'])
+    if len(data) != item['size'] or hashlib.sha256(data).hexdigest() != item['sha256']:
+        raise RuntimeError('Artifact integrity mismatch')
+    filename = f'output-{index}.bin'
+    with (output / filename).open('xb') as destination:
+        destination.write(data)
+    manifest.append({
+        'filename': filename, 'artifact_id': item['id'],
+        'original_name': item['name'], 'run_id': run_id,
+        'size': len(data), 'sha256': item['sha256'],
+    })
+with (output / 'manifest.json').open('x', encoding='utf-8') as destination:
+    json.dump(manifest, destination, ensure_ascii=False, indent=2)
+    destination.write('\n')
+print(output)
+```
+
+TypeScript：
+
+```typescript
+import { mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createHash } from 'node:crypto';
+const output = await mkdtemp(join(tmpdir(), 'hexagon-downloads-'));
+const { artifacts } = await client.artifacts(runId);
+const manifest: Array<{
+  filename: string; artifact_id: string; original_name: string;
+  run_id: string; size: number; sha256: string;
+}> = [];
+for (const [index, item] of artifacts.entries()) {
+  const bytes = await client.downloadArtifact(item.id);
+  if (bytes.length !== item.size || createHash('sha256').update(bytes).digest('hex') !== item.sha256)
+    throw new Error('Artifact integrity mismatch');
+  const filename = `output-${index}.bin`;
+  await writeFile(join(output, filename), bytes, { flag: 'wx', mode: 0o600 });
+  manifest.push({
+    filename, artifact_id: item.id, original_name: item.name,
+    run_id: runId, size: bytes.length, sha256: item.sha256,
+  });
+}
+await writeFile(join(output, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n',
+  { flag: 'wx', mode: 0o600 });
+console.log(output);
+```
+
+每次执行创建独立私有临时目录，并使用生成的文件名排他写入。打印出的目录保留供检查；核对后将文件移入应用存储，使用完毕清理临时副本。示例写出 `manifest.json`，将生成文件名映射到 Artifact ID、原始名称、Run ID、大小与 hash。只有全部列出产物下载并通过完整性检查后才写清单；此前若执行中断，目录可能留下部分下载，没有清单表示本批未完成。空清单仍不满足要求交付文件的任务。不要直接使用远端名称作为本地路径。
+
+元数据包括 name、size、sha256、Session ID、Run ID 和创建时间。API 以二进制内容提供下载。交付给浏览器时，应用仍需检查业务权限，并选择安全的内容类型和下载文件名。
+
+## 判断交付是否完整
+
+hash 一致证明下载字节与导出快照一致，不证明代码正确、报告准确或 Agent 实际执行了要求的测试。执行前定义必需产物名称和任务专有检查；即使 Run 为 completed，空列表也不满足这些要求。最终回答、Run 结果和产物验证应分别记录。
+
+worker 对未中断的终态 invocation 尝试导出，包括失败或取消的执行。这些文件可能只是有用的部分结果，不应直接作为已验收交付。Runtime 中断会跳过该导出路径，不能假定未导出的工作区已经成为 Artifact。导出错误也可能使 Harness 本身成功的任务最终失败。决定是否重做前，先检查 Run 错误和时间线。
+
+通过应用交付时，先认证请求者，再通过其业务任务定位 Artifact ID，由后端下载并核对字节，再返回下载响应。使用受控文件名和 `Content-Disposition: attachment`；不要在应用可信 origin 上直接渲染生成的 HTML。运行生成页面应使用独立的私有预览机制。
+
+## 限制与保留
+
+当前每个 Run 最多 64 个文件，每文件 4 MiB，总计 8 MiB。导出不接受符号链接或非普通文件。具体校验见[产物实现](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/artifacts/artifacts.ts)与 Runtime 导出逻辑。
+
+导出内容存储于 PostgreSQL，Session close 不删除这些内容。后续 Run 修改同名工作区文件不会覆盖前一 Run 的快照。这不是无限容量或永久归档保证：数据库备份、存储容量和你部署的保留政策仍需管理。
+
+## 常见问题与验收
+
+空列表时先看 Run 是否终态、文件是否写在正确目录、Harness 是否实际执行、导出是否失败。不要为了查文件重新提交任务。跨租户的 Artifact ID 不应可读；业务应用也必须验证接收者。
+
+完成验证应包含：列表存在、hash 与长度正确、文件内容符合任务、关闭 Session 后相同 Artifact ID 仍可下载。关闭失败时保留 Session 和资源记录，不能把产物成功当作云清理成功。
+
+## 两个文件的留存练习
+
+使用专用 Session 提交任务：在提供的本轮产物目录生成 `message.txt`，内容精确为 `Hello from Hexagon` 加换行；另生成 `status.json`，内容精确为 `{"ok":true}` 加换行。按[后端接入](/zh-CN/build/backend-integration)保存提交意图与 Run ID。等待 Run 终态；本成功练习要求 `completed`，其他结果应先检查错误。
+
+使用上文下载循环，并额外核对必需文件名及预期字节。如果任务合理地导出了其他文件，不必要求列表只能包含这两个文件。保存两个 Artifact ID 与 hash，显式关闭 Session 并确认资源清理，再用相同 ID 下载。字节应与关闭前一致；下载成功证明留存，不证明资源删除已经完成。
+
+从仓库根目录运行完整的 [Python 程序](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/artifact-retention.py)或 [TypeScript 程序](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/artifact-retention.ts)。先完成[首个 Session 指南](/zh-CN/start/first-session)中的 SDK 安装，设置已启用的连接 ID。两个程序分别创建独立云 Session，会消耗 Provider 和模型资源：
+
+```sh
+.local/docs-example-venv/bin/python examples/documentation/artifact-retention.py
+```
+
+```sh
+npm --prefix sdk/typescript run build
+./node_modules/.bin/tsx examples/documentation/artifact-retention.ts
+```
+
+每个程序要求两个精确文件名与精确字节，核对全部导出文件的大小和 hash，等待 `completed`，显式关闭 Session，再用每个原 Artifact ID 重新下载比较字节。允许额外产物，但同样检查。下载文件使用生成的本地名称；原始元数据与 ID 保存在私有日志中。本练习使用日志作为下载记录，上文可复用片段则独立写出 `manifest.json`。
+
+Python 记录在 `.local/docs-artifacts-python/`，TypeScript 记录在 `.local/docs-artifacts-typescript/`。成功时日志阶段为 `closed_and_retention_checked`。十分钟观察超时不会取消任务；出错后保留日志，检查原 Session、Run 和资源操作，按首个 Session 的恢复表继续。程序拒绝覆盖现有日志，不要删除日志重试；确认清理后，先归档目录再开始独立实验。
+
+2026-11-20，两个程序分别通过 Vercel、内置 Pi 1.5.2 与配置的 Messages 端点（`deepseek-ai/DeepSeek-V4-Flash`）真实云执行。[两个文件的执行记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-artifact-retention-docs-cloud.json)确认了两个文件的精确字节与 hash、Run 完成、Session 关闭、资源删除记录完成以及关闭后下载字节一致。这不证明其他组合、无限留存，也不代表本轮进行了超限云测试。可运行的[项目教程](/zh-CN/start/project-task)提供更完整的实现：[带日期的双 SDK 记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-project-docs-cloud.json)核对每轮六个必需导出文件，包括代码与固定测试结果，并在所记载 Vercel/Pi/Messages 组合关闭后检查留存字节一致。
+
+## 理解导出失败
+
+| 观察结果 | 含义与处理 |
+| --- | --- |
+| 超过 64 个文件、单文件超过 4 MiB 或总量超过 8 MiB | Runtime 返回 `artifact_limit_exceeded`。在后续获授权的任务中减少导出集合；系统不会静默截断文件并将其视为有效交付。 |
+| 非法名称或嵌套过深 | 名称最多 512 字符；Runtime 拒绝控制字符、反斜线及超过八层的目录嵌套。导出目录应浅且只包含常规文件。 |
+| 符号链接或非常规文件 | 导出拒绝跟随或发布它；应在产物目录生成实际常规文件。 |
+| Manifest 完整性或名称重复错误 | 控制平面拒绝非法内容、hash 或 manifest，先检查错误，不把看似部分存在的输出当作已确认捕获。 |
+| 同一 Run/name 再次捕获时内容改变 | `artifact_conflict` 保护既有快照。查询原产物，不假设它已被覆盖。 |
+
+Runtime 快照与控制平面捕获是两个边界。Runtime 错误可能通过 worker 的 Run 错误呈现，不一定是直接下载产物接口返回的同名公共错误码。参见[限制](/zh-CN/reference/limits)与[错误](/zh-CN/reference/errors)。
+
+依据：[捕获与下载存储](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/artifacts/artifacts.ts)、[字节存储迁移](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/storage/006-artifact-content.sql)、[Runtime 导出](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/runtime/server.py)。下一步：[私有预览](/zh-CN/build/private-preview)、[持久化边界](/zh-CN/concepts/persistence)、[备份恢复](/zh-CN/operate/backup-restore)。

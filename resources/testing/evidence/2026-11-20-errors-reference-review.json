@@ -1,0 +1,347 @@
+{
+  "scope": "R06 all 41 common-code table branches/statuses matched to current linked source with hashes; surrounding conditions reviewed. Literal matching is source evidence, not fault injection or a complete internal error enumeration.",
+  "branch_checks": [
+    {
+      "code": "invalid_submission",
+      "http_branch_status": 400,
+      "source": "modules/execution/runs.ts",
+      "source_line": 26,
+      "source_sha256": "f462cf48c64b845d29861f4a2fac3d144ee99c61775301cac56249cc09842ecf",
+      "matched": true
+    },
+    {
+      "code": "idempotency_conflict",
+      "http_branch_status": 409,
+      "source": "modules/execution/runs.ts",
+      "source_line": 33,
+      "source_sha256": "f462cf48c64b845d29861f4a2fac3d144ee99c61775301cac56249cc09842ecf",
+      "matched": true
+    },
+    {
+      "code": "session_busy",
+      "http_branch_status": 409,
+      "source": "modules/execution/runs.ts",
+      "source_line": 54,
+      "source_sha256": "f462cf48c64b845d29861f4a2fac3d144ee99c61775301cac56249cc09842ecf",
+      "matched": true
+    },
+    {
+      "code": "session_closed",
+      "http_branch_status": 409,
+      "source": "modules/execution/runs.ts",
+      "source_line": 36,
+      "source_sha256": "f462cf48c64b845d29861f4a2fac3d144ee99c61775301cac56249cc09842ecf",
+      "matched": true
+    },
+    {
+      "code": "sandbox_expired",
+      "http_branch_status": 409,
+      "source": "modules/execution/runs.ts",
+      "source_line": 37,
+      "source_sha256": "f462cf48c64b845d29861f4a2fac3d144ee99c61775301cac56249cc09842ecf",
+      "matched": true
+    },
+    {
+      "code": "connection_not_ready",
+      "http_branch_status": 409,
+      "source": "modules/execution/runs.ts",
+      "source_line": 57,
+      "source_sha256": "f462cf48c64b845d29861f4a2fac3d144ee99c61775301cac56249cc09842ecf",
+      "matched": true
+    },
+    {
+      "code": "context_file_missing",
+      "http_branch_status": 409,
+      "source": "modules/execution/runs.ts",
+      "source_line": 42,
+      "source_sha256": "f462cf48c64b845d29861f4a2fac3d144ee99c61775301cac56249cc09842ecf",
+      "matched": true
+    },
+    {
+      "code": "context_file_changed",
+      "http_branch_status": 409,
+      "source": "modules/execution/runs.ts",
+      "source_line": 43,
+      "source_sha256": "f462cf48c64b845d29861f4a2fac3d144ee99c61775301cac56249cc09842ecf",
+      "matched": true
+    },
+    {
+      "code": "context_file_encoding",
+      "http_branch_status": 400,
+      "source": "modules/execution/runs.ts",
+      "source_line": 46,
+      "source_sha256": "f462cf48c64b845d29861f4a2fac3d144ee99c61775301cac56249cc09842ecf",
+      "matched": true
+    },
+    {
+      "code": "context_file_too_large",
+      "http_branch_status": 413,
+      "source": "modules/execution/runs.ts",
+      "source_line": 44,
+      "source_sha256": "f462cf48c64b845d29861f4a2fac3d144ee99c61775301cac56249cc09842ecf",
+      "matched": true
+    },
+    {
+      "code": "input_too_large",
+      "http_branch_status": 413,
+      "source": "modules/execution/runs.ts",
+      "source_line": 52,
+      "source_sha256": "f462cf48c64b845d29861f4a2fac3d144ee99c61775301cac56249cc09842ecf",
+      "matched": true
+    },
+    {
+      "code": "initialization_too_large",
+      "http_branch_status": 413,
+      "source": "modules/execution/initialization.ts",
+      "source_line": 18,
+      "source_sha256": "02b5d71a73e513a500949e6c5e45973f9cf13fd75c62f05982e43fb41398e91e",
+      "matched": true
+    },
+    {
+      "code": "upload_too_large",
+      "http_branch_status": 413,
+      "source": "modules/execution/inputs.ts",
+      "source_line": 18,
+      "source_sha256": "345ac0d84fb7b90f86b12bb2d383d81dad63b27c9c54ae705789b5d289c7e03d",
+      "matched": true
+    },
+    {
+      "code": "connection_changed_during_validation",
+      "http_branch_status": 409,
+      "source": "modules/connections/connections.ts",
+      "source_line": 116,
+      "source_sha256": "b504a32b402abca8f6e656e31f4632d38abbb70200e0e620aa8eb90f82e2dcfe",
+      "matched": true
+    },
+    {
+      "code": "connection_in_use",
+      "http_branch_status": 409,
+      "source": "modules/connections/connections.ts",
+      "source_line": 147,
+      "source_sha256": "b504a32b402abca8f6e656e31f4632d38abbb70200e0e620aa8eb90f82e2dcfe",
+      "matched": true
+    },
+    {
+      "code": "harness_version_conflict",
+      "http_branch_status": 409,
+      "source": "modules/harnesses/images.ts",
+      "source_line": 38,
+      "source_sha256": "5d07c609834e5d2939a77cf88bfd55da506d064389f9b242a2ed211d01da65ad",
+      "matched": true
+    },
+    {
+      "code": "preview_session_unavailable",
+      "http_branch_status": 409,
+      "source": "modules/sandboxes/previews.ts",
+      "source_line": 17,
+      "source_sha256": "b941e97d2d72a4f0930a5719fac3c0d73ce52dce2f35737628ee90656b592516",
+      "matched": true
+    },
+    {
+      "code": "preview_unauthorized",
+      "http_branch_status": 401,
+      "source": "modules/sandboxes/previews.ts",
+      "source_line": 29,
+      "source_sha256": "b941e97d2d72a4f0930a5719fac3c0d73ce52dce2f35737628ee90656b592516",
+      "matched": true
+    },
+    {
+      "code": "tool_call_conflict",
+      "http_branch_status": 409,
+      "source": "modules/tools/broker.ts",
+      "source_line": 32,
+      "source_sha256": "6197af2cba2ca94cb7241ef671e284c4f6c4f90954947d392746555e0096bf75",
+      "matched": true
+    },
+    {
+      "code": "tool_call_in_flight",
+      "http_branch_status": 409,
+      "source": "modules/tools/reconciliation.ts",
+      "source_line": 22,
+      "source_sha256": "a95103cec9d22d38bca12e2ac699eec0eec305790c6e8ec537d9fdcb1fad9a8a",
+      "matched": true
+    },
+    {
+      "code": "tool_outcome_not_unknown",
+      "http_branch_status": 409,
+      "source": "modules/tools/reconciliation.ts",
+      "source_line": 61,
+      "source_sha256": "a95103cec9d22d38bca12e2ac699eec0eec305790c6e8ec537d9fdcb1fad9a8a",
+      "matched": true
+    },
+    {
+      "code": "tool_resolution_conflict",
+      "http_branch_status": 409,
+      "source": "modules/tools/reconciliation.ts",
+      "source_line": 57,
+      "source_sha256": "a95103cec9d22d38bca12e2ac699eec0eec305790c6e8ec537d9fdcb1fad9a8a",
+      "matched": true
+    },
+    {
+      "code": "tool_authorization_not_pending",
+      "http_branch_status": 409,
+      "source": "modules/tools/reconciliation.ts",
+      "source_line": 30,
+      "source_sha256": "a95103cec9d22d38bca12e2ac699eec0eec305790c6e8ec537d9fdcb1fad9a8a",
+      "matched": true
+    },
+    {
+      "code": "tool_run_not_active",
+      "http_branch_status": 409,
+      "source": "modules/tools/broker.ts",
+      "source_line": 29,
+      "source_sha256": "6197af2cba2ca94cb7241ef671e284c4f6c4f90954947d392746555e0096bf75",
+      "matched": true
+    },
+    {
+      "code": "tool_account_changed",
+      "http_branch_status": 409,
+      "source": "modules/tools/broker.ts",
+      "source_line": 53,
+      "source_sha256": "6197af2cba2ca94cb7241ef671e284c4f6c4f90954947d392746555e0096bf75",
+      "matched": true
+    },
+    {
+      "code": "mcp_schema_changed",
+      "http_branch_status": 409,
+      "source": "modules/tools/broker.ts",
+      "source_line": 55,
+      "source_sha256": "6197af2cba2ca94cb7241ef671e284c4f6c4f90954947d392746555e0096bf75",
+      "matched": true
+    },
+    {
+      "code": "tool_operation_unavailable",
+      "http_branch_status": 400,
+      "source": "modules/tools/broker.ts",
+      "source_line": 54,
+      "source_sha256": "6197af2cba2ca94cb7241ef671e284c4f6c4f90954947d392746555e0096bf75",
+      "matched": true
+    },
+    {
+      "code": "lease_lost",
+      "http_branch_status": 409,
+      "source": "modules/artifacts/artifacts.ts",
+      "source_line": 24,
+      "source_sha256": "13158ab61c9f875acecc8eacf9fd48699d8eb022527c265afc87a2b279f40bb7",
+      "matched": true
+    },
+    {
+      "code": "invalid_artifact_manifest",
+      "http_branch_status": 400,
+      "source": "modules/artifacts/artifacts.ts",
+      "source_line": 20,
+      "source_sha256": "13158ab61c9f875acecc8eacf9fd48699d8eb022527c265afc87a2b279f40bb7",
+      "matched": true
+    },
+    {
+      "code": "artifact_integrity_failed",
+      "http_branch_status": 400,
+      "source": "modules/artifacts/artifacts.ts",
+      "source_line": 21,
+      "source_sha256": "13158ab61c9f875acecc8eacf9fd48699d8eb022527c265afc87a2b279f40bb7",
+      "matched": true
+    },
+    {
+      "code": "artifact_conflict",
+      "http_branch_status": 409,
+      "source": "modules/artifacts/artifacts.ts",
+      "source_line": 31,
+      "source_sha256": "13158ab61c9f875acecc8eacf9fd48699d8eb022527c265afc87a2b279f40bb7",
+      "matched": true
+    },
+    {
+      "code": "duplicate_input_path",
+      "http_branch_status": 400,
+      "source": "modules/execution/inputs.ts",
+      "source_line": 16,
+      "source_sha256": "345ac0d84fb7b90f86b12bb2d383d81dad63b27c9c54ae705789b5d289c7e03d",
+      "matched": true
+    },
+    {
+      "code": "reserved_initialization_path",
+      "http_branch_status": 400,
+      "source": "modules/execution/inputs.ts",
+      "source_line": 22,
+      "source_sha256": "345ac0d84fb7b90f86b12bb2d383d81dad63b27c9c54ae705789b5d289c7e03d",
+      "matched": true
+    },
+    {
+      "code": "workspace_already_started",
+      "http_branch_status": 409,
+      "source": "modules/execution/inputs.ts",
+      "source_line": 26,
+      "source_sha256": "345ac0d84fb7b90f86b12bb2d383d81dad63b27c9c54ae705789b5d289c7e03d",
+      "matched": true
+    },
+    {
+      "code": "ambiguous_variables",
+      "http_branch_status": 400,
+      "source": "modules/execution/sessions.ts",
+      "source_line": 54,
+      "source_sha256": "7c573299bb53511c84e2e9ac2d0fde6ff61fcef02bf53bbef6087699264f0a0d",
+      "matched": true
+    },
+    {
+      "code": "connection_kind_mismatch",
+      "http_branch_status": 400,
+      "source": "modules/execution/sessions.ts",
+      "source_line": 67,
+      "source_sha256": "7c573299bb53511c84e2e9ac2d0fde6ff61fcef02bf53bbef6087699264f0a0d",
+      "matched": true
+    },
+    {
+      "code": "missing_tool_binding",
+      "http_branch_status": 400,
+      "source": "modules/execution/sessions.ts",
+      "source_line": 138,
+      "source_sha256": "7c573299bb53511c84e2e9ac2d0fde6ff61fcef02bf53bbef6087699264f0a0d",
+      "matched": true
+    },
+    {
+      "code": "agent_archived",
+      "http_branch_status": 409,
+      "source": "modules/execution/sessions.ts",
+      "source_line": 94,
+      "source_sha256": "7c573299bb53511c84e2e9ac2d0fde6ff61fcef02bf53bbef6087699264f0a0d",
+      "matched": true
+    },
+    {
+      "code": "agent_revision_changed",
+      "http_branch_status": 409,
+      "source": "modules/execution/sessions.ts",
+      "source_line": 95,
+      "source_sha256": "7c573299bb53511c84e2e9ac2d0fde6ff61fcef02bf53bbef6087699264f0a0d",
+      "matched": true
+    },
+    {
+      "code": "stale_approval",
+      "http_branch_status": 409,
+      "source": "modules/execution/runs.ts",
+      "source_line": 202,
+      "source_sha256": "f462cf48c64b845d29861f4a2fac3d144ee99c61775301cac56249cc09842ecf",
+      "matched": true
+    },
+    {
+      "code": "session_connection_changed",
+      "http_branch_status": 409,
+      "source": "modules/access/access.ts",
+      "source_line": 30,
+      "source_sha256": "7c528f6dedbf261a816d8b46057cf2a8e07a73f26e162ea49ac4568c1d22cb69",
+      "matched": true
+    }
+  ],
+  "reviewed_logic": [
+    "Runs.submit prior request_hash check",
+    "Runs.decide identical-decision return and stale_approval branch",
+    "ExecutionWorker artifact_export_rejected branch",
+    "both SDK structured HTTP error parsing"
+  ],
+  "remaining": "Global article/readability/version gates and full end-to-end recovery acceptance remain separate.",
+  "example_checks": {
+    "command": ".local/docs-example-venv/bin/python examples/documentation/check-backend-intents.py",
+    "exit_code": 0,
+    "passed": 6,
+    "scope": "SQLite durable intent sample with fake remote client, including lost-response/restart and access checks; not real HTTP/cloud fault injection"
+  },
+  "bilingual_code_status_source_order_matches": true
+}

@@ -1,0 +1,136 @@
+---
+title: "运行测试并记录验收证据"
+---
+
+验收源于[用户旅程](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/journey-source.md)，再结合[验收台账](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/acceptance.md)中的后续最小 Session 入口要求。保存 Agent 是可选步骤。不要因为现有实现或某个测试脚本覆盖有限而缩减验收范围。
+
+## 选择对应的验证层级
+
+| 层级 | 能证明什么 | 不能证明什么 |
+| --- | --- | --- |
+| 单元与连接器契约 | schema、请求映射、能力声明、错误分类 | Provider 可用性或真实账户权限 |
+| 确定性 API、数据库与 Runtime 场景 | 租户检查、持久化事件、审批、受控故障下的恢复 | 真实模型决策或 Provider 生命周期 |
+| 安装后 SDK 测试 | wheel、tarball 的导入及指定 API 旅程 | 所有 SDK 方法或实云兼容性 |
+| 实云组合测试 | 精确 Provider、Harness 版本或 digest、模型协议、客户端场景 | 未测组合、全部 UI 路径或任意自定义包 |
+| 浏览器与完整用户旅程 | 实际配置、授权、预览交互及用户可见结果 | 未经 Provider 核查的全局资源清零 |
+
+fixture 通过只能证明对应断言。完成注册、凭据验证、获得模型回复，都不足以单独证明用户任务完成。
+
+## 确定性检查命令
+
+按[开发环境指南](/zh-CN/contribute/development)准备依赖与隔离测试数据库，两个验证门禁都需要先导出 `TEST_DATABASE_URL`：
+
+```sh
+npm run verify
+npm run verify:packages
+npm run release:check
+```
+
+`verify` 在缺少测试数据库 URL 时直接失败，再依次运行 `check` 和 `test`。仅运行 `npm test` 且未配置数据库可能缺少数据库覆盖，不能报告成完整门禁通过。Vitest 创建随机 schema、应用迁移，并在正常结束时删除 schema。测试文件串行运行，因为全局调度器可能领取其他文件的 fixture Run；保留显式并发测试，不要随意开启文件并行。
+
+`verify:packages` 需要 Python 打包依赖；它构建 SDK，在临时消费目录安装，检查导入，并用安装产物运行 Harness API、SDK 互操作、本地 SDK、授权拒绝测试。结果及产物哈希写入 `.local/evidence/sdk-packages.json`。后续云测试会引用其中的临时消费目录，运行前需保留它们。
+
+针对单项改动可以先运行实际存在的测试：
+
+```sh
+npx vitest run testing/tenant-boundaries.test.ts
+```
+
+从仓库根目录执行，沿用测试数据库配置。单项通过不替代完整门禁。`release:check` 生成私有文件清单审计；模式扫描不是完整秘密检测，也不会发布产物。
+
+## 启动与备份测试有不同前置条件
+
+| 命令 | 准备与影响 |
+| --- | --- |
+| `npm run verify:startup` | 使用 `DATABASE_URL`，不是 `TEST_DATABASE_URL`；创建独立 schema 与数据目录，启动和重启子服务，验证身份保持及错误密钥识别。使用可丢弃数据库并检查私有证据。 |
+| `npm run verify:backup` | 使用 `TEST_DATABASE_URL`，缺省有本地地址；需要 PostgreSQL 备份工具以及创建数据库的权限。创建 schema、恢复数据库及含敏感材料的本地备份包，不会自动移除这些数据库或备份包。 |
+| `npm run build:local` | 构建本地发行产物，不等于启动、备份或实云验收。 |
+
+运行有状态检查时显式指定数据库，不依赖缺省地址。执行前阅读脚本，证据保持私有。启动与备份脚本的输出会指出证据位置。调查完毕后有针对性地清理可丢弃资源，不能删除真实实例的身份或加密密钥。
+
+## 实云检查单独执行
+
+它们需要运行中的控制平面、就绪的 Sandbox 和模型连接、正确的 ingress、配额、固定 Harness 定义，以及相应脚本要求的安装包验证记录。执行会使用真实 Provider 和模型，可能产生费用。私有配置保存连接 ID；Provider 密钥留在控制平面凭据存储中。
+
+```sh
+npm run verify:compatibility -- /absolute/path/to/private-config.json
+```
+
+完整配置及筛选方式见[兼容性运行器](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/compatibility-runner.md)。它使用安装后的 SDK，为每次执行创建新的私有日志。只选一个客户端只能形成部分证据，被排除的组合不会变成通过。范围较窄的 `npm run verify:cloud -- /absolute/path/to/private-config.json pi` 使用自己的 Harness 映射并执行双客户端；其配置不能与兼容性运行器直接互换。准备前阅读[实现](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/tooling/cloud-matrix.ts)及子旅程输入。
+
+`npm run verify:serverless -- <provider> <harness-key>` 是单独的暂停恢复检查。它从本地实例选择就绪连接，当前预期存在 MiniMax-M3 模型连接。运行前阅读[脚本](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/tooling/cloud-serverless.ts)：私有报告文件名由 Provider 和 Harness 决定，重跑前先保留历史报告。它不是通用 benchmark，也不是完整 Web 旅程。
+
+## 保留完整旅程
+
+Python 与 TypeScript 都必须独立完成：创建 Session、上传并验证输入、幂等提交、订阅和重放事件、完成真实任务、处理授权与审批、获取产物、追问、取消与关闭。还需要双向跨语言继续同一个 Session。
+
+完整 Web 任务使用固定的[筛选应用](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/fixtures/filter-app/README.md)，不能修改验收测试来让任务通过。确认真实文件变化、测试输出、经过认证且可交互的预览、审批前零次报告写入和审批后恰好一次、最终回复与状态一致、关闭后导出产物仍可读取，以及预览访问失效。
+
+另外保留连接轮换、停用与删除，Tool 拒绝与过期，worker 与 Runtime 故障，取消竞态，创建或删除结果未知，租户隔离，真实网络允许与拒绝探测等支线。声明支持暂停恢复等能力时增加专项验证。仅支持对话的 Harness 不能被记为通过 Tool 或预览测试；兼容性矩阵某一行通过不能自动覆盖这些支线。
+
+## 读取测试结果，而不只看退出码
+
+当前 `testing/tenant-boundaries.test.ts` 使用 `describe.skipIf(!process.env.TEST_DATABASE_URL)`。缺少数据库配置时，它可以退出 0，同时显示 `1 skipped`；这代表没有执行租户隔离断言。完整门禁因此在启动测试前明确拒绝缺少 `TEST_DATABASE_URL` 的环境。
+
+2026-11-20 的[缺少数据库配置检查](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-test-gates-docs.json)实际观察到：
+
+| 命令 | 观察结果 | 可报告的结论 |
+| --- | --- | --- |
+| `npm run verify` | 退出 1，要求 TEST_DATABASE_URL | 门禁拒绝缺少前提，不是完整回归失败或通过 |
+| `npm run verify:packages` | 退出 1，要求 TEST_DATABASE_URL | 未开始安装产物验收，不能记作 SDK 通过 |
+| `npm test -- testing/tenant-boundaries.test.ts` | 退出 0，1 项 skipped | 该场景未执行，不能记作隔离通过 |
+
+该检查有意移除了子进程的数据库变量，没有连接数据库，也没有产生实云证据。正常验收必须检查用例数量、跳过数量、失败内容与实际断言，再连同命令退出状态记录。把零执行报告登记为 passed 会让缺失的验收范围悄悄消失。
+
+## 隔离 schema 的边界
+
+[数据库 setup](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/database-setup.ts)为配置的数据库创建随机 `hexagon_test_...` schema，迁移后通过测试上下文传递带 search_path 的连接；[环境 setup](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/test-environment.ts)把该连接交给各测试。正常 teardown 删除对应 schema。这个隔离不等于所有外部服务、扩展或数据库级操作都自动沙箱化，因此仍使用专用可丢弃数据库。
+
+若进程被强行终止，正常 teardown 可能没有执行。先核对原测试进程和具体 schema 所属，再处理残留；不要运行匹配前缀的批量删除去替代归属确认。保留故障时的私有运行记录，避免测试清理波及开发工作区。
+
+## 安装产物检查与源码检查分别保留
+
+`verify:packages` 在打包前检查数据库前提。之后生成 TypeScript tarball 和 Python wheel，在独立临时目录安装，通过 `HEXAGON_TEST_TS_MODULE` 与 `HEXAGON_TEST_PYTHON_PATH` 指向安装产物执行指定 API / SDK 套件。它使用明确列出的测试文件，并不自动覆盖整个 SDK 的每个方法。
+
+普通仓库内 import 或 TypeScript 编译无法证明发布包包含必需文件；安装包导入成功也无法证明真实模型旅程。记录三者时分别写清源代码检查、安装包检查和真实云检查，保留包 SHA-256、版本和源码 revision / snapshot 的关联。
+
+脚本会写入固定的 `.local/evidence/sdk-packages.json`，再次运行会替换该路径中的当前记录。重跑前保留需要追溯的旧记录，且不要删除后续云运行器仍要使用的临时消费目录。失败可能发生在创建记录之前，也可能发生在打包、安装或测试阶段；文件不存在或旧文件仍显示 verified 时，不能替代本次命令结果。
+
+## 脱敏证据模板
+
+下面是尚未执行的模板，不是通过报告。把占位值替换为实际观察，并保留失败尝试。
+
+```yaml
+status: planned
+started_at: null
+finished_at: null
+source_revision_or_snapshot: null
+command: null
+exit_code: null
+scope:
+  level: null
+  scenario: null
+  provider: null
+  harness_id_version_digest: null
+  model_protocol_and_identifier: null
+  sdk_language_version_artifact_sha256: null
+assertions: []
+failures: []
+not_tested: []
+cleanup:
+  status: not_checked
+  completion_basis: null
+  confirmed_at: null
+  associated_resources_checked: null
+  private_provider_receipt_reference: null
+  unresolved_operation_count: null
+  private_journal_reference: null
+```
+
+`cleanup.status` 与任务成功分别判断。按实际观察填写 `not_checked`、`pending`、`failed` 或 `confirmed`；这些是报告标签，不是新增 API 状态。`completion_basis` 写明 Provider 特定完成条件：有的资源可以通过确认缺失判断，有的还需要完成的删除回执与关联资源核对。unresolved_operation_count 为 `null` 表示未知，不是零。模型任务失败仍可能完成清理，回答成功也可能尚未确认清理。每次尝试分别保留执行与清理结论。
+
+公开的 testing/evidence 记录脱敏命令、时间、范围、断言、失败与清理结论。真实 Session、Run、资源、操作 ID，Provider 回执、端点标识和排查所需关联信息保存在访问受限的本地证据中。不要公开密钥、原始提示词、请求体或备份，也不要删除后续重试清理需要的私有 ID。
+
+响应丢失意味着结果未知。先对账已记录的操作与精确资源，再判断是否可重试；不能靠创建新资源或重放写操作把报告变绿。单次任务清理与全局账户清理是不同结论。即使后续任务全部成功，也必须保留未决操作。历史证据保持原日期，不能自动证明修改后的代码通过。
+
+下一步：[已验证组合](/zh-CN/integrations/verified-combinations)、[未知结果对账](/zh-CN/operate/reconciliation)、[贡献审查](/zh-CN/contribute/proposals-and-prs)。

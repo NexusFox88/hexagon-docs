@@ -1,0 +1,159 @@
+---
+title: "给任务提供文件与上下文"
+---
+
+在首次提交 Run 之前，把项目输入上传到 Session。上传的是工作区文件；它们不会自动变成模型的完整上下文，也不会自动作为最终 Artifact 导出。
+
+先创建一个尚未提交任何 Run 的 Session，参见[首个 Session](/zh-CN/start/first-session)。以下片段接续已初始化的 `client` 和 `session`。
+
+## 上传项目文件
+
+Python 接受相对路径到 bytes 的映射：
+
+```python
+from pathlib import Path
+import hashlib
+source = Path('hello.py').read_bytes()
+uploaded = client.upload(session['id'], {'src/hello.py': source})
+assert uploaded[0]['sha256'] == hashlib.sha256(source).hexdigest()
+assert uploaded[0]['size'] == len(source)
+```
+
+TypeScript 接受显式 base64 文件列表：
+
+```typescript
+import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+const source = await readFile('hello.py');
+const uploaded = await client.upload(session.id, [
+  { path: 'src/hello.py', content_base64: source.toString('base64') },
+]);
+if (uploaded[0].sha256 !== createHash('sha256').update(source).digest('hex') ||
+    uploaded[0].size !== source.length) throw new Error('Stored input mismatch');
+```
+
+在本机准备 `hello.py`，例如内容为 `print("hello")`。返回的 hash 和 size 验证控制平面保存的输入；它们并不单独证明云工作区已经准备好。下一次 Run 中要求 Agent 读取 `src/hello.py`、运行它并报告结果，以验证实际执行环境。
+
+## 路径与上传时机
+
+目录通过显式相对路径列表表达；该 API 不会 clone Git 仓库或解压归档。小项目优先使用允许列表，不要递归上传 `.env`、`.git`、构建输出和已安装依赖。下面继续使用同一个尚未开始执行的 Session：
+
+```python
+root = Path('examples/documentation/filter-app')
+paths = ['package.json', 'acceptance.mjs']
+files = {path: (root / path).read_bytes() for path in paths}
+receipts = client.upload(session['id'], files)
+expected = {path: (len(data), hashlib.sha256(data).hexdigest())
+            for path, data in files.items()}
+assert {row['path']: (row['size'], row['sha256']) for row in receipts} == expected
+```
+
+```typescript
+const paths = ['package.json', 'acceptance.mjs'];
+const files = await Promise.all(paths.map(async path => ({
+  path, bytes: await readFile(`examples/documentation/filter-app/${path}`),
+})));
+const receipts = await client.upload(session.id, files.map(file => ({
+  path: file.path, content_base64: file.bytes.toString('base64'),
+})));
+if (receipts.length !== files.length) throw new Error('Incomplete upload receipt');
+for (const file of files) {
+  const receipt = receipts.find((row: {path: string}) => row.path === file.path);
+  if (!receipt || receipt.size !== file.bytes.length ||
+      receipt.sha256 !== createHash('sha256').update(file.bytes).digest('hex')) {
+    throw new Error(`Stored input mismatch: ${file.path}`);
+  }
+}
+```
+
+这里选择两个文件演示路径保留，不构成完整可运行项目。读写、测试、导出的完整旅程使用[项目任务教程](/zh-CN/start/project-task)及其完整 fixture。上传契约没有空目录、符号链接身份或可执行权限字段；上述本地文件读取会跟随符号链接，因此读取前需检查允许列表。
+
+路径必须是工作区相对路径。拒绝绝对路径、反斜线、空段、`.`、`..` 和 NUL。单次请求中不能重复相同路径。首次执行前再次上传同一路径会更新保存的输入。
+
+当前实现每请求允许 1—100 个文件，base64 字段每文件最多 2 MiB 字符，解码后总量最多 8 MiB。这不是“每个源文件 2 MiB”的承诺；base64 编码会增加长度。路径最多 500 字符。数值依据当前[输入实现](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/inputs.ts)，后续版本需重新核对。
+
+首个 Run 提交后，或 Sandbox 已经关联后，上传返回 `workspace_already_started`。后续修改通过 Agent 执行完成；需要一份全新的原始项目时创建新 Session。启用了初始化配置时，`SOUL.md` 是保留路径，不能通过该接口覆盖。
+
+## 文件与模型上下文
+
+普通上传让文件存在于工作区。是否读取、如何理解，由任务指令和 Harness 的工具能力决定。不要把整个目录压入文本 prompt，也不要假设上传后模型已经逐字阅读全部内容。
+
+Session 的 `context.files` 可以引用文件路径和预期 SHA-256。提交时控制平面核对文件存在、hash、大小和 UTF-8 内容，防止被引用的上下文在初始化后发生变化。当前被引用文本文件上限为 32768 bytes，拒绝 NUL 与无效 UTF-8；这与普通文件上传上限不同。详情见[初始化契约](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/session-initialization.md)。
+
+如果上下文引用缺失或不匹配，先解决 `context_file_missing` / `context_file_changed`，不要反复提交相同的无效配置。
+
+## 创建 Session 前固定引用文档
+
+先计算实际字节的 hash，将其写入创建请求，再向返回的 Session 上传相同字节。以下片段需要已初始化的客户端、已验证的连接 ID，以及支持初始化的 Harness。它们会创建一个**新 Session**；上传前先保存其 ID。准备一份简短的 UTF-8 `brief.md`，确认其中内容适合作为参考材料。
+
+```python
+brief = Path('brief.md').read_bytes()
+digest = hashlib.sha256(brief).hexdigest()
+session = client.create_session(
+    harness={'id': 'pi', 'version': '1.5.2'},
+    sandbox_connection_id=sandbox_id, model_connection_id=model_id,
+    context={'files': [{'path': 'brief.md', 'sha256': digest}]},
+)
+# 下一次网络请求前，将 session['id'] 持久化到应用数据库。
+client.upload(session['id'], {'brief.md': brief})
+```
+
+```typescript
+const brief = await readFile('brief.md');
+const digest = createHash('sha256').update(brief).digest('hex');
+const session = await client.createSession({
+  harness: {id: 'pi', version: '1.5.2'},
+  sandbox_connection_id: sandboxId, model_connection_id: modelId,
+  context: {files: [{path: 'brief.md', sha256: digest}]},
+});
+// 下一次网络请求前，将 session.id 持久化到应用数据库。
+await client.upload(session.id, [{path: 'brief.md', content_base64: brief.toString('base64')}]);
+```
+
+这是另一种创建方式，不要直接追加到上文已有 Session 的示例中。之后按[持久化后端流程](/zh-CN/build/backend-integration)提交任务。引用 hash 已被固定，覆盖上传 `brief.md` 不会更新 Session 定义。可以在首个 Run 被接受前恢复原字节；如果确实要更换内容，则用新 hash 创建新 Session。此流程不提供原地修改 context 的操作。最多允许八个文件引用；单文件均未超限也不代表合并后的初始化和任务输入未超限。
+
+## 处理上传与上下文失败
+
+| 观察结果 | 下一步 |
+| --- | --- |
+| 上传响应丢失 | 查询 `GET /v1/sessions/{id}/files`，按完整的目标路径、hash、size 集合核对。该接口列出保存的初始输入元数据，不读取实时工作区字节。仅在 Session 尚未开始执行时重发相同的目标字节；应用应串行安排上传与提交。 |
+| `duplicate_input_path` 或非法路径/base64 | 修正请求后再发送。请求会在数据库写入前验证，非法条目不代表部分上传成功。 |
+| `upload_too_large` | 执行前减少或分批上传输入。多个请求是独立事务，需要保存清单并核对所有批次后再提交；分批不绕过单文件限制。 |
+| `workspace_already_started` | 查询已有 Run，不通过重试上传覆盖工作区；由后续 Agent 任务修改，或创建新 Session。 |
+| `context_file_missing` / `context_file_changed` | 在 Run 被接受前补齐缺失的精确字节或恢复固定字节；目标内容改变时创建新定义。 |
+| `context_file_too_large` / `context_file_encoding` | 大文件或二进制保留为普通工作区输入；在新 Session 定义中引用更小、不含 NUL 的 UTF-8 文本。 |
+| `initialization_too_large` / `input_too_large` | 按问题减少合并上下文或任务输入。修改固定上下文需要新 Session；缩短任务不会改变上下文。 |
+
+单个上传请求的文件写入一起提交；多个上传请求不构成原子的完整项目上传。文件列表按路径排序，应按路径核对，不能依赖上传顺序。上传空文件会将内容替换为零字节，不会删除路径；该 API 未提供初始输入删除操作。
+
+## 三种边界情况
+
+| 准备上传的内容 | 实际处理 | 应采取的动作 |
+| --- | --- | --- |
+| `src/../brief.md` | 路径验证在数据库事务前拒绝，不会自动规范化成 `brief.md`。 | 在本地确认目标工作区路径，发送规范的相对路径。 |
+| 一个 1,572,865 字节的二进制文件 | 标准 base64 编码后有 2,097,156 个字符，比字段上限 2,097,152 多四个。 | 减小文件或调整任务方案；分批请求无法让这个单文件符合限制。 |
+| 六个不同路径、各 1,572,864 字节的文件 | 每个 base64 字段都符合限制，但解码总量 9,437,184 字节超过每请求 8,388,608 字节。 | 在任何 Run 提交前分成更小批次，保留完整清单；核对全部保存输入后再提交。 |
+
+分批改变的是请求大小，不会改变下游 Runtime 或 Provider 容量。这里检查的是每请求上限，不能据此承诺 Session 工作区容量无限。多批上传中途失败时，执行前必须根据清单完成对账。
+
+对于固定引用的 `brief.md`，假设创建时保存 digest A，随后上传内容的 digest 是 B。提交会返回 `context_file_changed`，不会自动把 B 当作新的参考文档。应在首个 Run 被接受前恢复 A 对应字节，或者创建固定 B 的新 Session。项目文件和参考文档中的指令属于需要审阅的任务数据，不是访问凭据或修改业务权限的授权。
+
+## 用完整项目验证实际执行
+
+[项目任务教程](/zh-CN/start/project-task)提供完整 fixture 与可运行的 Python、TypeScript 入口。[日期实云记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-project-docs-cloud.json)覆盖 Vercel、内置 Pi 1.5.2 与已配置的 Messages 兼容 DeepSeek-V4-Flash 端点：两种客户端均在两轮 Run 中修改项目、执行未改变的固定测试，并在关闭 Session 后保留导出文件。它验证了实际读写执行，不只检查上传回执。
+
+三个检查仍需区分：上传回执描述保存的输入，Runtime 输入验证描述云工作区交付，下载产物描述导出结果。记录没有为每个追问 Run 标记新的 `workspace.inputs_verified` 事件；继续已有工作区本来就不等于重新上传。该记录也不证明全部非法上传的真实拒绝行为、所有 Provider，或本页短片段的新一次执行。
+
+## 环境与凭据
+
+`env` / `variables` 用于普通配置，例如运行模式。Sandbox 代码可以读取这些值。模型、Provider 和 Tool 的受保护凭据应通过相应连接配置，不应为了“方便”复制进项目文件或环境值。
+
+## 验证与后续
+
+完成条件是：保存输入 hash 与本地一致，真实 Run 能读取指定文件并执行固定检查，最终所需交付文件写入 Run 产物目录并可下载。初始输入 hash、实际工作区内容和最终 Artifact 是三个分别需要验证的对象。
+
+失败时保留 Session ID；非法路径可以在首次执行前修正，已经开始的工作区不能通过覆盖上传修复。完成后显式关闭 Session 并确认清理。下一步：[连续多轮工作](/zh-CN/build/multi-turn)、[导出产物](/zh-CN/build/artifacts)、[理解持久化](/zh-CN/concepts/persistence)。
+
+审阅范围：[本地审阅记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-project-context-editorial.json)覆盖源码核对、schema 拒绝分支与片段语法/转译检查，不执行 PostgreSQL 上传事务，也不证明云工作区交付。
+
+契约依据：[Session 文件 API](/zh-CN/reference/sessions)、[限制](/zh-CN/reference/limits)、[输入存储](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/inputs.ts)、[提交上下文验证](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts)、[初始化编译](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/initialization.ts)。

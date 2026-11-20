@@ -1,0 +1,101 @@
+---
+title: "Catalog and Harness registration HTTP contract"
+---
+
+Catalog discovery is available to owner/application tokens; both registration routes require an owner. Registrations are tenant-scoped. Registration is not a Sandbox launch, model test or certification of a declared capability.
+
+## Discover catalogs
+
+`GET /v1/catalog` returns **200**, `{connections,harnesses,harness_templates,harness_protocols}`, with no pagination. Connections contains adapter kind/provider/capabilities and optional setup_url/evidence. Harnesses contains tenant-visible executable definitions; harness_templates is a separate template collection, not a promise that every image is registered or available. Harness_protocols describes adapter protocol contracts.
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" "$HEXAGON_API_URL/v1/catalog"
+```
+
+Harness entries include their source definition plus protocol, model_providers, continuation, distribution and verification. The current projection computes distribution from image, recipe and source metadata; do not use that label alone as proof of installation. Verification entries match exact image reference, protocol and command and include their Sandbox/model/client/scenario scope. An empty verification array means this projection has no matching evidence, not necessarily that execution is impossible. Choose compatible connections and preflight the actual Session.
+
+## Register an OCI Harness
+
+`POST /v1/harnesses` accepts a strict object:
+
+| Field | Requirement / default |
+| --- | --- |
+| image | Required string, 1–512 characters; registry reference resolved by the image resolver |
+| id | Optional, matches `^custom\.[a-z0-9][a-z0-9.-]{0,79}$`; otherwise derived from resolved reference |
+| version | Optional, matches `^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$`; otherwise first 16 digest hex characters |
+| name | Optional string 1–100; defaults to resolved ID |
+| protocol | Optional registered protocol enum; otherwise image label ai.hexagon.harness.protocol, then hexagon-json-v1 |
+| command | Optional array of 1–32 nonempty strings, each ≤65,536 without NUL; otherwise resolved image command |
+| capabilities | 1–3 entries from conversation/tools/initialization, default conversation |
+| registry_secret_id | Optional tenant-owned enabled managed Secret UUID |
+
+Accepted references use Docker Hub or GHCR repository syntax, not arbitrary URLs. `python:3.12` expands to Docker Hub’s `library/python`; `org/image:tag` defaults to Docker Hub; explicit `docker.io/...` and `ghcr.io/...` are supported. An omitted tag/digest selects `latest`. A digest selector must be `@sha256:` followed by 64 lowercase hexadecimal characters. HTTP(S) schemes, custom registry hosts and host ports are rejected. Prefer an immutable digest for a repeatable registration; a syntactically valid reference still needs a real image implementing the selected Harness protocol.
+
+For private registry authentication, the managed Secret value must be strict JSON `{username,password}` with nonempty strings. Do not put registry secrets into image URLs or request logs. The resolver checks the supported image/platform contract; current registrations pin linux/amd64. See [OCI integration](/en/integrations/harnesses/oci) for runnable image requirements.
+
+Save your actual image definition as `harness-image.json`:
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data-binary @harness-image.json "$HEXAGON_API_URL/v1/harnesses"
+```
+
+Success returns **201** with id/version/name, source=oci, protocol, effective capabilities/model_providers, image (reference/digest/platform/user and optional registry_secret_id), command and registration_digest. It contacts a registry and saves a resolved definition; it does not execute the image. Tools/initialization must be supported by the selected protocol, and a missing resolved command returns `400 harness_entrypoint_missing`.
+
+The immutable key is tenant/id/version. Re-registering an identical resolved definition returns it; different content at the same key yields `409 harness_version_conflict`. Image tags can move between requests, so preserve the returned digest and use an immutable image reference. OCI and source packages share this version namespace. No public update/delete route is defined here.
+
+## Register a source package
+
+`POST /v1/harness-packages` accepts a strict object:
+
+| Field | Requirement |
+| --- | --- |
+| id, version | Required, same explicit ID/version patterns as OCI |
+| capabilities | At most 3 conversation/tools/initialization entries; default empty |
+| model_providers | Exactly `["anthropic-compatible"]` |
+| protocol | Exactly hexagon-json-v1 |
+| interpreter | python3 or node |
+| entrypoint | Valid package path, present in files |
+| files | 1–32 strict `{path,content}` objects |
+
+Paths are at most 240 characters, begin with an alphanumeric/underscore/hyphen and use alphanumeric, underscore, dot, slash or hyphen characters. Empty/`.`/`..` segments, duplicate paths and file/directory collisions are rejected. Content is text, not Base64, ≤262,144 JavaScript string code units per file; total UTF-8 content is at most 512 KiB. This endpoint is not a general dependency installer.
+
+Prepare `harness-package.json` following the [source-package guide](/en/integrations/harnesses/source-package), including actual executable protocol implementation:
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data-binary @harness-package.json "$HEXAGON_API_URL/v1/harness-packages"
+```
+
+Success **201** returns id/version/capabilities/model_providers, digest and created_at, not the full source files. Digest is computed over a canonical package with deduplicated/sorted capabilities and sorted files. Identical canonical content at the same key is accepted; different content or an OCI collision yields `409 harness_version_conflict`.
+
+Registration stores inert data in the control plane. During execution, files are installed and byte-checked in the Sandbox, the interpreter must exist, and the program must implement the declared protocol. Source acceptance alone does not establish tool support, continuation, correctness or isolation beyond the documented Sandbox boundary.
+
+Malformed strict inputs return `400 invalid_request`; image-specific registry/manifest failures use resolver errors. Private registry lookup may return secret_not_found (404), secret_disabled (409), secret_store_unavailable (503) or image_registry_credential_invalid (400). A lost registration response should be reconciled against catalog identity/digest rather than changing version to bypass a conflict.
+
+## Registration failures
+
+Both registration operations use the common [error envelope](/en/reference/errors). The following named failures supplement strict input validation; a transport or unclassified server failure can still use the general error contract.
+
+| Error code | HTTP | Interpretation / action |
+| --- | --- | --- |
+| `invalid_image_reference` | 400 | Correct registry/repository/tag/digest syntax; custom registry URLs are not supported |
+| `image_not_found` | 404 | The registry read returned 404; verify repository, selector and access |
+| `image_registry_authentication_failed` | 401 | Registry token/challenge authentication failed; distinguish this code from control-plane token rejection |
+| `image_platform_unsupported` | 400 | A supported Linux amd64 manifest/config was not resolved |
+| `image_user_unsupported` | 400 | Image user does not match the supported user/group format |
+| `image_digest_mismatch` | 400 | Retrieved manifest/config bytes do not match their digest; do not ignore integrity failure |
+| `image_manifest_too_large` | 400 | A registry response exceeded the resolver’s bounded read |
+| `image_registry_invalid_response` | 502 | Required response/body/config/command shape is unsupported or missing |
+| `image_registry_request_failed` | 502 | Registry request failed; retain the intended identity/digest when investigating |
+| `image_registry_redirect_rejected` | 502 | Redirect is outside the permitted blob-download destinations or form |
+| `harness_entrypoint_missing` | 400 | Supply a valid command or an image with an executable command |
+| `harness_initialization_unsupported` / `harness_tools_unsupported` | 400 | Requested capabilities are not supported by the selected protocol |
+| `harness_version_conflict` | 409 | Same tenant/id/version already has different content, including the other distribution type; reconcile before choosing a genuinely new version |
+
+Private registry Secret failures are listed above. Source-package path, entrypoint, file count, encoding-size and strict-schema violations return `400 invalid_request`; a successful package registration does not run the interpreter or validate behavior. Registry reads may retry bounded read failures internally; this does not authorize retrying image publication, cloud allocation or external Tool writes.
+
+Sources: [catalog projection](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/catalog.ts), [OCI registration](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/images.ts), [source packages](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/harness-packages.ts), [routes](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts). Examples assume an origin without `/v1`; no registry request, registration or cloud execution was performed in this documentation pass. Next: [HTTP overview](/en/reference/http), [Harness selection](/en/integrations/harnesses).

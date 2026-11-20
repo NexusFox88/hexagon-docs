@@ -1,0 +1,106 @@
+---
+title: "选择并配置 Harness"
+---
+
+Harness 是执行 Agent 逻辑的引擎。它负责模型交互、对话和工具使用；Runtime 监督它的进程，控制平面管理任务、授权与云资源。
+
+## 三条分发路径
+
+| 路径 | 选择方式 | 边界 |
+| --- | --- | --- |
+| 内置 | catalog 中的准确 id/version | 已注册安装适配器，不要求 Provider 支持 OCI |
+| OCI | 注册镜像，再使用返回 id/version | 需要 OCI 能力，镜像 digest 固定 |
+| Legacy source package | 专用 package API | 兼容源代码分发，不是镜像 API |
+
+当前内置 Pi 1.5.2 和 OpenCode 1.2.27 支持 conversation、tools、initialization，声明支持三种模型协议。查询 `catalog()` 确认部署实际注册项；历史文档中的版本不能替代当前目录。
+
+## 内置 Harness 的最小选择
+
+以下预检片段复用[首个 Session](/zh-CN/start/first-session)中的已初始化客户端与已启用连接 ID，不注册镜像，也不分配 Sandbox。选择一个准确的 selector；把 Pi 换成 OpenCode 是切换 Harness，不是转换模型协议。
+
+```python
+selector = {"id": "pi", "version": "1.5.2"}
+# Alternative: {"id": "opencode", "version": "1.2.27"}
+definition = dict(harness=selector,
+                  sandbox_connection_id=sandbox_connection_id,
+                  model_connection_id=model_connection_id)
+check = client.preflight_session(**definition)
+if not check['ready']:
+    raise RuntimeError('Review the preflight diagnostics')
+```
+
+```typescript
+const selector = { id: 'pi', version: '1.5.2' };
+// Alternative: { id: 'opencode', version: '1.2.27' }
+const definition = { harness: selector,
+  sandbox_connection_id: sandboxConnectionId,
+  model_connection_id: modelConnectionId };
+const check = await client.preflightSession(definition);
+if (!check.ready) throw new Error('Review the preflight diagnostics');
+```
+
+然后沿教程的持久创建、提交、观察和关闭流程继续。预检 ready 证明配置兼容性检查通过，不会安装 CLI、调用模型或证明任务成功。已有 Session 固定 Harness 选择；比较两个引擎时分别创建 Session，检查实际任务结果、Tools、产物和清理。
+
+## OCI 模板目录
+
+下面是当前模板/适配器索引，发布镜像与 recipe 的来源和固定版本见[镜像目录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/harness-images.md)。列出名称不代表该模板已完成全部真实组合验证。
+
+下面是 2026 年 11 月 20 日的仓库快照。“适配器契约”指本地调用与结果解析测试，不等于容器执行通过。“有范围的实云记录”指[验证注册表](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/verification.ts)中精确匹配镜像、命令和协议的条目；选择组合前仍需读取其模型、SDK 与场景字段。没有匹配条目表示目录缺少对应证据，不表示程序一定不能运行。
+
+| 模板 | 目录中的分发状态 | 契约证据 | 模板附带的实云证据 |
+| --- | --- | --- | --- |
+| [Codex](#codex) 0.169.0 | 固定 community 镜像 + recipe | Managed CLI 适配器 | 有范围的 Modal / Fly 记录 |
+| [Hermes](#hermes) 2026.9.24 | 固定 upstream 镜像 + recipe | Managed CLI 适配器 | 有范围的 Modal / Fly 记录 |
+| [OpenClaw](#openclaw) 2026.11.5 | 固定 upstream 镜像 + recipe | Managed CLI 适配器 | 有范围的 Modal / Fly 记录 |
+| [DeepSeek](#deepseek-harness) 0.2.2-rc.1 | recipe；模板未提供 registry 镜像 | DeepSeek 适配器 | 无匹配目录证据 |
+| [OpenCode](#opencode) 1.2.27 | 固定 upstream 镜像 + recipe | Runtime 适配器 | 有范围的 Modal / Fly 记录 |
+| [Aider](#aider) 0.86.2 | 固定 upstream 镜像 + recipe | Runtime 适配器；仅对话 | 有范围的 Modal / Fly 记录；不支持连接 Tools |
+| [Pi](#pi) 1.5.2 | recipe；模板未提供 registry 镜像 | Runtime 适配器 | 无匹配 OCI 模板证据；内置证据另计 |
+| [Claude Code](#claude-code) 2.1.327 | recipe；模板未提供 registry 镜像 | Runtime 适配器 | 无匹配目录证据 |
+| [Python Agent](#python-agent) 1.0.0 | recipe；模板未提供 registry 镜像 | JSON 结果契约 | 无匹配 OCI 模板证据；源码包证据另计 |
+
+契约来源：[Runtime 适配器测试](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/runtime-adapter.test.ts)、[Managed CLI 测试](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/managed-cli.test.ts)、[源码包结果测试](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/harness-packages.test.ts)。这些检查的范围小于镜像构建、云启动或完整用户旅程。生命周期还取决于 [Sandbox](/zh-CN/integrations/sandboxes)：原生对话 ID 不能保证任意进程与内存在空闲后继续存在。
+
+### Codex
+
+codex-v1，使用 Responses，Tools 经 MCP bridge，原生对话继续。需要核对所注册镜像的来源、digest 和具体执行证据。
+
+### Hermes
+
+hermes-v1，使用 Chat Completions，Tools 经 MCP bridge，原生对话继续。
+
+### OpenClaw
+
+openclaw-v1，声明三种模型协议，Tools 经 MCP bridge。不要把一类协议通过外推为其余两类通过。
+
+### DeepSeek Harness
+
+deepseek-v1，当前 Messages 路径，提供构建 recipe。初始化能力有限，不应声明当前适配器不支持的 initialization。构建产物发布和云执行需单独处理。
+
+### OpenCode
+
+opencode-v1，声明三种协议和 Tools。OCI OpenCode 与内置 OpenCode 是两条分发路径，Provider 要求不同。
+
+### Aider
+
+aider-v1，当前 Messages，恢复历史继续对话；当前适配器不提供连接 Tools，也不支持声明 initialization。
+
+### Pi
+
+pi-v1，三种协议，Tools 通过 Pi extension。模板可构建不等于已有可拉取镜像。
+
+### Claude Code
+
+claude-code-v1，当前 Messages，Tools 经 MCP bridge；按实际权限运行，不将 root 不兼容的 bypass 模式当默认方案。
+
+### Python Agent
+
+hexagon-json-v1，当前 Messages 示例，实现 mailbox 工具与自定义会话契约。自定义代码必须自己正确持久化对话。
+
+## 选择与验证
+
+根据[协议表](/zh-CN/integrations/model-protocols)选择模型，根据 Tools / initialization 要求选择适配器，再检查 Sandbox 的 OCI、私有镜像和恢复能力。提交明确结果任务，验证两轮、工具、产物、取消与清理；必要时增加休眠恢复。
+
+能力声明由适配器限制。不能通过注册 `tools` 为 Aider 增加未实现功能，也不能靠换版本字符串改变镜像行为。
+
+下一步：[OCI 注册](/zh-CN/integrations/harnesses/oci)、[source package](/zh-CN/integrations/harnesses/source-package)、[模型协议](/zh-CN/integrations/model-protocols)。依据：[Runtime 协议](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/protocols.ts)、[注册检查](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/images.ts)。

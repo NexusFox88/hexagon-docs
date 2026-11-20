@@ -1,0 +1,105 @@
+{
+  "scope": "Batch 1 content and example-entry closeout. Remaining execution/evidence applicability transferred to shared batch 2; global bilingual/render gates remain batch 3. Not complete delivery.",
+  "items": {
+    "R01": {
+      "requirement_status": "proven",
+      "finding": "All 79 routes mapped to exact normative fields, roles, errors, effects and cURL examples. Seven actual HTTP records were source-hash revalidated; remaining families have explicit source review. This proves reference coverage, not 79 cloud journeys."
+    },
+    "R02": {
+      "requirement_status": "partial",
+      "finding": "All 76 public entries have source signatures, return/error mapping and exact linked bilingual contextual callsites. Python independent full-journey evidence applicability is consolidated in batch 2; no per-method cloud rerun is required."
+    },
+    "R03": {
+      "requirement_status": "partial",
+      "finding": "All 76 public entries reviewed with linked contexts; TypeScript response-type omissions and broad preflight bindings documented. Independent full-journey applicability belongs to batch 2; syntax, types and runtime are distinct."
+    },
+    "B01": {
+      "requirement_status": "partial",
+      "finding": "Existing SQLite backend provides durable submission, restart/query, ownership, artifact delivery and cleanup commands with 14 offline checks. Full application/cloud evidence applicability moves to J2; production login and a background scheduler are not acceptance requirements."
+    },
+    "B04": {
+      "requirement_status": "partial",
+      "finding": "Runnable loopback SSE server/browser entry now reuses forwarding and timeline helpers. Real HTTP test proves lost-delivery replay, same Run, two unique rows, state separation and final query with synthetic events. Browser interaction and shared cloud evidence remain J2; synthetic transport is not cloud proof."
+    },
+    "I19": {
+      "requirement_status": "partial",
+      "finding": "All 37 app anchors retain configuration, operations, permissions, examples, limitations and contract-only evidence levels. One complete authorized-account OAuth example remains to locate or execute in batch 2; per-app live acceptance is not required."
+    },
+    "I21": {
+      "requirement_status": "partial",
+      "finding": "Protocol version/transport table and permission, expiry/schema and unknown-write risk explanations are complete. Batch 2 will check applicability of the existing controlled protocol-server discovery/call and historical cloud records; no new live negative/write matrix is required."
+    },
+    "D01": {
+      "requirement_status": "proven",
+      "finding": "The existing bilingual no-cloud documentation edit exercise and actual structural-check result meet the original small-change requirement. Clean installation belongs to S03; no additional clean-room rehearsal is required for D01."
+    },
+    "D03": {
+      "requirement_status": "partial",
+      "finding": "Existing connector skeleton, Boat reference and explicit zero/multiple/lost-response test requirements are documented. Batch 2 must match actual reference-test evidence for those branches; implementing and live-certifying a new provider is not required."
+    },
+    "D05": {
+      "requirement_status": "partial",
+      "finding": "Guide now points to existing read/write registry, broker and dual-SDK authorization/cancellation fixtures. Batch 2 checks executed DB-backed zero-call/repeated-decision/unknown-outcome results; no duplicate report service or real-account acceptance is required."
+    }
+  },
+  "supporting_records": [
+    {
+      "path": ".local/docs-content-checks/closeout-http-contract-matrix.json",
+      "sha256": "795d9ca0585e5685d81303c163367ebb1cada40a72139bcd4778e8ad6313a219"
+    },
+    {
+      "path": ".local/docs-content-checks/closeout-sdk-method-review.json",
+      "sha256": "9a37f7c3b327ac3b824d0149f3797b26e5cab167131f19e846d2e7a4d87c6bb8"
+    },
+    {
+      "path": ".local/docs-content-checks/closeout-structure.json",
+      "sha256": "606ee43ba39da4b955e9ba4c232f754a0336e95d7f76cd69950371e0d350c91a"
+    },
+    {
+      "path": ".local/docs-content-checks/closeout-links.json",
+      "sha256": "ef30fa3e21d7325bcdda0f23be36056b1b99d125e6768e45ec32ff5946f387cf"
+    },
+    {
+      "path": ".local/docs-content-checks/closeout-code-syntax.json",
+      "sha256": "2430fc46ea11e5cb53420e1cd35c25cb9f4c4ce9c5a9eff15b948bee48d3c520"
+    }
+  ],
+  "example_sha256": {
+    "examples/documentation/event-delivery-server.mjs": "c7f95038488b8b966a8551dcd232d5d7cf3e377c02c0b60c37608ad3ab94d0a5",
+    "examples/documentation/event-delivery-viewer.html": "1026fa6a38a02927d0bdf03ca61b81c4645dadd1c52fa64c994bfc5ca5d459f4",
+    "examples/documentation/event-delivery.mjs": "57ef7d3b4a2b1ef631b17a2e15102252b222dcb058f4cd28f33edad60b4e90b3"
+  },
+  "actual_checks": [
+    {
+      "command": "node --check examples/documentation/event-delivery-server.mjs",
+      "exit_code": 0
+    },
+    {
+      "command": "node examples/documentation/check-event-delivery.mjs",
+      "exit_code": 0,
+      "scope": "offline helper assertions"
+    },
+    {
+      "command": "inline Node loopback HTTP harness importing deliveryServer and RunTimeline",
+      "exit_code": 0,
+      "scope": "synthetic source over actual HTTP/SSE; no browser or Hexagon",
+      "checks": [
+        "drop first delivery before applying",
+        "reconnect from viewer cursor",
+        "same Run ID",
+        "complete two-event set",
+        "duplicate apply suppressed",
+        "disconnect preserves running state",
+        "final queried completed state",
+        "bad cursor 400",
+        "POST 405",
+        "viewer HTML served"
+      ]
+    }
+  ],
+  "global_content_review": {
+    "G01": "82 assets and 246 original requirement groups retained; prior scoped semantic reviews retained. New visual acceptance not inferred from structural checks.",
+    "G02": "79-route and 76-pair method/context maps complete; runtime applicability consolidated in batch 2.",
+    "G03": "Product vs engineering/evidence boundaries and generators documented; task-book section 7 remains the source-to-destination migration map. No move/deletion or published redirect is required in this task."
+  }
+}

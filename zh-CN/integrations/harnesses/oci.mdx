@@ -1,0 +1,76 @@
+---
+title: "注册并运行 OCI Harness"
+---
+
+新 Harness 集成使用 OCI 镜像。注册解析镜像元数据并固定 Linux amd64 manifest digest；它不是一次 Agent 任务，也不证明运行成功。
+
+需要 owner 身份、允许的 registry 镜像，以及兼容 Sandbox 和模型连接。当前 registry 为 Docker Hub / GHCR；其他来源不能当任意 URL 拉取。
+
+## 注册并预检
+
+以下接续已初始化的管理客户端。IMAGE_REFERENCE 是你已核对的镜像引用，protocol 必须匹配镜像内真实程序；示例使用 opencode-v1。
+
+```python
+harness = client.register_harness(
+    image="ghcr.io/anomalyco/opencode@sha256:763ea3bce6bdaee6d6092775c83c03a90b11b2a74dcfb89942a4cb82a99f974e", id='custom.project-agent', version='1.0.0',
+    protocol='opencode-v1', command=['opencode'], capabilities=['conversation', 'tools'],
+)
+definition = dict(harness={'id': harness['id'], 'version': harness['version']},
+                  sandbox_connection_id=sandbox_connection_id,
+                  model_connection_id=model_connection_id)
+check = client.preflight_session(**definition)
+if not check['ready']:
+    raise RuntimeError('Review compatibility before creating the Session')
+session = client.create_session(**definition)
+```
+
+```typescript
+const harness = await client.registerHarness({
+  image: 'ghcr.io/anomalyco/opencode@sha256:763ea3bce6bdaee6d6092775c83c03a90b11b2a74dcfb89942a4cb82a99f974e', id: 'custom.project-agent', version: '1.0.0',
+  protocol: 'opencode-v1', command: ['opencode'], capabilities: ['conversation', 'tools'],
+});
+const definition = { harness: { id: harness.id, version: harness.version },
+  sandbox_connection_id: sandboxConnectionId, model_connection_id: modelConnectionId };
+const check = await client.preflightSession(definition);
+if (!check.ready) throw new Error('Review compatibility before creating the Session');
+const session = await client.createSession(definition);
+```
+
+随后按[首个 Session](/zh-CN/start/first-session)的持久提交方式运行任务、查询产物并关闭。保存注册返回的 image.digest 和实际配置；不要只记录可变 tag。相同定义重复注册幂等，同一 id/version 变更返回冲突，需新版本。source package 与 OCI 共用版本命名空间。
+
+未指定 command 时取镜像 Entrypoint + Cmd；未指定 protocol 时从镜像 label 或默认 JSON 协议推导。检查推导结果，不能假设任意 CLI 镜像天然兼容。
+
+## 区分镜像身份与版本标签
+
+注册记录解析后的 Linux amd64 镜像 digest、执行命令、协议、能力和可选 registry Secret 引用。Harness 的 `id`/`version` 是稳定选择键，可变镜像 tag 只是解析输入。之后移动 tag，不会静默更新既有注册或 Session。
+
+未指定时，protocol 来自 `ai.hexagon.harness.protocol`，否则默认为 `hexagon-json-v1`；command 来自镜像 Entrypoint 与 Cmd。默认值不证明程序实现了该协议。默认能力列表只有 conversation；只有适配器与程序实际支持时才声明 Tools 或 initialization。注册会拒绝 Aider 的 Tools，以及 Aider/DeepSeek 的 initialization 等组合。
+
+发布新定义时，先构建并验证镜像、记录解析 digest，定义变化后注册新 id/version，再用专用 Session 验证所需行为，最后为应用新任务选择该版本。重复 id/version 但解析定义不同会返回 `harness_version_conflict`，不能因此覆盖原版本。source package 与 OCI 注册共享版本命名空间。
+
+分别记录三个检查点：注册成功解析元数据；Provider 准备并启动该镜像；Harness 完成所需行为。registry manifest 只证明第一项。镜像准备可能改变 Runtime 前提，因此运行身份和行为需要与源码镜像 digest 分开记录。
+
+
+## 固定镜像示例的验证范围
+
+上面的镜像与显式 `opencode` 命令对应[11 月 18 日 MiniMax 矩阵](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-18-minimax-matrix.md)。选择已验证的 Modal 或 Fly Machines 连接，并按[验证注册表](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/verification.ts)使用精确的 MiniMax-M3 协议条目。该记录覆盖双 SDK、对话继续、远程 Tool、环境、产物与清理；本页不宣称本次重新拉取或执行了镜像。registry 可访问性与当前账户仍需验证。
+
+如果选择不支持 OCI 的 Provider，在创建资源前保留失败预检的诊断，不删除兼容性检查，也不偷偷替换镜像掩盖失败。重复注册相同定义应返回相同选择；在相同 id/version 下改变 command 应产生版本冲突，变更应注册新版本。这两项都不能证明模型任务成功。随后按完整教程持久保存提交记录、验证输出与产物，最后确认计算资源及 Provider 所有的准备资源均已清理。
+
+[合并 Harness 证据复核](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-docs-harness-reuse.json)将这里的精确 digest 匹配到 Python 与 TypeScript 独立 Modal 旅程，均验证产物并确认清理。当前隔离数据库检查另外证明，不支持镜像的 Provider 在创建 Session 或资源操作前被拒绝。这些检查不是新一轮镜像拉取或实云执行。
+
+## Provider 与身份边界
+
+Modal 和 Fly Machines 支持原生 OCI；Fly 当前仅公开镜像。E2B 当前以 Session 自有 Template 构建公开 OCI 镜像，构建和创建有独立操作记录，关闭先清理计算再清理模板。其新增镜像组合仍需逐项验收。
+
+Modal 会派生镜像补齐 Runtime 前提，支持的包管理器有限。准备阶段使用 root；当前代码写回镜像 USER，但既有运行说明报告实际执行为 root，因此 USER 不是已验证的安全边界。需要依赖身份时核验实际 uid，详见 [Modal 接入](/zh-CN/integrations/sandboxes/modal)。Fly 也可能准备 Runtime 依赖并以 root 执行。镜像 digest 标识源镜像，不表示运行文件系统从未被准备过程改变。
+
+私有 registry 使用 enabled Secret，内容为 username/password JSON；密钥不进入普通 Agent 环境。私有镜像能力与公开 OCI 分开预检。镜像解析、拉取、执行、工具调用和清理各需验证。
+
+## 构建与失败
+
+仓库模板可用 `node --import tsx tooling/build-harness-images.ts all` 构建，不自动 push。构建可能下载依赖并创建本地镜像；检查各模板要求。recipe 不是已发布产物。
+
+缺失入口、架构不支持、拉取授权、Runtime 依赖、模型协议和输出协议分别定位。模板 build receipt 丢失时查原操作，不能自动开始第二次构建。失败仍需保留并清理模板 / 资源。
+
+依据：[OCI 设计](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/oci-harness-design.md)、[镜像契约](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/harness-images.md)、[注册实现](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/images.ts)。下一步：[Harness 适配器](/zh-CN/contribute/harness-adapters)、[已验证组合](/zh-CN/integrations/verified-combinations)、[安全边界](/zh-CN/concepts/security-boundaries)。

@@ -1,0 +1,44 @@
+{
+  "scope": "R02 isolated installation/help reproducibility and global Python/TypeScript Markdown syntax check; not full runtime acceptance",
+  "sha256": {
+    "docs/product/en/reference/python.md": "6fd31f3ee5d91dddb627eb96e53f956e20851a354038046cfc228bd475461bbe",
+    "docs/product/en/contribute/documentation.md": "4666f2793cf1600edcff133239dd6b74f442bda21720a7d77eb7fbdbb020e525",
+    "docs/product/zh-CN/reference/python.md": "f0b0a163d20200e4033f074d2aa41b4624302c7b01fe52337c5487d5c31c5820",
+    "docs/product/zh-CN/contribute/documentation.md": "37188b73bbc6bfc5bd28bc9d73b2604a32a14fafa807064db1fc700c4e35862f",
+    "tooling/check-product-doc-code.mjs": "1e1a41df2244f7bfa73a1e83e5a8528b90d7cdaaf1f3f5083420acd0a477cde6"
+  },
+  "python_setup": {
+    "fresh_virtual_environment": true,
+    "install_checkout_exit_code": 0,
+    "isolated_import_exit_code": 0,
+    "installed_import_outside_checkout": true,
+    "version": "0.1.0",
+    "diagnostic_help_exit_code": 0,
+    "required_options_present": true,
+    "private_record": ".local/docs-content-checks/sdk-reference-setup-result.json"
+  },
+  "syntax_report": "testing/evidence/2026-11-20-product-doc-code-syntax.json",
+  "checks": [
+    {
+      "description": "Marked parser recognizes full-language and short aliases; all 114 Python and 114 TypeScript blocks parse across 193 product pages",
+      "passed": true
+    },
+    {
+      "description": "Isolated checker fixtures: valid py/ts aliases pass, malformed Python and TypeScript produce failure and language diagnostics",
+      "passed": true
+    },
+    {
+      "description": "Structure and local links pass",
+      "passed": true,
+      "targets": 3992,
+      "fragments": 213
+    }
+  ],
+  "limitations": [
+    "Fresh Python environment used existing checkout; not a fresh repository clone or a clean control-plane installation.",
+    "Python 3.12.11 syntax does not establish Python 3.10 compatibility.",
+    "TypeScript parser checks syntax, not types, imports or runtime.",
+    "Diagnostic --help does not discover workspace, contact HTTP or execute cloud work.",
+    "All-method runtime and global publication acceptance remain open."
+  ]
+}

@@ -1,0 +1,91 @@
+---
+title: "Applications and OAuth HTTP contract"
+---
+
+These six management routes require owner authentication and tenant scoping. OAuth consent is separate from per-operation approval. An authorization flow is not a Run, and cancelling it does not revoke an existing provider account or undo an external operation. Examples use an owner token and an API origin without `/v1`.
+
+## Application catalog
+
+`GET /v1/applications` returns **200**, `{applications,oauth_clients}`. Application entries contain id/name/category, credential_url, oauth support boolean, credential_fields, verification_may_charge, evidence and operations. Operation entries include name, description, write, input_schema and required_scopes. Evidence records describe their stated implementation/testing scope, not live readiness of your account.
+
+OAuth_clients entries contain provider, client_id, redirect_uri and updated_at; they never contain client_secret. There is no pagination contract.
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" "$HEXAGON_API_URL/v1/applications"
+```
+
+## Configure the OAuth client
+
+`PUT /v1/applications/{provider}/oauth-client` accepts strict client_id (1–2000 characters), client_secret (1–32,768 characters) and redirect_uri. Redirect URI must have exactly `/oauth/callback` as its path, no username/password/query/fragment, and HTTPS except HTTP loopback hosts 127.0.0.1, localhost or [::1]. It must match the callback registered with your provider.
+
+Save real values in a private `oauth-client.json`; do not place secrets in shell history:
+
+```sh
+curl --fail-with-body --silent --show-error --request PUT \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data-binary @oauth-client.json \
+  "$HEXAGON_API_URL/v1/applications/$HEXAGON_PROVIDER/oauth-client"
+```
+
+Success **200** returns `{configured:true,provider,client_id,redirect_uri}`. Configuration upserts the tenant/provider client and stores the secret encrypted. It does not complete consent. Unsupported provider returns `400 app_oauth_unsupported`; invalid strict input returns `400 invalid_request`. Changing client configuration invalidates an in-flight flow's saved client-update comparison. A changed client ID can require existing grants to reauthorize. Repeated setup is not a flow-preserving no-op.
+
+## Start consent
+
+`POST /v1/connections/{id}/authorize` takes no required body and returns **200**, `{id,authorization_url,expires_in:600}`. Save the flow ID, then open its authorization_url for the intended user. Keep the URL private: it contains the flow state. This creates a flow; it does not perform consent automatically.
+
+```sh
+umask 077
+curl --fail-with-body --silent --show-error --request POST \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" --output oauth-flow.json \
+  "$HEXAGON_API_URL/v1/connections/$HEXAGON_CONNECTION_ID/authorize"
+```
+
+Require curl success before reading the saved JSON. The target must be an undeleted Tool connection with an OAuth-capable application and configured client. Missing/foreign/non-Tool target returns `404 connection_not_found`; unsupported OAuth is 400; absent setup is `409 app_oauth_setup_required`.
+
+Starting another flow cancels pending flows for the same connection. There is no idempotency key; automatic POST retries can invalidate a URL already shown to the user. The flow pins connection version and client updated_at, stores a hashed random state and encrypted verifier, and uses PKCE when the provider definition supports it. Requested scopes derive from the selected application operations/configuration.
+
+## Query or cancel the flow
+
+`GET /v1/authorization-flows/{id}` returns **200**, `{id,connection_id,status,error_code,expires_at}`. States include pending/completed/failed/cancelled/expired. Pending past its deadline is reported expired on read; this projection does not itself persist an expiry transition. Unknown/foreign flow returns `404 app_oauth_flow_not_found`.
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/authorization-flows/$HEXAGON_FLOW_ID"
+```
+
+`DELETE` on the same path returns **200** with the flow object, not 204. It changes stored pending flows to cancelled; other states are returned without changing them. Repeating cancellation of an existing flow is safe; missing flow remains 404.
+
+```sh
+curl --fail-with-body --silent --show-error --request DELETE \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/authorization-flows/$HEXAGON_FLOW_ID"
+```
+
+The provider callback is a separate `/oauth/callback` surface. Do not send it an owner token or manually replay authorization codes. It validates state, expiry, connection version and client configuration, exchanges the code and verifies the application account/scopes. Success stores the OAuth envelope, clears a managed Secret association, increments connection version, marks it ready/enabled and completes the flow. Unlike ordinary connection validation, successful callback explicitly enables the connection.
+
+Consent denial records failed/app_oauth_denied; other caught callback failures record failed/app_oauth_failed. Invalid or reused state can reject the callback with `400 app_oauth_state_invalid`. The browser may return to Console after a failed exchange too: a redirect is not success evidence. Poll the flow and inspect the connection's final state.
+
+## Inspect connection authorization
+
+`GET /v1/connections/{id}/authorization` returns **200** with connection_id, authentication, provider_revoked:false, state, refresh_available and nullable expires_at. It reads stored credential lifecycle facts; it is not a live provider revocation check. Missing connection is 404; non-Tool is `400 connection_kind_mismatch`.
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/connections/$HEXAGON_CONNECTION_ID/authorization"
+```
+
+| State | Meaning |
+| --- | --- |
+| disconnected | No stored connection credential |
+| manual | Non-OAuth credential and connection not marked invalid |
+| reauthorization_required | Invalid manual credential, unreadable OAuth envelope, client-ID mismatch, invalid connection, or expired OAuth without refresh |
+| refreshing | Recorded refresh attempt is started and younger than 40 seconds |
+| refresh_unknown | Other unresolved recorded refresh-attempt condition |
+| oauth | Stored OAuth lifecycle allows continued use/refresh; not necessarily an unexpired access token |
+
+Refresh_available reports whether a refresh token is stored, not whether replay is safe. Status checks do not perform refresh. Unknown refresh outcomes must not blindly replay a possibly rotated token; follow the reauthorization workflow. To remove local Tool credentials use [disconnect](/en/reference/connections), which explicitly reports provider_revoked:false. There is no provider-revocation promise in flow cancellation or disconnect.
+
+Sources: [OAuth implementation](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/apps/oauth.ts), [application catalog](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/apps/registry.ts), [HTTP routes](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts). No OAuth client, consent, token exchange or external account was changed in this documentation pass. Next: [application integrations](/en/integrations/apps), [HTTP overview](/en/reference/http).

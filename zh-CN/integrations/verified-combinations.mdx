@@ -1,0 +1,97 @@
+---
+title: "已验证的执行组合"
+---
+
+兼容性必须按 Sandbox、Harness 版本或镜像 digest、模型端点与协议、SDK、旅程范围和日期一起判断。目录中存在某项能力，不等于所有交叉组合都经过验证。本页是仓库证据的阅读入口，不是实时服务状态或当前账户健康检查。
+
+## 先选择要验证的行为
+
+| 问题 | 主要证据 | 不能由此推断 |
+| --- | --- | --- |
+| 能否执行真实任务？ | [MiniMax 任务矩阵](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-18-minimax-matrix.md)及其 JSON | 任意模型、后续镜像、所有账号均成功 |
+| 是否通过早期完整 Web 旅程？ | [执行索引](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/execution-matrix.md)中的逐项记录 | 索引中旧结论就是当前状态 |
+| 能否空闲后继续？ | [Harness 休眠矩阵](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-harness-serverless-matrix.json)和[说明](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-harness-serverless-ui.md) | 单轮通过等于恢复通过 |
+| E2B 公开 OCI 是否有后续证据？ | [E2B OCI 专项](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-e2b-oci-preparation.md) | 所有 Harness 或双 SDK × 三协议都通过 |
+| 镜像具体是什么？ | [固定组合注册记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/verification.ts) | 可变 tag 后来仍是同一内容 |
+| MCP 用什么方式测过？ | [MCP 验收](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-18-mcp-lark-responses.md) | SSE 模拟等于公开 SSE 实云成功 |
+| 最新实现承诺是什么？ | [验收旅程](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/acceptance.md)及对应实现 | 已有测试覆盖缺失的用户要求 |
+
+## 2026-11-20 文档教程实测
+
+教程程序已有 **Vercel + 内置 Pi 1.5.2 + 已配置 Messages 端点的 deepseek-ai/DeepSeek-V4-Flash** 组合下，Python 与 TypeScript 独立运行证据。记录包含程序源文件 hash；程序后续修改时，先比较 hash，再判断证据是否仍适用。端点/账户详情和资源身份保留在本地私有证据，模型名称本身不是可复用凭据，也不保证所有同名模型端点行为一致。
+
+| 教程 | 已执行范围 | 已确认清理 | 未覆盖 |
+| --- | --- | --- | --- |
+| [首个 Session](/zh-CN/start/first-session) — [证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-first-session-docs-cloud.json) | 两条独立 SDK 旅程，各一个 completed Run；预期产物文本、大小与 hash | 两个 Session 关闭、删除操作完成、留存字节一致 | Tools、审批、多轮和预览 |
+| [项目任务](/zh-CN/start/project-task) — [证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-project-docs-cloud.json) | 两条独立 SDK 旅程，各两个 completed Run；固定测试未变且有真实执行回执、每轮六份导出、每种 SDK 五项筛选与两项 Reset 浏览器检查 | 两个 Session 关闭、删除操作完成、旧预览被拒绝、全部下载字节留存 | 外部 Tool 授权/审批、grant 自然过期、其他 Provider/协议 |
+
+合计是同一已配置组合的四条教程旅程、六个 Run，不是四个或六个独立兼容组合。它们与下方历史 MiniMax、空闲恢复矩阵分别记录；成功删除不解决此前无关的未知资源。
+
+## 证据快照
+
+以下计数由这次文档编写时读取 JSON 的 rows.status 得出，只反映文件所标时间。第一份按组合记录，第二份按 SDK 行记录，不能相加成“通过组合总数”。文件后续变化时应重新派生此表。
+
+| Source | checked_at | rows.status | Count |
+| --- | --- | --- | ---: |
+| [2026-11-18-minimax-matrix.json](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-18-minimax-matrix.json) | 2026-11-18T14:54:52.956Z | `passed` | 84 |
+| [2026-11-18-minimax-matrix.json](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-18-minimax-matrix.json) | 2026-11-18T14:54:52.956Z | `unsupported_model_protocol` | 132 |
+| [2026-11-18-minimax-matrix.json](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-18-minimax-matrix.json) | 2026-11-18T14:54:52.956Z | `unsupported_oci_provider` | 81 |
+| [2026-11-18-minimax-matrix.json](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-18-minimax-matrix.json) | 2026-11-18T14:54:52.956Z | `unverified_build_required` | 66 |
+| [2026-11-19-harness-serverless-matrix.json](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-harness-serverless-matrix.json) | 2026-11-19T04:01:50.759Z | `passed` | 38 |
+| [2026-11-19-harness-serverless-matrix.json](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-harness-serverless-matrix.json) | 2026-11-19T04:01:50.759Z | `unsupported_oci_provider` | 72 |
+
+## 如何解读一条记录
+
+1. **固定身份**：确认 builtin Harness 的 version，OCI 的完整 digest、protocol 与 command；内置 OpenCode 和 OCI OpenCode 是不同路线。
+2. **模型范围**：核对实际 endpoint、model ID 与 Messages / Chat Completions / Responses；同一厂商不意味着协议等价。
+3. **客户端**：检查 Python 和 TypeScript 独立结果、安装版本与场景。不能由 Python Harness 推断 Python SDK 通过。
+4. **具体分支**：任务、上传、Tools、审批、事件重放、产物、继续对话和恢复各自查看。Aider 等有限契约不能被标为具有未执行的 Tools/产物能力。
+5. **清理**：区分该成功尝试的 Session 清理、同组合早期失败尝试的未决资源，以及账户全局资源审计。
+
+任务矩阵保留 attempts。一个最终 passed 行仍可能包含早期失败或未确认创建。不要丢弃失败历史或据通过行声称全局没有孤儿资源。原始资源 ID 留在私有证据中供对账，公共页面只链接脱敏摘要。
+
+## 状态与证据类型
+
+| 类别 | 含义与动作 |
+| --- | --- |
+| 已通过 | 只对记录中的版本、账户条件、SDK 和场景成立 |
+| 支持但未验证 | 有实现或声明，缺少目标范围实测，需安排验证 |
+| 失败 | 某次执行未满足断言，保留原因与清理状态 |
+| 阻塞 / unknown | 凭据、额度、网络或远程结果无法确定，不计入通过 |
+| 有条件通过 | 明确满足前提的部分范围成功，必须保留条件，不归并为无限制通过 |
+| 不支持 | 当时契约不提供该组合，不等于测试失败；新实现可能需要新记录 |
+
+契约/模拟测试证明确定性逻辑，真实云任务证明当次远端行为。源码注册表声明的 implemented 或 live_resource 标签不能代替具体端到端记录。页面结构检查也不证明示例或云行为。
+
+## 时间变化的具体例子
+
+旧 MiniMax 矩阵中 E2B OCI 行不支持，是当时能力快照。随后 E2B 新增 Session 自有 Template 准备，专项记录给出了 OpenCode 镜像的 Python/Chat 与 TypeScript/Messages 旅程、文件字节 hash 和 native session ID 检查。它没有证明 Responses 或所有 SDK/协议交叉组合。
+
+专项保留了模型输出不精确导致的失败，以及后来澄清提示后的成功；不能回写早期失败为通过。其独立资源审计只覆盖该次增量，不包括另行保留的历史操作。相同原则适用于其他 Provider 的新版本和恢复改动。
+
+## 为自己的部署建立证据
+
+使用[兼容性运行指南](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/compatibility-runner.md)与[用户验收旅程](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/acceptance.md)，固定组合并分别运行双 SDK。实际命令会创建资源与产生模型用量，不能作为普通文档检查隐式运行。
+
+记录日期、控制平面 revision、SDK 版本、Provider 与模板、Harness 版本/digest、模型 endpoint/protocol、实际命令、结果、失败分支和清理状态。只有实际观察过的内容写 passed；尚未运行写 planned，仍未知保留 unknown。凭据不进入日志，资源 ID 留在本地私有证据。未知创建或写入按[对账](/zh-CN/operate/reconciliation)处理。
+
+本页分别索引上述新教程实测和历史矩阵。下一步：[选择组合](/zh-CN/integrations/choose)、[Sandbox 能力](/zh-CN/integrations/sandboxes)、[模型协议](/zh-CN/integrations/model-protocols)。
+
+## 重新计算快照计数
+
+从仓库根目录运行。这里只读取本地脱敏证据，不请求 Provider 或模型；输出重现上方状态计数，不重新执行验收，也不将两个矩阵合并成同一个统计单位。
+
+```sh
+python3 - <<'PYCOUNTS'
+import json
+from collections import Counter
+from pathlib import Path
+for name in ('2026-11-18-minimax-matrix.json',
+             '2026-11-19-harness-serverless-matrix.json'):
+    data = json.loads((Path('testing/evidence') / name).read_text())
+    print(name, data['checked_at'])
+    print(dict(Counter(row['status'] for row in data['rows'])))
+PYCOUNTS
+```
+
+新增或改变组合时，按[测试与证据](/zh-CN/contribute/testing)以及对应 [Sandbox](/zh-CN/integrations/sandboxes)、[Harness](/zh-CN/integrations/harnesses)或[模型](/zh-CN/integrations/models)指南执行。

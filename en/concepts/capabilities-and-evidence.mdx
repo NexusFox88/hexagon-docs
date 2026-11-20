@@ -1,0 +1,85 @@
+---
+title: "Capabilities, compatibility, and evidence"
+---
+
+“Supported” can mean an implemented interface, a reachable account, one successful task, or a verified recovery journey. Identify the evidence behind the claim before choosing a combination.
+
+| Information | Establishes | Does not establish |
+| --- | --- | --- |
+| Adapter capability | Declared implementation of an interface | Your quota, account, or network readiness |
+| Connection verification | That adapter's configured check passed | Every operation executed; generic HTTP checks can be structural |
+| Session preflight | Known structural compatibility | Future allocation or model execution success |
+| One real turn | That task succeeded for that combination | All multi-turn, approval, preview, or sleep behavior |
+| Independent dual-SDK journey | Both clients completed recorded steps | Every version, endpoint, or concurrent workload |
+| Fault/cleanup test | A specified failure branch recovered | No other unresolved resources exist in the account |
+
+## Capability ownership
+
+Sandbox adapters declare resource/network capabilities. Harnesses declare conversation, Tools, and initialization. Tool adapters participate in approval capability. One layer cannot grant another layer's capability. Required capabilities express conditions, not feature switches.
+
+A buildable OCI recipe still fails compatibility when the Provider lacks `oci_image`. A verified model endpoint does not prove all Harness tool-calling and continuation behavior.
+
+## Read an evidence row
+
+Check Provider, Harness version/image digest, model endpoint/protocol, SDK, task scope, date, and cleanup. Separate passed, failed, unrun, and explicitly unsupported outcomes. Keep unknown outcomes unknown.
+
+Historical results prove their recorded executions. Current preflight keeps verification unverified instead of automatically certifying new configuration from old successes. Account, endpoint, or deployment changes may require fresh evidence.
+
+## Two decisions in practice
+
+**Example one: a buildable image with an unsupported combination.** Building an OCI Harness image locally establishes that the build produced an image. If the selected Sandbox adapter lacks `oci_image`, Session preflight rejects it with `sandbox_oci_image_unsupported`. A private image additionally requires `private_oci_image` and a usable registry Secret. Adding `required_capabilities` cannot supply those capabilities. Choose a suitable execution path, preflight again, and verify actual image pull, startup and work. Do not record build success as a cloud pass. This illustrates the mechanism rather than permanently assigning a support status to a particular Provider.
+
+**Example two: a verified model connection without a verified Tool journey.** An endpoint check does not establish that the selected Harness can complete tool calling through that protocol. Check the Harness model protocol and `tools` declaration, then the bound Tool's operations, authorization and approval capabilities. The real journey must observe the model issuing a call, Runtime / broker handling it, required authorization or approval, the result returning to the model, and the same Run continuing to completion. Receiving model text alone proves none of that chain. Record protocol incompatibility, execution failure and unexecuted tests separately.
+
+## Supported and unverified can both be true
+
+Combination resolution separates structural judgment from real execution. This excerpt illustrates field relationships; it is not a captured preflight response:
+
+```json
+{
+  "compatibility": {"status": "supported", "reasons": []},
+  "verification": {"status": "unverified", "evidence": []}
+}
+```
+
+Known requirements and declarations agree, but the result does not certify this configuration as cloud-tested. Session preflight also checks connection ownership, enablement, known configuration and credential-ingress readiness. It creates neither a Session nor a Sandbox. `ready: true` does not reserve cloud quota, pull the image or execute the model and every Tool. An incompatible request can receive an error response instead of this JSON; do not assume rejection reasons always arrive inside a successful response.
+
+## Choose evidence for your application
+
+1. **List required behavior.** Examples include project upload, multi-turn edits, approved writes, private previews, idle wake and post-close downloads. Preserve the application journey rather than dropping requirements missing from existing tests.
+2. **Pin the combination.** Record control-plane revision, SDK version, Sandbox connection, Harness version / digest, model endpoint / model ID / protocol and Tool configuration. A connection display name does not uniquely identify a test.
+3. **Eliminate known structural conflicts.** Use catalog, connection validation and preflight for their respective questions. Resolve explicit unsupported combinations rather than repeatedly submitting tasks as a compatibility repair.
+4. **Find matching prior evidence.** Check steps and dates in [verified combinations](/en/integrations/verified-combinations). A newer focused result updates only the combinations it covers; it does not erase previous failures or unresolved operations.
+5. **Test missing critical branches.** Run the required SDK journeys independently and record outcomes and cleanup. Disconnects, authorization, approval and recovery need their own assertions; one successful answer does not replace the full journey.
+
+Use the same categories as the matrix: **passed, supported but unverified, failed, blocked / unknown, conditionally passed, explicitly unsupported**. Blocked describes a condition preventing further testing; unknown describes an uncertain remote outcome. Even when grouped in a display, identify which applies in the record. Passed still needs scope, conditional passes retain their conditions, and unexecuted work is neither failed nor passed.
+
+You can make an evidence-based choice when you can explain which application step a record proves and which still lacks evidence. Continue with [choosing combinations](/en/integrations/choose), [verified combinations](/en/integrations/verified-combinations) and [testing and real acceptance](/en/contribute/testing).
+
+## Why capability names cannot be combined indiscriminately
+
+The resolver builds a capability set with explicit ownership rules. It does not union every string returned by every adapter.
+
+| Requested behavior | Relevant declaration | Example of an invalid inference |
+| --- | --- | --- |
+| Conversation, Tools, initialization | Harness capabilities | A Sandbox declaring `tools` cannot make a Harness support Tool calls |
+| Resource and network behavior | Sandbox capabilities, excluding Harness/approval-owned names | A Harness declaring `network_allowlist` cannot enforce the Provider network |
+| Approval capability for bound Tools | Harness supports `tools`, at least one Tool is bound, and every bound Tool adapter declares `approval` | One approval-capable Tool does not certify a second Tool lacking the declaration; zero bound Tools does not establish approval capability |
+| Required application behavior | Every `required_capabilities` entry must be in the resolved set | Adding `snapshot` to the request cannot implement snapshots |
+| Allowlisted execution with protected credential access | Sandbox supports `network_allowlist` and the configured credential host is listed | A model host entry alone does not make a separate credential-proxy host reachable |
+
+These are resolver rules, not proof that an approved operation was executed correctly. The specific Tool's policy and actual call still determine whether approval is required. Catalog data is discovered through the [Harness registry](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/harness.ts); connection adapters and the [combination resolver](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/compatibility.ts) establish the corresponding boundaries.
+
+## A bounded conclusion from actual documentation evidence
+
+The [2026-11-20 project tutorial record](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-project-docs-cloud.json) reports independent Python and TypeScript journeys using Vercel, built-in Pi 1.5.2 and the configured Messages endpoint with DeepSeek-V4-Flash. Each journey has two Runs in one Session, fixed-test execution, browser checks, closure and retained artifact checks.
+
+A suitable conclusion is: “This recorded combination completed the two-turn project tutorial through each SDK, including the listed browser and post-close checks.” It is not: “Vercel supports every Harness,” “every model using Messages supports Tools,” or “all serverless recovery cases passed.” External Tool authorization/approval and natural preview expiry are explicitly outside that record's scope.
+
+Count what the record measures: two SDK journeys and four Runs are still one configured compatibility combination. Adding the separate first-Session tutorial gives four tutorial journeys and six Runs, not six supported combinations. When the endpoint, Harness digest or adapter changes, use the old result as historical evidence and identify the new checks needed for your actual journey.
+
+## Establish your own evidence
+
+Begin with a verified combination. Record the task and checks, prove a minimal result and cleanup, then test the files, Tools, approvals, previews, and recovery your application needs. Run each SDK independently when both are required. Record actual commands and failed attempts as well as successes. Keep real resource identifiers in private local evidence and publish redacted summaries.
+
+Sources: [resolver](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/compatibility.ts), [acceptance](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/acceptance.md), [matrix](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/execution-matrix.md). Next: [network verification](/en/build/sandbox-policy), [first Session](/en/start/first-session).

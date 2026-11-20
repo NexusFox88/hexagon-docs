@@ -1,0 +1,74 @@
+---
+title: "Workspace, conversation, artifacts, and persistence"
+---
+
+Stateful work includes several data classes. Before choosing retention behavior, identify whether you need files, conversation, execution history, or process memory.
+
+| Data | Main location | Purpose |
+| --- | --- | --- |
+| Sessions/Runs, events, initialization | Control-plane PostgreSQL | Queries, observation recovery, audit |
+| Uploaded inputs | Control-plane input storage, then Sandbox preparation | Initial workspace |
+| Modified workspace | Managed cloud Sandbox directory | Continuing project work |
+| Harness conversation | Harness-managed Session files/native identifiers | Multi-turn context |
+| Exported artifacts | PostgreSQL in the current implementation | Deliverable snapshots independent of compute |
+| Services and memory | Cloud processes | Previews, temporary computation, connections |
+
+## Lifecycle effects
+
+| Data type | Planned pause / wake | Unexpected Runtime supervisor restart | Session closed with cleanup confirmed | Database corruption or loss |
+| --- | --- | --- | --- | --- |
+| Sessions / Runs / public events | Control-plane records remain | Committed records remain; investigate original invocation | Historical records remain | Restore a consistent backup; cloud processes cannot reconstruct records |
+| Uploaded inputs | Retained as initial inputs, not the latest workspace snapshot | Overwriting current files with initial inputs is not recovery | Retained input records do not imply cloud directory access | Depend on control-plane backup |
+| Workspace modifications | Managed directories follow the pinned Provider strategy | Files may remain without making active invocation replay safe | Do not assume access after resource destruction | Surviving cloud files may aid investigation but do not replace control records |
+| Harness conversation files / native identity | Recovery depends on compatible Harness and managed files together | Existing files do not establish safe continuation of an active conversation | No guarantee of continuing through the closed Session | Files or an identifier alone cannot restore a complete Session |
+| Captured Artifact bytes and metadata | Control-plane records remain | Captured bytes remain; unexported files have no such guarantee | Authorized download remains available | Bytes currently reside in PostgreSQL too; restore the matching backup |
+| Preview service processes / memory / connections | Provider-dependent and potentially lost; no portable guarantee | Survival or safe restart is not guaranteed | Resources are reclaimed; the old service cannot sustain previews | Restoring a database does not restore process memory or browser connections |
+
+Retention assumes the relevant storage remains available and has not been separately deleted. Client disconnect alone neither deletes these data nor cancels a Run. Database loss and key loss are distinct failures: the database backup contains history and artifacts, while the matching key enables protected credential recovery. Either one alone is insufficient to restore the complete workspace service.
+
+
+A project file is not automatically an Artifact. Export deliverables into the Run artifact directory and verify metadata, size, and hash. Later Runs do not overwrite earlier exported snapshots.
+
+File retention alone does not prove conversation recovery. Test a known file and a prior conversation fact separately. Temporary directories are not portable storage guarantees; Agent37 clears `/tmp` on its recovery path.
+
+## A concrete two-Run project
+
+The first Run modifies `app.js` in the workspace and copies its deliverable version into that Run's artifact directory. Only the copy exported by Runtime, validated and captured by the control plane becomes an independently downloadable Artifact. The second Run modifies workspace `app.js` again without changing the first Run's Artifact; it must export its own version. Store each Run ID, Artifact ID and digest rather than identifying a version by filename alone.
+
+Before closing the Session, confirm that every file you need appears in the artifact list, then download it and verify its digest. Seeing a working preview or a file in the workspace does not prove that source code will remain retrievable after closure. Downloading the captured Artifact again after closure and confirmed cloud cleanup verifies that delivery no longer depends on cloud resource lifetime.
+
+## Run output, exports and previews are separate results
+
+Run text output is not a complete workspace backup. On non-interrupted Runtime terminal paths, the current worker attempts artifact export before finalizing Run state. A failed or cancelled Run can therefore still have captured files. Conversely, the Runtime interrupted path skips that export attempt; uncaptured files cannot be assumed downloadable. Rejected export validation records `artifact_export_rejected`, so Harness exit alone does not prove successful delivery.
+
+A preview URL grants access to a running service; it is not a static archive URL. Expired authorization, Session closure or a stopped service process can each make the old URL unusable. For lasting presentation, deliver complete deployable artifacts to your own hosting system; keeping a temporary Hexagon preview is a different lifecycle.
+
+## Verify the retention you actually need
+
+For the selected combination, check four separate outcomes: a later Run reads a modified file; it recalls a prior conversation fact; the preview service is available or deliberately restarted after planned wake; and exported artifacts remain downloadable with matching digests after closure. None proves the others. Separately verify historical events, artifact bytes and credential decryption in an isolated database restore, following [backup and restore](/en/operate/backup-restore). The current local offline backup requires all Sessions to be closed, so it is not an active Sandbox snapshot tool.
+
+These are verification requirements, not new acceptance results claimed by this page. Export ordering sources: [worker](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/worker.ts), [Runtime export](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/runtime/server.py).
+
+For continuing edits, retain a Session and verify the idle strategy. For delivery, download artifacts or store an authorized application copy. For archival, manage database capacity, backups, and retention policy; current retention is not an unlimited-duration SLA. For a running service, manage process and preview authorization lifecycle rather than saving a URL alone.
+
+Sources: [artifacts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/artifacts/artifacts.ts), [serverless strategies](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/serverless-sessions.md). Next: [downloads](/en/build/artifacts), [multi-turn verification](/en/build/multi-turn), [backup/restore](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/local-installation.md#backup-upgrade-and-restore).
+
+## Evidence for retention, with its limits
+
+The 2026-11-20 documentation journeys used Vercel Sandbox, built-in Pi 1.5.2 and the configured Anthropic-compatible Messages endpoint with `deepseek-ai/DeepSeek-V4-Flash`. Python and TypeScript ran independently. These records demonstrate specific retention outcomes; they are not a retention-duration guarantee or a result for every combination.
+
+| Evidence | Observed outcome | Does not establish |
+| --- | --- | --- |
+| [First Session journey](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-first-session-docs-cloud.json) | Both SDKs completed a Run, closed the Session with a completed deletion record, then downloaded the same 19-byte Artifact with matching metadata and expected text | Multi-turn conversation, pause/wake continuity or database restore |
+| [Two-turn project journey](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-project-docs-cloud.json) | Each SDK used two distinct Runs in one Session; six exported files per Run remained byte-identical after closure; the old preview was denied | Preview process survival after pause, natural ticket expiry, arbitrary workspace recovery or global orphan cleanup |
+
+The project evidence separates two facts that a single “success” label would hide: exported files remain downloadable while the preview is no longer authorized after closure. Its second-turn result also does not prove a universal memory service or that every Harness conversation format survives every Provider restoration strategy.
+
+## A missing item has different recovery sources
+
+If the cloud workspace disappears but the control-plane database remains, first list the already captured Artifacts and retained Run output. Reconstruct a new project from those deliverables and any separately retained source inputs; do not present that as restoring the original process, native conversation or unsaved workspace changes. The initial upload is a baseline, not a continually synchronized copy of the project.
+
+If PostgreSQL is lost while a cloud process still runs, the process is not a replacement for Session ownership, event history, resource-operation receipts or stored Artifact bytes. Protect the remaining resource information and follow a deliberate database recovery procedure before issuing new work. Do not blindly create replacement resources while the prior resource outcome is unknown.
+
+If the database survives but its encryption key is lost, plaintext history or stored Artifact bytes do not reconstruct the encrypted connection credentials and invocation material. Conversely, a key alone cannot reconstruct the database. The local backup implementation bundles the schema dump with matching private identity material and verifies identity/decryption; it requires stopped local services and closed Sessions. A verified backup bundle is still different from an executed restore rehearsal. See [backup and restore](/en/operate/backup-restore) before choosing an operational recovery plan.
+

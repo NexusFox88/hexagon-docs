@@ -1,0 +1,65 @@
+---
+title: "Manage a local workspace"
+---
+
+A local workspace contains deployment configuration, private identity, and encryption keys. PostgreSQL contains tasks and connection records. Recovery requires the matching components together.
+
+Complete [installation](/en/start/install), then run these commands from the repository root with the same DATABASE_URL and HEXAGON_DATA_DIR as the original deployment.
+
+```sh
+npm run local -- doctor
+npm run local -- status
+npm run local -- start
+```
+
+Doctor checks Node/database and purpose-specific Python, OpenSSH, and cloudflared prerequisites. Missing an optional dependency does not disable every feature. Management health and credential-ingress health are distinct.
+
+The default data directory is `.local/control-plane`. Keep an explicit HEXAGON_DATA_DIR consistent. Select a workspace with Python `Hexagon.local(data_directory=...)` or TypeScript `Hexagon.local({dataDirectory: ...})` when needed.
+
+Do not copy owner Tokens to frontend code. Console and SDKs have separate local discovery mechanisms. A new browser credential after restart does not imply lost database history.
+
+## Keep workspace selection consistent
+
+A different data directory alone is not a complete isolated deployment. For two concurrent workspaces, use separate PostgreSQL targets, private data directories, API ports, preview ports and credential-listener ports; give each its own ingress routing. The launcher probes `127.0.0.1` using `PORT` and the selected directory's owner file. Running status/stop with a different port or directory can inspect the wrong service or fail authentication. Carry the same environment into every lifecycle command.
+
+| Item | Must remain paired across restart |
+| --- | --- |
+| `DATABASE_URL` | Existing task/connection records and schema |
+| `HEXAGON_DATA_DIR` | Matching owner identity, encryption key and saved settings |
+| `PORT` | Launcher health/identity checks and SDK API address |
+| `PREVIEW_PORT` / `HEXAGON_ACCESS_PORT` | The deployment's separate listeners and corresponding routing |
+
+Do not run two launchers against one data directory, copy another workspace's owner file to bypass authentication, or delete a directory to resolve an unknown cloud operation. Multiple workspaces are explicit deployments, not a built-in multi-workspace switcher or a high-availability topology.
+
+## Save configuration
+
+Use Console Settings → Network & ingress, or a credential-free configuration file:
+
+```json
+{"no_proxy":[],"ingress":{"mode":"cloudflare"}}
+```
+
+```sh
+npm run local -- configure /absolute/path/deployment-config.json
+npm run local -- restart
+```
+
+Revision checks prevent silent conflicting updates. Explicit process environment overrides saved network settings; bypass entries merge with loopback. Do not store Provider keys here. Save disabled ingress to keep it disabled; stopping a temporary tunnel does not change saved mode.
+
+## Planned downtime
+
+Settle active Runs, close unused cloud Sessions, confirm deletion, then run:
+
+```sh
+npm run local -- stop
+```
+
+The launcher refuses active Runs, verifies process identity/PID before signalling, and waits for graceful shutdown without unconditional force-killing. If a process exists but cannot authenticate, inspect private service.log and workspace/port selection instead of deleting PID files and starting duplicates.
+
+Cloud deadlines cannot be enforced on schedule while the control plane is down. Unknown cleanup survives in database records and needs reconciliation after restart. Stopping local processes does not delete cloud resources.
+
+Verify restart retains Sessions, connections, artifacts, and usable credentials, followed by a test task with confirmed cleanup. A listening management port alone is insufficient. See [backup/restore](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/local-installation.md#backup-upgrade-and-restore).
+
+Sources: [launcher](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/tooling/local.ts), [settings](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/deployment/settings.ts). Next: [networking](/en/operate/networking), [reconciliation](/en/operate/reconciliation), [backup and restore](/en/operate/backup-restore).
+
+The [November 18 local distribution drill](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-18-local-beta-delivery.md) records independent cloud tasks followed by stopped-workspace backup, restoration, retained Sessions/connections and decryption, then new cloud tasks. This is dated local-mode evidence, not a new restart of your current service.

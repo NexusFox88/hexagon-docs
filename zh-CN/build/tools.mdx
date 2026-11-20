@@ -1,0 +1,96 @@
+---
+title: "为 Agent 绑定 Tools 与 MCP"
+---
+
+Tools 让 Harness 调用已配置的外部操作。先在控制平面配置和授权连接，再在 Session 创建时按名称绑定它。Sandbox 平台设置、模型端点、受保护 HTTP 访问与 Agent Tools 有各自的角色，不能用同一配置入口互相替代。
+
+## 选择连接方式
+
+| 方式 | 适用情况 | 配置重点 |
+| --- | --- | --- |
+| 应用连接器 | 已有应用的受支持操作 | 账户、允许的操作、OAuth / Token、写入审批 |
+| HTTP Tool | 需要固定请求映射的受保护 API | 输入 schema、请求映射、鉴权和副作用策略 |
+| Remote MCP | 服务提供 MCP 工具发现和调用 | 传输、远端 schema、工具选择和逐操作审批 |
+
+应用目录列出的是实现范围，不表示所有账户、操作和真实模型组合都已验收。查看[应用连接器资料](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)中的验证范围。
+
+## 配置一个只读工具
+
+在 Console 的 Tools 中添加连接，选择目标账户与操作，完成授权、验证并启用。首次集成选择一个能明确核对结果的只读操作，例如读取专用测试文档。
+
+Remote MCP 先发现工具，再审查名称、描述和 schema，选择允许操作。工具默认要求审批，包括自称 read-only 的工具；只有明确审查后才调整策略。服务器的说明是外部数据，不能直接作为授予权限的依据。
+
+目前 MCP 支持 Streamable HTTP 和 legacy SSE；没有通用 stdio、资源 / prompts 订阅、sampling 或 elicitation 支持。任意 MCP 服务的 OAuth 浏览器注册和自动刷新也不在该接口范围，见[Remote MCP](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/remote-mcp.md)。
+
+## 创建带绑定的 Session
+
+以下片段接续已初始化客户端和已验证的连接 ID。所选 Harness 必须支持 Tools。
+
+```python
+session = client.create_session(
+    harness={'id': 'pi', 'version': '1.5.2'},
+    sandbox_connection_id=sandbox_connection_id,
+    model_connection_id=model_connection_id,
+    tools={'research': tool_connection_id},
+)
+```
+
+```typescript
+const session = await client.createSession({
+  harness: { id: 'pi', version: '1.5.2' },
+  sandbox_connection_id: sandboxConnectionId,
+  model_connection_id: modelConnectionId,
+  tools: { research: toolConnectionId },
+});
+```
+
+任务中使用绑定名 `research` 解释工具用途。连接 ID 指向账户配置，绑定名是 Session 中的使用名称。默认工具在初始化时为必需；确实允许缺失授权时可把该别名加入 `optional_tools: ['research']`。可选不等于获得授权或跳过审批，任务遇到权限缺口仍需处理。
+
+## 必需与可选绑定的就绪规则
+
+可选表示允许延后就绪检查，不表示可以绑定不存在、属于其他租户或类型错误的连接。
+
+| 配置 | 其他前提均满足时的初始化结果 |
+| --- | --- |
+| 直接 Session 不绑定任何 Tools | 不会隐式要求某个 Tool；模型和 Sandbox 仍须就绪。 |
+| `tools: {research: id}`，连接禁用或未就绪 | 默认必需，返回 `tool_not_ready`。 |
+| 同一个有效绑定，另加 `optional_tools: ['research']` | 可以延后就绪；实际调用时可能进入 `waiting_authorization`。 |
+| 指定 `optional_tools: ['research']`，却没有 `tools.research` | 请求无效，可选别名没有对应绑定。 |
+| 保存的 Agent 声明 `research`，Session 却未提供绑定 | 返回 `missing_tool_binding`，即使该 Tool 声明为启动时可选。 |
+| 绑定不存在、已删除、其他租户或非 Tool 类型的连接 | 归属、存在性或类型检查拒绝；可选标记不绕过检查。 |
+
+创建资源前，可以用 [Session 预检](/zh-CN/reference/sessions)比较目标定义。直接定义的 Python `client.preflight_session(..., tools={'research': tool_connection_id})` 和 TypeScript `client.preflightSession({...definition, tools: {research: toolConnectionId}})` 使用与创建相同的初始化检查；这里只展示 API 形态，Sandbox、模型与 Harness 字段须由完整定义提供。只有任务确实允许在该连接尚未就绪时开始，才添加 `optional_tools`。预检成功不代表后续操作已经获批，也不预留外部服务未来的可用性。
+
+完整契约见[初始化](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/session-initialization.md)。必需或可选就绪、允许操作集合、单次调用审批是三个分别生效的控制。
+
+## 从有记录的只读调用开始
+
+一个具体记录是通过 DeepWiki Remote MCP 的 `read_wiki_structure` 读取 `modelcontextprotocol/typescript-sdk`。[11 月 18 日记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-18-mcp-lark-responses.md)包含发现、仅选择这一操作、对已审阅的读取显式关闭审批，以及分别通过 Vercel 上 TypeScript/Pi、Python/OpenCode 与已配置 SiliconFlow 模型的实际调用。两者均返回仓库主题并确认清理。这份记录不证明所有 MCP 服务、上游当前可用性或任意 OAuth 接入。
+
+在自己的服务上重复该流程时，按 [Remote MCP 配置](/zh-CN/integrations/mcp)检查发现结果，只选择目标操作。除非审阅过该操作并有意调整策略，否则保留审批。绑定返回的连接 ID，提交一个明确读取任务，再检查 Tool call 的实际参数与结果内容，不能仅凭助手措辞推断调用发生。写入任务继续阅读[审批示例](/zh-CN/build/approvals)，并单独核对外部结果；只读记录不证明写入安全。
+
+## 跟踪一次操作的完整流程
+
+使用专用测试记录，分开执行读取和写入任务。先要求 `research` 读取已知记录，将实际返回内容与预期核对；再请求一次小规模、可撤销且需要审批的更新。应用记录 Session ID、Run ID、Tool call ID，以及存在时的 approval ID，它们分别标识不同对象。
+
+| 阶段 | 应用观察到什么 | 用户可以做什么 |
+| --- | --- | --- |
+| 账户访问缺失或过期 | 调用等待授权 | 为绑定连接授权，或拒绝本次调用 |
+| 已授权操作需要同意 | 与调用关联的 pending 审批 | 检查实际参数，批准或拒绝 |
+| 请求已经发出 | 调用处于 executing | 继续观察；批准不证明外部成功 |
+| 可能生效的请求响应丢失 | 调用 unknown，Run 可能处于 waiting_approval | 调查外部系统并对账 |
+| 结果已记录 | 调用 completed，并有 `is_error` | 检查结果；completed 不一定表示成功 |
+
+Tool 别名不是凭据，不授予额外操作。Session 已固定的允许操作与连接当前策略都会影响执行。连接更换账户身份可能返回 `tool_account_changed`；在连接当前配置新增操作，不会自动向既有 Session 授予该操作。相关 MCP schema 变化可能返回 `mcp_schema_changed`。目标绑定需要变化时，先审查新配置，再创建新 Session。
+
+## 调用与变更
+
+提交一个明确要求读取测试对象的 Run，检查 Tool 调用记录和最终内容，而不仅看助手声称用了工具。受保护原始凭据留在控制平面，不写入 Sandbox 环境。
+
+MCP 发现得到的 schema、描述和名称会在调用时检查。发生变化时重新发现并审查，然后创建新的 Session；不要假设原 Session 自动获得新操作。远端调用响应丢失可能成为 unknown，不能因操作名带 read 就擅自重新发起。
+
+完成条件：指定工具实际调用、结果与测试对象一致、未允许的操作不能调用、授权 / 审批分支可处理，最后关闭并确认资源清理。本页为契约指导，真实组合验收需单独记录。
+
+运行时决策见[处理授权](/zh-CN/build/tool-authorization)和[人工审批](/zh-CN/build/approvals)。按集成类型继续：[应用账户](/zh-CN/integrations/apps)、[HTTP Tools](/zh-CN/integrations/http-tools)、[Remote MCP](/zh-CN/integrations/mcp)。
+
+实现依据：[Session 绑定检查](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts)、[Tool 派发与固定操作](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/broker.ts)。

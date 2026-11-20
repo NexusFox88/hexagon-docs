@@ -1,0 +1,158 @@
+---
+title: "监控与集合查询 HTTP 契约"
+---
+
+这些读取模型反映持久化控制平面状态，不是直接 Provider 检查、账单测量或模型执行成功证明。全部 `/v1` 路由要求认证和租户归属。Health、Run 集合与 Session 列表/活动允许应用 Token；overview、pending、Fleet 要求 owner。
+
+## 健康检查
+
+`GET /v1/health` 查询数据库，返回 process_id、布尔 active_runs、api/database 就绪、credentials、credential_access、execution。可选健康服务可能返回 not_configured。Credentials.state=unavailable 时返回 **503**，其他正常响应为 **200**；数据库异常进入服务器错误处理。必须检查字段，不能只看状态码：处理器不会把每一种 execution/access 降级情况都转换成 503。
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" "$HEXAGON_API_URL/v1/health"
+```
+
+`GET /health/live` 是独立的未认证存活检查，返回 `{status:"alive"}`，不查询依赖。运维决策应使用就绪和生命周期诊断，不能以存活代替完整健康。
+
+## Session 集合
+
+`GET /v1/sessions` 返回 **200**、`{sessions:[...],offset,next_offset}`。Limit 默认 25，整数 1–100；offset 默认 0，非负整数；search 默认空，最多 200 字符；state 默认空，最多 40 字符。非空 state 精确过滤 Session 状态；search 对 Session ID、Agent ID、definition 名称做不区分大小写的子串匹配。排序为 created_at DESC、id DESC；观测到末页时 next_offset 为 null，并发插入可能移动页面。
+
+```sh
+curl --fail-with-body --silent --show-error --get \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  --data-urlencode 'limit=25' --data-urlencode 'offset=0' --data-urlencode 'state=open' \
+  "$HEXAGON_API_URL/v1/sessions"
+```
+
+每项包含 id、agent_id、agent_revision、definition、env_names、state、sandbox、created_at、updated_at、harness、runtime_state 和可空 latest_run。Latest_run 含 id/state/input_preview（数据库文本前 240 字符），按 Run 创建时间/ID 倒序选取。Runtime 状态来自已记录绑定。此投影不同于单 Session GET 和 Fleet，不要假定所有接口共用一种 Session 响应类型。不返回环境值。
+
+## 任务活动
+
+`GET /v1/sessions/activity` 接受 period=24h（默认）或 7d，返回 **200**，包含 active_sessions、idle_sessions、paused_sessions、period、buckets、checked_at。
+
+```sh
+curl --fail-with-body --silent --show-error --get \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" --data-urlencode 'period=24h' \
+  "$HEXAGON_API_URL/v1/sessions/activity"
+```
+
+| 指标 | 定义 |
+| --- | --- |
+| active_sessions | open/paused/pausing/resuming 且存在非终态 Run 的 Session |
+| idle_sessions | open 且没有非终态 Run 的 Session |
+| paused_sessions | 当前 paused 的 Session，不论是否已有待执行工作 |
+| buckets[].active_sessions | Run 与该时间区间重叠的不同 Session ID 数量 |
+
+分类未必互斥：刚提交工作但仍 paused 的 Session 可以同时算 active 和 paused。每个 bucket 包含 start、active_sessions。24h 使用逐小时滚动区间，7d 使用逐日滚动区间，以查询时间为基准，不是自然日零点。终态 Run 的重叠截止 updated_at，非终态延伸到当前时间。统计覆盖租户完整数据，不受当前 Session 列表页影响。它衡量任务活动，不是 CPU、HTTP 流量或计费计算量。
+
+## 总览
+
+`GET /v1/overview` 返回 **200**，包含 checked_at 和以下计数：
+
+- ready_connections：未删除、已启用、ready 的连接。
+- open_sessions：仅 open，不是全部未关闭 Session。
+- active_runs：全部非终态 Run。
+- pending_approvals：pending 审批。
+- pending_authorizations：waiting_authorization 的 Tool calls。
+- unknown_operations：全部 unknown 资源操作，包括已 acknowledged 的项。
+- active_agents：未归档模板。
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" "$HEXAGON_API_URL/v1/overview"
+```
+
+## 待处理工作
+
+`GET /v1/pending` 返回 **200**、`{items:[...],offset,next_offset}`，limit/offset 与集合查询相同。共享解析器虽然接受 search/state，但当前 SQL 不应用这两个过滤条件，因此不能将它们宣传为此接口的筛选功能。
+
+```sh
+curl --fail-with-body --silent --show-error --get \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  --data-urlencode 'limit=25' --data-urlencode 'offset=0' \
+  "$HEXAGON_API_URL/v1/pending"
+```
+
+每项包含 id、kind、state、session_id、可空 run_id、created_at，按创建时间/ID 从旧到新排列。Kind 为 approval（pending 审批）、authorization（Tool 等待授权）、tool_outcome（Tool unknown）、resource（资源 unknown 且 review_state 非 acknowledged）。已知悉的 unknown 操作仍计入总览，但不进入该待处理队列。列表是保存的待处理记录，操作前应读取对应对象，Run 或决定可能已改变。
+
+## Fleet 快照
+
+`GET /v1/fleet` 返回 **200**、`{sessions:[...]}`，最多最近 200 个 Session，无分页契约。每项包含 id、agent_id、definition、env_names、state、sandbox、created_at、updated_at、runtime_state、latest_run、resource_operations。
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" "$HEXAGON_API_URL/v1/fleet"
+```
+
+Closed Session 的 runtime_state 显示 stopped，其他使用持久绑定状态。Latest_run 含 id/state/updated_at，按创建时间倒序选取。资源操作包含 id、kind、state、provider_resource_id、reason（仅 unknown/rejected 时填入）、updated_at，按创建时间/ID 排列，无记录为空数组。它不是实时 Provider 轮询，不能证明所有远端资源不存在；200 个 Session 的上限也不能用于确认全局清理。
+
+查询值不合法返回 `400 invalid_request`；应用 Token 访问 owner 路由返回 `403 owner_token_required`；未认证返回 401。具体调查使用[资源操作](/zh-CN/reference/resource-operations)与 [Runs](/zh-CN/reference/runs)。来源：[查询实现](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/queries.ts)、[Fleet 投影](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts)、[HTTP 路由](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts)。[监控契约审阅](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-monitoring-http-contract-review.json)通过当前处理器和真实 PostgreSQL，在新建并迁移的隔离 schema 中完成 36 项检查，覆盖角色、租户隔离、分页、search/state 语义、pending 分类、活动重叠、Fleet 上限与就绪响应。测试后已删除 schema。这些是受控的持久状态 fixture，不是云监控或网络传输验收。
+
+## SDK 示例：分别读取运维视图
+
+使用已初始化的 owner 客户端，因为 overview 和 pending 仅限 owner。这些函数只读，并保留各集合的响应外层，包括各自的 `next_offset`。仅定义函数不会请求接口。TypeScript 片段使用 SDK 初始化时导入的 `Hexagon`。
+
+```python
+def read_operations_page(client, session_offset=0, pending_offset=0):
+    return {
+        'overview': client.overview(),
+        'sessions': client.list_sessions(limit=25, offset=session_offset, state='open'),
+        'pending': client.pending(limit=25, offset=pending_offset),
+        'activity': client.session_activity('24h'),
+    }
+
+
+def read_authenticated_health(client):
+    return client.request('GET', '/health')
+```
+
+```typescript
+async function readOperationsPage(
+  client: Hexagon, sessionOffset = 0, pendingOffset = 0,
+) {
+  return {
+    overview: await client.overview(),
+    sessions: await client.listSessions({ limit: 25, offset: sessionOffset, state: 'open' }),
+    pending: await client.pending(25, pendingOffset),
+    activity: await client.sessionActivity('24h'),
+  };
+}
+
+async function readAuthenticatedHealth(client: Hexagon) {
+  return await client.request('GET', '/health');
+}
+```
+
+
+`read_operations_page` / `readOperationsPage` 返回四次独立查询的观察，不是一个一致快照。Session 页的 `next_offset` 用作下一次 `session_offset` / `sessionOffset`，pending 页的游标则单独用作 `pending_offset` / `pendingOffset`。null 表示对应集合已到本次观察的末尾；不要把 Session offset 用于 pending，也不要由单页推断租户总量。并发变化可能移动 offset 分页。
+
+示例只选 open Session，不包含所有未关闭 Session。overview 的未知操作计数可能包含已 acknowledged、因而不在 pending 队列中的操作；activity 类别也可能重叠，不能直接相加得到总资源数。pending 行用于提示调查：行动前读取对应审批、Tool 调用或资源操作，并重新核对当前状态。不要把这个只读函数扩展为自动批准循环。
+
+通用 `request` 接收 `/health`，SDK 会补 `/v1`；传 `/v1/health` 会重复前缀。成功时返回 JSON，health 的 503 会成为 SDK 异常，不会由该函数作为普通状态对象返回。200 中仍可能有降级的执行或访问状态。读取结果不证明实时 Provider 状态或全局资源清理。鉴权、角色、校验、网络和解码错误向调用方传播；组合函数在首次失败时停止，没有内置部分结果恢复。
+
+
+## 比较不同视图，不拼出虚假的总数
+
+考虑这样一组持久状态：A 为 open，存在 running Run；B 为 paused，存在 queued Run；C 为 open，没有活动 Run；D 已 closed，但其 completed Run 曾在最近一小时执行。另有两条 unknown 资源操作，其中一条已 acknowledged，另一条仍待检查。
+
+| 观察项 | 预期值 | 原因 |
+| --- | --- | --- |
+| Overview `open_sessions` | 2 | 只计 A、C；paused 的 B 不属于 open |
+| Activity `active_sessions` | 2 | A、B 存在非终态 Run |
+| Activity `idle_sessions` | 1 | C 为 open 且无活动任务 |
+| Activity `paused_sessions` | 1 | B 同时计入 paused 与 active |
+| 最后一个小时桶 | 3 | A/B 的执行与该区间重叠，D 已完成的 Run 也曾与该区间重叠 |
+| Overview `unknown_operations` | 2 | 包含已 acknowledged 项 |
+| Pending 中的 resource 行 | 1 | 排除已 acknowledged 项 |
+
+不要把 active、idle、paused 相加当作 Session 总数，也不要直接用历史桶与当前 active 数量比较。Acknowledgement 改变的是调查队列，不代表已消除记录中的不确定性或确认远程资源状态。决定动作前先读取底层记录。
+
+## 理解空结果与不健康响应
+
+- 集合查询的 `state` 是有长度限制的文本，不按 enum 校验。未知状态可以返回 `200` 与空列表，不能据此证明没有任务。相反，activity 的 `period=30d` 等非法值返回 `400 invalid_request`。
+- Search 是不区分大小写的字面子串匹配，`%`、`_` 在这里不是 SQL 通配符。使用 URL 编码，确保服务端收到预期文本。
+- 集合的 `next_offset: null` 只描述本次查询观察到的末尾。Fleet 没有下一页游标，最多返回 200 个 Session；这些观察都不能证明全局资源已清理。
+- 已关闭 Session 在 Fleet 中的 `runtime_state` 被投影为 `stopped`，Session 集合则暴露记录中的 Runtime binding 状态。字段不同前先确认各投影定义，不要将差异当作新的实时观察。
+- 凭据不可用时，Health 返回 `503`，响应体仍为包含 `credentials.state` 的健康对象，而不是通常的 `{error:{code}}`。`curl --fail-with-body` 返回失败时仍保留该响应体。当前 SDK 的通用 request 将它转换为 status 503、code `http_error` 的异常，上文 helper 不会返回其中的健康字段。独立 liveness 返回 `200` 不能抵消 readiness 失败。

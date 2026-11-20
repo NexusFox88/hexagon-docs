@@ -1,0 +1,11 @@
+{
+  "stage": "developer-preview-preparation",
+  "project_license": "Apache-2.0",
+  "private_security_contact": null,
+  "third_party_review_complete": false,
+  "artifact_review_complete": false,
+  "clean_install_evidence": null,
+  "cloud_journey_evidence": null,
+  "repository_and_package_ownership_confirmed": false,
+  "publication_approved": false
+}

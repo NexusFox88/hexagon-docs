@@ -1,0 +1,75 @@
+{
+  "scope": "Fresh independent Python and TypeScript first-session documentation programs, Vercel cloud sandbox, built-in Pi 1.5.2, configured Messages endpoint. Covers one task, artifact integrity/content, Session closure, completed resource deletion records and retained byte equality. Does not cover project preview, tools/approval, multi-turn or other combinations.",
+  "combination": {
+    "sandbox": "vercel",
+    "harness": {
+      "id": "pi",
+      "version": "1.5.2"
+    },
+    "model_provider": "anthropic-compatible",
+    "model_id": "deepseek-ai/DeepSeek-V4-Flash"
+  },
+  "program_sha256": {
+    "examples/documentation/first-session.py": "3bb666c7c4f0a7ab6d71c2ba8c624e960a1ad5e4ff9661dd927b82c3884b4358",
+    "examples/documentation/first-session.ts": "bfc7b313e9792c4c31041cc8ebdb43a700652161a8d9ac0c0d1a8c16118a525c"
+  },
+  "journeys": [
+    {
+      "sdk": "python",
+      "exit_code": 0,
+      "journal_phase": "closed_and_retention_checked",
+      "session_state": "closed",
+      "run_state": "completed",
+      "artifacts": [
+        {
+          "size": 19,
+          "sha256": "ff1e45828a4a539980e0bb0a45b3cebaaeb0446649ec3aa703a7424c05039429",
+          "metadata_matches": true,
+          "same_as_preclose_download": true,
+          "expected_text": true
+        }
+      ],
+      "resource_operations": [
+        {
+          "kind": "delete",
+          "state": "completed"
+        },
+        {
+          "kind": "create",
+          "state": "completed"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "sdk": "typescript",
+      "exit_code": 0,
+      "journal_phase": "closed_and_retention_checked",
+      "session_state": "closed",
+      "run_state": "completed",
+      "artifacts": [
+        {
+          "size": 19,
+          "sha256": "ff1e45828a4a539980e0bb0a45b3cebaaeb0446649ec3aa703a7424c05039429",
+          "metadata_matches": true,
+          "same_as_preclose_download": true,
+          "expected_text": true
+        }
+      ],
+      "resource_operations": [
+        {
+          "kind": "delete",
+          "state": "completed"
+        },
+        {
+          "kind": "create",
+          "state": "completed"
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "private_evidence": ".local/docs-readiness/final-records.json and .local/docs-first-{python,typescript}/journal.json",
+  "global_cleanup_claim": false,
+  "passed": true
+}

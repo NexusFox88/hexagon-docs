@@ -1,0 +1,167 @@
+---
+title: "HTTP API 参考"
+---
+
+管理 API 位于控制平面 origin 下的 `/v1`。缺省本地地址为 `http://127.0.0.1:8787/v1`，hosted 使用配置的 HTTPS origin。`/v1` 是路由前缀，不证明全部开发快照 schema 相同；记录服务端构建并阅读[升级提示](/zh-CN/changelog)。
+
+## 按资源查找接口
+
+当前服务器中的每条字面量管理路由均已关联操作契约草稿。对应关系只检查路由和页面存在，不证明字段穷尽准确或运行验收通过。请求与响应行为见下表，路由权限见生成清单。
+
+| 资源 | 契约 |
+| --- | --- |
+| Runs、事件与取消 | [Runs、事件与取消](/zh-CN/reference/runs) |
+| Session 创建、文件和生命周期 | [Session 创建、文件和生命周期](/zh-CN/reference/sessions) |
+| Session 环境、授权与访问凭据 | [Session 环境、授权与访问凭据](/zh-CN/reference/session-access) |
+| 产物内容与私有预览 | [产物内容与私有预览](/zh-CN/reference/artifacts-previews) |
+| 审批与 Tool 恢复 | [审批与 Tool 恢复](/zh-CN/reference/approvals-tools) |
+| 连接、验证与使用记录 | [连接、验证与使用记录](/zh-CN/reference/connections) |
+| 应用与 OAuth | [应用与 OAuth](/zh-CN/reference/oauth) |
+| Managed Secrets | [Managed Secrets](/zh-CN/reference/secrets) |
+| 应用 Token | [应用 Token](/zh-CN/reference/tokens) |
+| Agent 模板与修订 | [Agent 模板与修订](/zh-CN/reference/agents) |
+| 目录与 Harness 注册 | [目录与 Harness 注册](/zh-CN/reference/harness-registration) |
+| 资源操作对账 | [资源操作对账](/zh-CN/reference/resource-operations) |
+| 监控与集合查询 | [监控与集合查询](/zh-CN/reference/monitoring) |
+| 本地部署配置 | [本地部署配置](/zh-CN/reference/deployment) |
+
+## 认证与通用约定
+
+可信后端发送 `Authorization: Bearer <token>`。本地 Console 可使用独立的工作区引导。API 身份解析出租户和角色，所有资源查询与绑定保持租户范围。Application Token 有显式路由白名单，不授权审批决定、账户凭据管理或任意部署修改。身份无效返回 401，Application Token 访问 owner 路由返回 403 `owner_token_required`。
+
+JSON 请求使用 `Content-Type: application/json`。标识参数遵守对应 schema，通常为 UUID，路径值需要 URL 编码。严格 schema 拒绝未知字段。除产物字节、SSE 和空 204 外，响应为 JSON。不能认为所有 DELETE 返回 204 或所有创建返回 201，例如 Run 提交为 202。参见[错误](/zh-CN/reference/errors)与[限制](/zh-CN/reference/limits)。
+
+以下只读请求要求环境中已有真实后端 Token，不创建资源：
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/catalog"
+```
+
+不要把 Token 放进终端录屏或公开证据。这里 HEXAGON_API_URL 是 shell 示例变量，不是服务端身份引导配置。
+
+## 管理路由清单
+
+表格从 [server.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts)中明确的 api.get/post/put/patch/delete 注册生成，Application Token 分类调用真实[权限函数](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/credentials/application-tokens.ts)。路由可能依赖启动时注入的服务；hosted 不保证提供 local 部署配置路由。“允许”仅代表角色检查，仍需通过所有权、状态、能力与请求体验证。
+
+
+
+| 方法 | 路径 | Application Token |
+| --- | --- | --- |
+| GET | `/v1/tokens` | Owner required / 要求 owner |
+| POST | `/v1/tokens` | Owner required / 要求 owner |
+| POST | `/v1/tokens/:id/rotate` | Owner required / 要求 owner |
+| DELETE | `/v1/tokens/:id` | Owner required / 要求 owner |
+| GET | `/v1/health` | Allowed / 允许 |
+| GET | `/v1/deployment` | Owner required / 要求 owner |
+| PUT | `/v1/deployment` | Owner required / 要求 owner |
+| POST | `/v1/deployment/ingress/retry` | Owner required / 要求 owner |
+| POST | `/v1/deployment/ingress/stop` | Owner required / 要求 owner |
+| GET | `/v1/secrets` | Owner required / 要求 owner |
+| POST | `/v1/secrets` | Owner required / 要求 owner |
+| GET | `/v1/secrets/:id` | Owner required / 要求 owner |
+| PATCH | `/v1/secrets/:id` | Owner required / 要求 owner |
+| DELETE | `/v1/secrets/:id` | Owner required / 要求 owner |
+| GET | `/v1/applications` | Owner required / 要求 owner |
+| PUT | `/v1/applications/:provider/oauth-client` | Owner required / 要求 owner |
+| POST | `/v1/connections/:id/authorize` | Owner required / 要求 owner |
+| GET | `/v1/authorization-flows/:id` | Owner required / 要求 owner |
+| DELETE | `/v1/authorization-flows/:id` | Owner required / 要求 owner |
+| GET | `/v1/catalog` | Allowed / 允许 |
+| POST | `/v1/harnesses` | Owner required / 要求 owner |
+| POST | `/v1/harness-packages` | Owner required / 要求 owner |
+| GET | `/v1/connections` | Allowed / 允许 |
+| POST | `/v1/connections` | Owner required / 要求 owner |
+| GET | `/v1/connections/:id/usage` | Owner required / 要求 owner |
+| GET | `/v1/connections/:id/dependencies` | Owner required / 要求 owner |
+| GET | `/v1/connections/:id` | Allowed / 允许 |
+| PATCH | `/v1/connections/:id` | Owner required / 要求 owner |
+| POST | `/v1/connections/:id/discover-mcp` | Owner required / 要求 owner |
+| GET | `/v1/connections/:id/authorization` | Owner required / 要求 owner |
+| POST | `/v1/connections/:id/disconnect` | Owner required / 要求 owner |
+| POST | `/v1/connections/:id/validate` | Owner required / 要求 owner |
+| DELETE | `/v1/connections/:id` | Owner required / 要求 owner |
+| GET | `/v1/agents` | Allowed / 允许 |
+| POST | `/v1/agents` | Allowed / 允许 |
+| GET | `/v1/agents/:id` | Allowed / 允许 |
+| PUT | `/v1/agents/:id` | Owner required / 要求 owner |
+| POST | `/v1/agents/:id/archive` | Owner required / 要求 owner |
+| POST | `/v1/agents/:id/copy` | Owner required / 要求 owner |
+| POST | `/v1/agents/preflight` | Allowed / 允许 |
+| GET | `/v1/overview` | Owner required / 要求 owner |
+| GET | `/v1/pending` | Owner required / 要求 owner |
+| GET | `/v1/runs` | Allowed / 允许 |
+| GET | `/v1/sessions` | Allowed / 允许 |
+| GET | `/v1/sessions/activity` | Allowed / 允许 |
+| GET | `/v1/fleet` | Owner required / 要求 owner |
+| POST | `/v1/sessions/preflight` | Allowed / 允许 |
+| POST | `/v1/sessions` | Allowed / 允许 |
+| GET | `/v1/sessions/:id/access` | Allowed / 允许 |
+| POST | `/v1/sessions/:id/access` | Allowed / 允许 |
+| DELETE | `/v1/access/:id` | Allowed / 允许 |
+| GET | `/v1/sessions/:id/environment` | Owner required / 要求 owner |
+| GET | `/v1/sessions/:id/authorization` | Owner required / 要求 owner |
+| DELETE | `/v1/sessions/:id/connections/:connection` | Owner required / 要求 owner |
+| GET | `/v1/sessions/:id/initialization` | Allowed / 允许 |
+| GET | `/v1/sessions/:id` | Allowed / 允许 |
+| GET | `/v1/sessions/:id/files` | Allowed / 允许 |
+| POST | `/v1/sessions/:id/files` | Allowed / 允许 |
+| GET | `/v1/resource-operations` | Owner required / 要求 owner |
+| GET | `/v1/resource-operations/:id` | Owner required / 要求 owner |
+| POST | `/v1/resource-operations/:id/review` | Owner required / 要求 owner |
+| POST | `/v1/sessions/:id/pause` | Owner required / 要求 owner |
+| POST | `/v1/sessions/:id/resume` | Owner required / 要求 owner |
+| POST | `/v1/sessions/:id/close` | Allowed / 允许 |
+| POST | `/v1/sessions/:id/previews` | Allowed / 允许 |
+| DELETE | `/v1/previews/:id` | Allowed / 允许 |
+| POST | `/v1/sessions/:id/runs` | Allowed / 允许 |
+| GET | `/v1/sessions/:id/runs` | Allowed / 允许 |
+| GET | `/v1/runs/:id` | Allowed / 允许 |
+| GET | `/v1/runs/:id/artifacts` | Allowed / 允许 |
+| GET | `/v1/artifacts/:id/content` | Allowed / 允许 |
+| GET | `/v1/runs/:id/events` | Allowed / 允许 |
+| GET | `/v1/runs/:id/stream` | Allowed / 允许 |
+| GET | `/v1/runs/:id/tool-calls` | Allowed / 允许 |
+| POST | `/v1/runs/:id/tool-calls/:call/resolve` | Owner required / 要求 owner |
+| POST | `/v1/runs/:id/tool-calls/:call/deny-authorization` | Owner required / 要求 owner |
+| POST | `/v1/runs/:id/cancel` | Allowed / 允许 |
+| GET | `/v1/runs/:id/approvals` | Allowed / 允许 |
+| POST | `/v1/approvals/:id/decision` | Owner required / 要求 owner |
+
+
+
+使用 `npx tsx tooling/generate-http-doc-index.ts` 重新生成，不向服务器、Provider 或模型发请求。逐接口字段、效果与 curl 工作流位于上方参考页；Provider 专有配置与可执行端到端示例仍需分别审阅。生成器也写入[路由覆盖记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/product/http-operation-coverage.json)，已关联不等于完成。
+
+## 资源契约与影响
+
+| 资源 | 请求响应要点 | 副作用边界 |
+| --- | --- | --- |
+| Catalog／applications | 能力与操作目录，不是执行回执 | 就绪或注册不证明真实组合通过 |
+| Connections | kind、provider、name、config、凭据或 Secret 引用，选定操作与验证元数据 | 创建、验证、启用、授权不同；验证可能访问 Provider |
+| Harnesses | OCI 镜像注册与兼容源码包不同 | 固定定义和 digest，同版本改变内容冲突，不等于云执行 |
+| Agents | 定义、绑定及更新用 expected_revision | 保存配置可选，revision 不重写已有 Session |
+| Session 预检／创建 | harness 与 agent_id 二选一，加连接 ID；可选资源、网络、工具与初始化 | 预检是结构检查，创建固定配置且可能要求凭据入口就绪 |
+| Session files | `{files:[{path,content_base64}]}`，返回文件元数据 | 规范 Base64 表示二进制，相对路径，大小受限 |
+| Run 提交 | `{input,origin?}` 与 Idempotency-Key | 持久接受，保存 ID 并查询终态，202 不等于完成 |
+| Tools／审批 | 原 call/hash 或 approval ID；决定输入 approved 布尔值 | 账户授权、审批、人工核实 resolve 是不同操作 |
+| 产物内容 | 二进制响应及 SHA-256、附件元数据 | 导出字节独立于云 workspace 生命周期 |
+| Preview／access | port/TTL 或 connection ID 产生限定 grant | URL/grant 敏感，撤销与关闭影响可用性 |
+| 资源审查 | action 为 acknowledge/reopen/reconcile，可带 note | 确认已知晓不证明资源不存在 |
+| Deployment | config 和 expected_revision | local owner 管理，可能需重启，不是 hosted 开通 API |
+
+字段约束与示例见[配置](/zh-CN/reference/configuration)、[Python](/zh-CN/reference/python)、[TypeScript](/zh-CN/reference/typescript)、[连接](/zh-CN/build/connection-lifecycle)、[OCI](/zh-CN/integrations/harnesses/oci)、[审批](/zh-CN/build/approvals)、[对账](/zh-CN/operate/reconciliation)。这些资料补充逐操作契约；精确字段、错误、副作用与请求示例以对应契约页为准。
+
+## 幂等、分页与观察
+
+Run 提交前保存精确 Session、input、origin 与 key。同请求和 key 恢复原 Run，改变内容则冲突。Session 创建及其他任意 POST 不继承该保证。传输超时可能发生在远程副作用成功后，重发前调查原对象或操作。
+
+全局 Session、Run 列表按实现接受过滤参数；资源操作使用 limit/offset。单个 Session 的 Run 列表使用 before 时间戳和有界分页，不是全局 offset 契约。事件使用数字字符串 after 游标，每页最多 500。不能给所有端点套同一种翻页算法。
+
+SSE `/runs/:id/stream` 接受 after 或 Last-Event-ID，显式 after 优先。先持久化再推送；应用将事件、去重及游标一起提交。stream.end 是无编号传输标记，之后仍查询 Run。断开连接不取消执行，见[事件与状态](/zh-CN/reference/events-and-states)。
+
+## 其他 HTTP 入口
+
+`GET /health/live` 是无认证存活探测，不是就绪证明。`/local/connect` 是有独立保护条件的本地引导，不是 hosted 登录。OAuth callback、预览 grant、凭据访问分别有独立处理和认证，不能当作匿名管理 API。Sandbox 内 Runtime 端点属于内部执行协议，不应传 owner Token。
+
+本页不宣称存在 OpenAPI 下载或通用部署 API。链接的逐操作页面说明 schema、错误、副作用和示例，已在[第一批收尾](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-docs-closeout-batch1.json)中对照实现审阅。生成清单本身只证明路由归属；HTTP 执行与实云验收需要各自有明确范围的证据。

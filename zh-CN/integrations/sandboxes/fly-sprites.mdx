@@ -1,0 +1,96 @@
+---
+title: "接入 Fly Sprites"
+---
+
+Sprites 提供持久工作区、命令执行和私有访问，自动 standby 由 Provider 管理。它与 Fly Machines 是不同集成：API provider 为 `sprites`，资源是 Sprite，不使用 Machines 的 App、机器镜像和网络配置。当前 Sprites 连接器不声明 OCI 或网络 allowlist。
+
+## 配置与验证
+
+准备有目标 Sprite 账户访问权限的 Token，通过连接 credential 提交。Token 只保留在控制平面。下面使用本地管理客户端；hosted 初始化见[自托管](/zh-CN/operate/self-host)。SPRITES_TOKEN 是本例读取的私有环境变量名，不是给 Agent 注入的变量。
+
+| config 字段 | 默认值 | 约束 |
+| --- | --- | --- |
+| memory_mb | 2048 | 整数，至少 2048 MiB |
+| cpus | 2 | 整数，1—8 |
+
+配置采用 cpus，不是其他 Provider 的 cpu；额外字段不接受。实际账户配额需另行确认。
+
+```python
+import os
+from hexagon import Hexagon
+
+client = Hexagon.local()
+connection = client.create_connection(
+    kind="sandbox", provider="sprites", name="Sprite workspace",
+    credential=os.environ["SPRITES_TOKEN"],
+    config={"memory_mb": 2048, "cpus": 2},
+)
+checked = client.validate_connection(connection["id"])
+if checked["status"] != "ready":
+    raise RuntimeError("Inspect Sprites connection diagnostics")
+client.update_connection(connection["id"], enabled=True)
+```
+
+```typescript
+import { Hexagon } from '@hexagon/agent-sdk';
+const client = await Hexagon.local();
+const credential = process.env.SPRITES_TOKEN;
+if (!credential) throw new Error('Set SPRITES_TOKEN');
+const connection = await client.createConnection({
+  kind: 'sandbox', provider: 'sprites', name: 'Sprite workspace', credential,
+  config: { memory_mb: 2048, cpus: 2 },
+});
+const checked = await client.validateConnection(connection.id);
+if (checked.status !== 'ready') throw new Error('Inspect Sprites connection diagnostics');
+await client.updateConnection(connection.id, { enabled: true });
+```
+
+每次运行示例会创建连接，保存返回 ID 后复用。验证执行 list_sprites，不分配资源或运行 Harness。ready 后单独启用；修改配置或 Token 后重新验证、启用。列举成功不证明有足够创建额度。
+
+## 首次任务与私有访问
+
+使用返回的 connection.id 作为[首个 Session](/zh-CN/start/first-session)的 sandbox_connection_id，搭配兼容模型与 Harness，完成任务、文件产物和关闭流程。Python 与 TypeScript 独立验证，不从一个客户端成功推断另一个。
+
+Sprite 创建时使用 `auth: sprite`。Hexagon 的私有传输通过已鉴权的执行通道连接远程端口，Provider Token 不交给用户浏览器。预览通过[平台授权入口](/zh-CN/build/private-preview)访问；如果资源的 URL 配置不再私有，连接器会拒绝。不要把供应商裸 URL 当成稳定的应用分享地址。
+
+预览打不开时分别检查用户服务端口、Sprite 私有配置、传输和 Runtime 健康。普通应用进程退出不会通过创建另一个 Sprite 自动修好。
+
+## 持久工作区与 standby
+
+当前受管理根目录为 `/home/sprite/.hexagon`，Runtime 和 Harness 的工作区与恢复数据由平台管理。持久文件不等于任意进程或连接永久存活；不要对工作区外的临时路径作同样保留假设。
+
+Provider 的 standby 可能早于平台 idle_timeout。下一次提交仍使用原 Session，平台在尚未开始的新调用前准备 Runtime。已持久化的活动调用不能因为唤醒而重新执行；等待授权或审批也不属于可以安全重放的任务。
+
+后台命令使用有期限的独立执行，不注册成唤醒时自动重放的服务。你的预览服务可能需要明确重启；先确认旧实例状态，避免重复启动产生副作用。Provider 自动 standby 不等于平台确认暂停，等待一段时间也不是计算或账单状态的证据。
+
+## 单独验证下一轮
+
+先让第一轮在工作区写入一个已知文件并记录对话中的测试值。等待目标空闲条件后，向同一 Session 提交第二轮，要求读取文件并引用先前测试值，同时检查实际工具输出、Run 终态和会话继续。需要预览的应用还要重新检查服务。
+
+必须记录等待条件、Harness 版本、模型协议和两套 SDK 的独立结果。文件仍在并不能证明对话继续；第二轮成功也不能证明 Provider 曾进入计费意义上的待机状态。参考[空闲与唤醒](/zh-CN/build/idle-and-wake)。
+
+## 到期、关闭与对账
+
+当前期限由控制平面持久生命周期处理，Sprite 睡眠不是删除。控制平面停机会影响及时到期清理；仅结束本地服务不释放云资源。关闭 Session 后确认对应 Sprite 不存在，同时确认历史产物仍可读取。
+
+创建名称由持久 operation ID 派生，丢失创建响应时按原名字查找。连接器只把 Provider 404 当作不存在；网络故障或鉴权失败必须保留不确定结果。删除请求之后仍能查询到资源时，清理未确认，不应报告成功。
+
+常见问题：401/403 检查 Token 权限；创建失败检查资源规格与额度；非零命令退出检查原执行输出；后台启动未知检查启动标记与 Runtime 健康；删除不确认保留原资源 ID 并[对账](/zh-CN/operate/reconciliation)。
+
+本页核对了配置与实现，未新增实云验证。历史单轮与完整旅程见[扩展矩阵](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-expanded-harness-matrix.md)，恢复范围见[Harness serverless 矩阵](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-harness-serverless-matrix.json)，不能将旧文档中的未验证状态或成功状态无限外推。
+
+依据：[Sprites 连接器](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/sandboxes/sprites.ts)、[私有传输](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/sandboxes/sprites-transport.ts)。下一步：[Sandbox 对比](/zh-CN/integrations/sandboxes)、[持久化边界](/zh-CN/concepts/persistence)。
+
+## 分开判断单轮、接续与待机证据
+
+| 问题 | 应查看的证据 |
+| --- | --- |
+| 是否通过已注册连接器执行真实 Agent 工作 | [扩展 Harness 矩阵](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-expanded-harness-matrix.md)记录 OpenCode、Pi 与示例自定义包的双 SDK 独立旅程，包括文件、私有预览和清理。 |
+| 后续任务是否保留文件和对话 | [Serverless 记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-harness-serverless-ui.md)及逐 SDK 矩阵另行覆盖 Provider 管理的空闲与下一任务路径。 |
+| 计费计算是否实际暂停 | 上述接续结果未独立确定该状态，应保留为未知。 |
+
+扩展记录中的早期可用性和传输探针发生在完整连接器旅程之前。其限制是历史发现，不能据此抹去后续限定范围的通过结果，也不能把所有传输扩展标成支持。内部私有执行通道与公开预览契约同样不同：内部通道能传 HTTP，不会增加浏览器 WebSocket 支持。
+
+如果新一轮能读取项目而预览失败，先检查服务进程，不直接替换 Session。Runtime 存在中断 invocation 时，启动其他进程前先调查。文件持久化或资源睡眠都不构成安全重放外部副作用的授权。
+
+依据：[Serverless 契约](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/serverless-sessions.md)。下一步：[空闲与唤醒](/zh-CN/build/idle-and-wake)、[独立的 Fly Machines 集成](/zh-CN/integrations/sandboxes/fly-machines)、[资源对账](/zh-CN/operate/reconciliation)。

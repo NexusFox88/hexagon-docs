@@ -1,0 +1,81 @@
+---
+title: "Glossary"
+---
+
+This reference defines product terminology. API identifiers, error codes, and code fields remain untranslated. Interpret states by object: Session, Run, Runtime, and cloud resources have distinct state models.
+
+| Term | Chinese equivalent | Meaning and boundary |
+| --- | --- | --- |
+| [Session](/en/concepts/sessions-runs-agents) | 会话工作上下文 | A durable work-context identity linking pinned configuration, workspace, conversation, and cloud resources. Not a particular machine; recovery can change the resource. |
+| [Run](/en/concepts/sessions-runs-agents) | 一次任务执行 | The durable execution record of one submission. A Session allows one active Run; authorization/approval waits remain active. |
+| [Agent template](/en/build/agent-templates) | Agent 模板 | Optional reusable configuration with immutable revisions. Direct Session creation requires no template. |
+| [Control plane](/en/concepts/execution-architecture) | 控制平面 | The service owning Sessions/Runs, tenant checks, credentials, durable events, and cloud-resource operations. |
+| [Sandbox](/en/integrations/sandboxes) | 云执行环境 | A remote isolated environment for task code, supplied by a provider and lifecycle-managed by the platform. Not a Console page. |
+| [Sandbox Runtime](/en/concepts/execution-architecture) | Sandbox 内运行服务 | The in-Sandbox supervisor for Harness processes, Tool mailboxes, and execution communication. It does not own cloud-account operations. |
+| [Harness](/en/integrations/harnesses) | Agent 执行引擎 | An engine running the model-driven loop, such as Pi/OpenCode; chosen separately from provider and model protocol. |
+| [Provider](/en/integrations/choose) | 服务提供方 | An adapter target for a connection kind. Fly Sprites and Fly Machines are distinct; vendor identity does not imply uniform capabilities. |
+| [Connection](/en/build/connection-lifecycle) | 连接 | Tenant-owned account configuration, endpoint, and access policy with validation, enablement, and version state. Not a single socket. |
+| [Binding](/en/build/tools) | 绑定 | A named Session association, such as an alias-to-connection ID mapping in tools or connections. It does not expand permissions. |
+| [ToolBroker](/en/build/tools) | 工具调用管理服务 | The control-plane component managing Tool authorization, approval, dispatch, durable calls, and unknown outcomes. |
+| [Agent Tool](/en/build/tools) | Agent 可调用工具 | A named capability discoverable and callable by a Harness through the platform, supplied by HTTP Tools, applications, or Remote MCP. |
+| [Protected HTTP connection](/en/integrations/http-tools) | 受保护 HTTP 连接 | Direct guest API access through a delegated URL with method/path restrictions; no automatic ToolBroker approval. |
+| [Authorization](/en/build/tool-authorization) | 授权 | Establishing and maintaining authority to access an account/Tool. A credential does not prove access to every resource. |
+| [Approval](/en/build/approvals) | 调用审批 | A decision on executing a specific operation and arguments; not account login or a substitute for upstream permissions. |
+| [Secret](/en/operate/credentials) | 受管理密钥 | An encrypted credential resource whose value is not echoed. Rotation/disable and reference-aware deletion apply. |
+| [Variable](/en/concepts/security-boundaries) | 变量 | Ordinary guest-readable configuration, not a Secret. Putting a key here does not protect it. |
+| [Delegated grant](/en/concepts/security-boundaries) | 委托访问授权 | Scoped, lifecycle-bound, revocable access. Its token still requires secrecy; it is not the original upstream account key. |
+| [Preflight](/en/integrations/choose) | 预检 | Checks configuration, references, capabilities, and credential ingress before allocation; not proof of live connectivity, quota, or task success. |
+| [Validation](/en/build/connection-lifecycle) | 连接验证 | Adapter-specific verification, sometimes only structural/list checks. Inspect its actual scope. |
+| [Pinned configuration](/en/concepts/initialization) | 固定配置 | Configuration versions and policy retained by a Session, not silently rewritten by later connection/template edits. |
+| [Idempotency key](/en/build/recovery) | 幂等键 | Identifies one logical submission. Preserve key/input after lost responses; use a new key for a new turn. |
+| [Durable event](/en/concepts/events-and-recovery) | 持久事件 | A state/activity record persisted before streaming. Disconnect does not cancel execution; cursors resume observation. |
+| [Artifact](/en/build/artifacts) | 产物 | An exported downloadable deliverable that may survive close. Arbitrary workspace files are not automatically artifacts. |
+| [Private preview](/en/build/private-preview) | 私有预览 | Authorized, expiry-bound access to a running service; not public deployment or a permanent URL. |
+| [Pause / suspend](/en/build/idle-and-wake) | 暂停 | An idle state retaining recovery context, not deletion. Memory/filesystem preservation depends on provider strategy. |
+| [Provider-managed standby](/en/concepts/serverless-lifecycle) | 供应商自动待机 | Provider-controlled standby whose compute/billing state may not be directly observable. |
+| [Resume / wake](/en/build/idle-and-wake) | 恢复 / 唤醒 | Continuing the same Session, possibly by resuming a VM or recreating from filesystem snapshot. |
+| [Close](/en/operate/reconciliation) | 关闭 Session | Terminates the Session and coordinates cloud cleanup. Accepted close does not by itself confirm remote deletion. |
+| [Cancellation](/en/build/recovery) | 取消 Run | Stops further execution of that Run; cannot undo external writes and is not automatically Session close. |
+| [Unknown outcome](/en/operate/reconciliation) | 结果未知 | A remote operation may have happened without a definitive receipt. Not failed and not permission to retry blindly. |
+| [Reconciliation](/en/operate/reconciliation) | 对账 | Checking original operations/resources/external records and recording conclusions, not rerunning an action to guess its outcome. |
+| [OCI digest](/en/integrations/harnesses/oci) | OCI 内容摘要 | An immutable image-content identity, unlike a mutable tag; preparation can still modify the execution filesystem. |
+| [Native session ID](/en/build/multi-turn) | Harness 原生会话标识 | Harness-owned history identity, distinct from Hexagon Session ID and cloud resource ID. |
+| [Local / hosted](/en/operate/self-host) | 本地 / 托管控制平面 | Describes control-plane deployment, not local task execution on the user computer; real tasks use cloud Sandboxes. |
+| [Verified combination](/en/integrations/verified-combinations) | 已验证组合 | Evidence scoped to exact versions, protocols, SDKs, scenarios, and date; not certification of every catalog capability. |
+| [Agent revision](/en/build/agent-templates) | Agent 修订版本 | An immutable version of one Agent template definition, selected when creating a Session. It is not a Harness software version, and revising it does not migrate existing Sessions. |
+| [Workspace](/en/concepts/persistence) | 工作区 | Files available to task execution inside the Sandbox. It is not the durable artifact store, and retention depends on the lifecycle strategy. |
+| [Model protocol](/en/integrations/model-protocols) | 模型协议 | The request/response wire contract, such as Messages, Chat Completions or Responses. A model/vendor name does not establish protocol compatibility or imply conversion. |
+| [Event cursor](/en/build/stream-events) | 事件游标 | A position for reading durable Run events, represented as a numeric string. It is neither an event count nor the internal Runtime cursor; gaps are valid. |
+| [Runtime invocation](/en/concepts/events-and-recovery) | Runtime 调用 | The persisted instruction for a Harness process execution managed by Runtime. Reconnecting to an existing invocation is not submitting a new Run. |
+| [Resource operation](/en/operate/reconciliation) | 资源操作 | A durable record of a cloud lifecycle operation such as create or delete. Its completion concerns that operation, not the Run result or account-wide cleanup. |
+| [Lease / generation](/en/concepts/events-and-recovery) | 租约／代次 | Time-bounded worker ownership plus a fencing generation used to reject stale control-plane writes. It cannot roll back an upstream side effect. |
+| [Tenant](/en/concepts/security-boundaries) | 租户 | The ownership boundary used by control-plane resource lookups and bindings. It does not automatically separate every end user in an application sharing one tenant. |
+
+## Avoid ambiguous claims
+
+- “Task completed” requires the actual Run terminal state and deliverable checks, not just model text. “Cleanup completed” additionally requires remote confirmation.
+- “Connection works” must specify structural validation, account validation, enablement, or actual invocation. Ready does not prove permission for every operation.
+- “Recovery supported” must identify preserved files, conversation, processes, or memory and the exact provider/Harness evidence.
+
+Prefer explicit actions: submit a new Run to the same Session, resume observing the original Run, or close and confirm cleanup. Do not use “restart” interchangeably for recovery, replay, recreation, and deletion.
+
+## Name the operation and the identity you retain
+
+| Intent | Precise wording | What remains the same |
+| --- | --- | --- |
+| Browser reconnect after a network break | Resume observing the original Run | Run ID and committed event cursor; no new submission |
+| Recover a lost submission response | Recover the original submission | Session, input, origin and idempotency key |
+| Ask for another change to the same project | Submit a follow-up Run | Session; the new turn gets its own idempotency key |
+| Start another project with the same setup | Create a Session from the selected Agent revision | Template ID/revision; workspace and history are separate |
+| Continue after idle suspension | Wake the same Session | Session identity; cloud resource identity may change |
+| End work and release resources | Close the Session and confirm deletion | Historical records remain queryable within their retention contract |
+
+“Replay” needs an object: replaying durable events is observation; replaying an external write can repeat a side effect. “Retry” likewise needs the original request identity and a stated policy. See [recovery](/en/build/recovery).
+
+## Writing and translation convention
+
+Keep `Session`, `Run`, `Harness`, `Runtime` and API field/state values unchanged in both languages. Chinese prose may introduce the explanatory term in this table, then use the API-facing name for precision. Use “Agent template” when discussing reusable configuration and “Agent revision” for its selected version; a bare “Agent” can otherwise mean the running model-driven engine.
+
+Do not translate `waiting_authorization` or `waiting_approval` into new wire values. UI labels may explain them, but actions come from the related connection, approval and Tool-call records. Likewise, `unknown` is a recorded uncertainty, not a translated synonym for `failed`. The [state reference](/en/reference/events-and-states) owns the exact state definitions; this glossary is the terminology entry point.
+
+This page summarizes the linked contracts and implementation explanations; it introduces no API or state values. Next: [object relationships](/en/concepts/sessions-runs-agents), [capabilities and evidence](/en/concepts/capabilities-and-evidence).

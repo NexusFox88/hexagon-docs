@@ -1,0 +1,128 @@
+---
+title: "CLI 与本地管理命令"
+---
+
+Hexagon 当前提供 npm 脚本和本地管理启动器，没有独立的 `hexagon deploy` 命令。源码命令在仓库根目录完成 `npm ci` 后执行。权威实现是 [package.json](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/package.json)与 [tooling/local.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/tooling/local.ts)。
+
+## 调用方式与环境
+
+```sh
+npm run local -- status
+npm run local -- doctor
+```
+
+不带子命令的 `npm run local` 默认执行 `status`。npm 的 `--` 之后的参数传给启动器。启动器使用位置参数，不是通用选项解析器；没有独立 `--help` 分支，未知子命令会输出用法并失败。多余参数被忽略不代表支持该选项。
+
+| 环境变量 | 启动器行为 |
+| --- | --- |
+| `HEXAGON_DATA_DIR` | 相对调用目录解析的数据目录，缺省 `.local/control-plane` |
+| `DATABASE_URL` | doctor、迁移、备份与恢复使用的数据库，缺省 `postgres://hexagon@127.0.0.1:55432/hexagon` |
+| `PORT` | 本地管理健康检查的端口，缺省 `127.0.0.1:8787` |
+| `CLOUDFLARED_BINARY` | doctor 检查的程序路径，缺省 `cloudflared` |
+| 代理与凭据 ingress 环境变量 | 托管启动时与已保存部署设置共同应用；显式环境可能覆盖保存值 |
+
+同一实例的命令使用一致的数据目录、数据库和端口。缺省数据库 URL 不会创建 PostgreSQL 或数据库。`TEST_DATABASE_URL` 用于测试，不会选择启动器数据库。部署网络配置见[网络指南](/zh-CN/operate/networking)。
+
+所有调用都会先创建尚不存在的数据目录，包括 `status`。除 `status` 外，还会取得目录中的独占 `operation.lock`，正常结束时释放。锁冲突不能直接通过删除文件解决，先确认是否仍有操作运行，再调查陈旧锁。
+
+## 托管服务命令
+
+| 命令 | 输出与影响 | 失败或限制 |
+| --- | --- | --- |
+| `status` | 输出经过认证的健康 JSON，或根据记录 PID 输出 `state: stopped` / `unreachable` | stopped、unreachable 也可能退出零，需要检查 JSON；没有认证健康结果就不能证明就绪。 |
+| `doctor` | 输出 Node、Python、OpenSSH、cloudflared 和数据库检查；数据库执行 `SELECT 1` | Node 或数据库未就绪时非零退出。缺少可选程序会报告，但不单独使退出码失败；不验证全部版本或云账户。 |
+| `start` | 应用数据库迁移，加载部署配置，启动独立进程，追加私有 `service.log`，保存 PID 并等待认证健康结果 | 已有健康服务返回 `already_running`；已有但不可访问的托管进程会阻止重启。等待期限 90 秒，超时不证明进程已结束。 |
+| `stop` | 核对健康和进程身份，发送 SIGTERM，等待约 30 秒 | 活动 Run、忙碌执行、无法确认身份或停止未完成会失败；不强杀，也不销毁云资源。 |
+| `restart` | 先 stop 再 start | stop 失败就不 start，不是零停机重启。 |
+
+启动成功输出包含状态、Console URL、owner 凭据文件与字段位置，以及凭据访问状态，不输出 owner Token。源码 `npm run dev` 在前台启动控制平面，不是托管启动器，也没有文件监听；直接启动前执行 `npm run db:migrate`。避免前台和托管实例意外同时处理同一数据集。
+
+捕获的启动器错误写入 stderr，退出码为 1。正常命令退出零，除非检查主动设置失败码。npm 还会输出脚本包装信息，所以不能把 `npm run` 的全部 stdout 假设成单个 JSON 文档。就绪和清理结论都不能只看退出码。
+
+## 保存部署配置
+
+```sh
+npm run local -- configure /absolute/path/deployment.json
+```
+
+输入文件是配置对象，不是 API envelope。以下示例用于有意关闭凭据 ingress 的开发实例：
+
+```json
+{
+  "no_proxy": ["localhost", "127.0.0.1"],
+  "ingress": {"mode": "disabled"}
+}
+```
+
+命令经过 schema 与 revision 检查后替换保存配置，不做局部合并；未填写字段采用 schema 默认值。ingress 可选 `cloudflare`、`disabled`、`external`，后者通过 `url` 提供 HTTPS origin。`outbound_proxy` 可选，`no_proxy` 默认空数组。精确 URL 约束见 [settings.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/deployment/settings.ts)。
+
+结果包含 revision 和 `restart_required: true`，不会自动重启。显式环境变量仍可能覆盖保存文件。关闭 ingress 后，受保护云执行无法访问控制平面凭据服务，不能把它作为正常云连接配置。外部 ingress 与代理设置见[网络指南](/zh-CN/operate/networking)。
+
+## 导出诊断
+
+```sh
+npm run local -- diagnostics /absolute/path/new-diagnostics.json
+```
+
+目标文件必须不存在，父目录必须存在。命令创建权限为 0600 的 JSON，输出 `{"written":true}`。它使用字段白名单的[诊断投影](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/diagnostics/support.ts)，包含时间、平台、架构、Node、可达性和服务状态，不打包原始日志、任意健康字段、Token 或用户提示词。服务不可达时仍可生成报告并成功退出，应检查 `reachable` 与各状态。分享前审阅报告。
+
+## 离线备份与恢复
+
+```sh
+npm run local -- backup /absolute/path/new-private-backup
+```
+
+先关闭全部 Session 并停止服务，显式选择对应的源数据库和数据目录。目标必须是新目录，父目录需存在。备份检查本地身份与加密材料匹配，用 `pg_dump` 导出所选 schema，并包含 `master.key`、`owner.json`、可选部署配置、数据库 dump 和完整性 manifest。结果报告目录、schema、文件与 `state: verified`。备份含秘密，必须保持私有。失败可能留下不完整目标，不能把它作为已验证备份复用。
+
+```sh
+DATABASE_URL='postgres://hexagon@127.0.0.1:5432/hexagon_restore' \
+HEXAGON_DATA_DIR='/absolute/path/empty-restored-data' \
+npm run local -- restore /absolute/path/private-backup
+```
+
+目标数据库必须已经存在，且不含用户表、视图或序列。数据目录应不存在或为空，启动器锁除外。恢复检查 manifest 和哈希，执行 `pg_restore`，验证身份，返回 `requires_start: true` 和恢复的 schema，不自动启动服务或重建云资源。恢复的 schema 非默认值时，需配置对应 search path。备份恢复要求 PostgreSQL 客户端工具与相应权限。
+
+恢复失败后不要盲目重试，可能已有数据库或 staging 变化。按[备份恢复指南](/zh-CN/operate/backup-restore)调查。`backup_close_sessions_first`、`backup_identity_mismatch`、`restore_database_not_empty`、`restore_integrity_failed` 指向不同问题，不能删除源身份来绕过检查。
+
+## 失败、超时与部分完成
+
+| 观察结果 | 可能已经发生的事 | 下一步 |
+| --- | --- | --- |
+| `start` 达到健康等待期限 | 已应用迁移、启动独立子进程、写入 PID 和日志 | 再次 start 前检查认证状态、原进程身份和私有日志；等待超时不会杀死子进程 |
+| `stop` 报告优雅停止仍在等待 | 已发送 SIGTERM，worker 与监听可能仍在退出 | 复查同一进程和健康状态；不能认定已停止，也不要用另一实例替代 |
+| `configure` 拒绝 schema | 原部署文件保持不变 | 修正完整 JSON 后重跑；没有发生服务重启 |
+| `diagnostics` 报告目标已存在 | 原报告保持不变 | 选择新路径，不要假定生成了新报告 |
+| `backup_postgres_timeout` | 可能留下部分 dump、备份目录或恢复 staging 目录 | 确定当时执行的是备份还是恢复，检查目标，保留原始来源备份 |
+| PostgreSQL 操作之后恢复失败 | 数据库可能已经恢复，但身份校验或私有文件移动失败 | 联合检查数据库和 staging；不能直接对已经非空的目标重跑 |
+
+PostgreSQL 子进程辅助函数的期限为 120 秒，之后发送 SIGTERM，再过五秒可能发送 SIGKILL。这只针对其 `pg_dump`／`pg_restore` 子进程，**不是**本地启动器的控制平面 stop 命令；后者不会强杀。恢复子进程使用单个 PostgreSQL 事务，但后续身份检查和私有文件移动是另外的步骤，整个恢复过程不是一个原子操作。
+
+备份结果 `state: verified` 表示备份过程完成了来源身份检查并写出 dump 与哈希，不代表已经演练恢复该备份。同样，恢复返回 `requires_start: true` 表示还需要验证服务启动与就绪。完整操作见[备份恢复手册](/zh-CN/operate/backup-restore)。
+
+## 源码开发与验证脚本
+
+| 脚本 | 用途与影响 |
+| --- | --- |
+| `npm run check` | TypeScript 类型检查，不输出编译代码 |
+| `npm test` | Vitest；完整数据库覆盖需要测试数据库配置 |
+| `npm run verify` | 要求 `TEST_DATABASE_URL`，运行类型检查和测试 |
+| `npm run verify:packages` | 要求测试数据库及 Python 打包依赖，构建并安装 SDK 到临时消费目录，运行指定 API 测试 |
+| `npm run verify:startup` | 使用 `DATABASE_URL`，创建隔离 schema 和数据目录，启动并重启服务 |
+| `npm run verify:backup` | 使用测试数据库，创建恢复数据库和私有备份，需要创建数据库权限 |
+| `npm run build:local -- <new-directory>` | 构建本地发行目录和 SDK 输出；默认新建 `.local/releases/local-<uuid>`，父目录需存在 |
+| `npm run release:check` | 检查源码清单和来源，写入 `.local/release-audit/latest.json`，不发布 |
+| `npm run release:public-check` | 额外在存在已配置的公开发布阻碍时失败，不发布 |
+
+发布检查器可在 npm 分隔符之后传入 `--artifact <directory>` 检查产物；模式扫描不等于完整秘密检测。证据范围、私有产物和门禁说明见[测试指南](/zh-CN/contribute/testing)。
+
+实云脚本单独使用：`verify:cloud -- <private-config> [harness ...]`、`verify:compatibility -- <private-config>`、`verify:serverless -- <provider> <harness-key>`。它们可能创建资源并产生云端和模型费用，输入与范围也不同，运行前阅读[测试指南](/zh-CN/contribute/testing)。内部故障注入脚本不是安装步骤。
+
+build:local 产出的发行目录使用不同的生成 package manifest，只提供 `local`、`start`、`db:migrate`。用 `npm ci --omit=dev` 安装依赖，再执行 `npm run local -- start` 或 `npm start`。不能假设源码验证脚本也存在于发行目录。本地构建成功不代表已有公开软件包或下载渠道。
+
+## 本页验证范围
+
+命令清单通过 `npm run`（退出 0）核对，该命令只列举脚本。随后在临时数据目录中执行了[隔离启动器检查](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-cli-reference-review.json)：stopped 状态、有效配置、服务不可达时导出诊断、拒绝覆盖诊断、未知命令、缺少配置输入、无效配置，共七项。确认了退出码、原文件保留、私有文件权限和锁释放，临时文件已清理。
+
+这些检查不使用数据库，也没有启动或停止服务。迁移、备份恢复、运行实例就绪和云验收未在本检查中执行；上述操作语义依据启动器、配置、备份、诊断与构建实现核对，历史运维证据仍保留自己的范围和日期。
+
+下一步：[安装](/zh-CN/start/install)、[本地工作区](/zh-CN/operate/local-workspace)、[测试指南](/zh-CN/contribute/testing)。

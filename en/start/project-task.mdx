@@ -1,0 +1,121 @@
+---
+title: "Complete a real project task"
+---
+
+Upload a small task board, ask an Agent to implement filtering, inspect its tests and private preview, then add a Reset button in a second Run within the same Session. Finally, close the Session and check that exported files remain downloadable.
+
+## Before you begin
+
+Complete [your first Session](/en/start/first-session). This tutorial uses the same local control-plane discovery, built-in Pi 1.5.2 and two verified connection IDs. Choose a compatible combination with private Web access from the [execution matrix](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/execution-matrix.md). The cloud workspace needs Node for the fixed test and Python 3 for the preview server. Local and hosted describe the control plane; this example executes the task in a cloud Sandbox.
+
+The complete [Python program](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/project-task.py) and [TypeScript program](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/project-task.ts) implement the same stages and use [shared prompts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/project-task-prompts.json). Both passed independent cloud and browser journeys on 2026-11-20 using Vercel, built-in Pi 1.5.2 and the configured Messages endpoint with deepseek-ai/DeepSeek-V4-Flash. The [execution evidence](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-project-docs-cloud.json) includes four completed Runs, unchanged fixed tests, actual test-execution receipts, filtering and Reset browser checks, completed deletion records, denied previews after closure and retained artifact bytes. This verifies that exact combination; rerun the checks for your environment. Execution consumes configured Provider and model resources.
+
+This tutorial's [fixture](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/filter-app/README.md) needs no external Tool account. The original [acceptance fixture](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/fixtures/filter-app/README.md) separately exercises requirements retrieval and approved report writes. This tutorial does not replace that full acceptance journey.
+
+## 1. Understand the input and fixed test
+
+The fixture contains `index.html`, `style.css`, `app.mjs`, `filter.mjs`, `acceptance.mjs`, `serve.py` and its README. The filtering implementation deliberately throws. Running the following against the unchanged input should fail:
+
+```sh
+node examples/documentation/filter-app/acceptance.mjs
+```
+
+The expected initial failure includes `ACCEPTANCE-001: implement text and status filtering` and a nonzero exit code. It confirms that the input implementation is intentionally incomplete; do not modify the fixed test to make this baseline pass.
+
+The Agent must implement trimmed, case-insensitive title matching, combine it with status selection, preserve order, avoid mutating the input and return an empty array when appropriate. The fixed test has eight assertions and must remain byte-for-byte unchanged. A successful execution prints `8 assertions passed` and exits with status 0. The string alone is not evidence of a real execution: inspect the Harness execution events and the exported report.
+
+The initial task asks the Agent to export six files, including the fixed test and `test-report.txt`, into the Run artifact directory supplied by Hexagon. The program compares the downloaded fixed test's SHA-256 with the uploaded version. It does not execute downloaded model-generated code on your local machine.
+
+## 2. Upload and submit the first Run
+
+Run from the repository root. Use the local SDK installation described in [installation](/en/start/install); for TypeScript, build the SDK first.
+
+```sh
+export HEXAGON_EXAMPLE_SANDBOX_ID='YOUR_SANDBOX_CONNECTION_ID'
+export HEXAGON_EXAMPLE_MODEL_ID='YOUR_MODEL_CONNECTION_ID'
+```
+
+Choose one language and keep using its journal for this journey:
+
+| Stage | Python | TypeScript |
+| --- | --- | --- |
+| Create, upload, submit | `.local/docs-example-venv/bin/python examples/documentation/project-task.py start` | `./node_modules/.bin/tsx examples/documentation/project-task.ts start` |
+| Observe and download | `.local/docs-example-venv/bin/python examples/documentation/project-task.py observe` | `./node_modules/.bin/tsx examples/documentation/project-task.ts observe` |
+| Create private preview | `.local/docs-example-venv/bin/python examples/documentation/project-task.py preview` | `./node_modules/.bin/tsx examples/documentation/project-task.ts preview` |
+| Submit second modification | `.local/docs-example-venv/bin/python examples/documentation/project-task.py followup` | `./node_modules/.bin/tsx examples/documentation/project-task.ts followup` |
+| Close and check retention | `.local/docs-example-venv/bin/python examples/documentation/project-task.py close` | `./node_modules/.bin/tsx examples/documentation/project-task.ts close` |
+
+For TypeScript, run `npm --prefix sdk/typescript run build` before the first stage. Running both languages creates two independent Sessions; one successful language does not verify the other.
+
+`start` saves creation intent, creates a Session directly, uploads the fixture before any Run, then submits the first task with a saved idempotency key. It prints the Session and Run IDs. Use those IDs to inspect Console activity and initialization. No saved Agent template is required.
+
+The journal is `.local/docs-project-python/journal.json` or `.local/docs-project-typescript/journal.json`. It contains resource IDs and, after preview creation, a credential-bearing URL. Keep it private. Commands take an exclusive process lock; do not run stages concurrently or delete the journal to retry.
+
+## 3. Observe and inspect the first result
+
+Run `observe`. It polls for up to ten minutes, records the terminal result, downloads all returned artifacts, requires the six named exports, verifies each size and SHA-256, and checks that the exported test has not changed. A timeout stops local observation; it does not cancel the Run. Repeat `observe` to query the same Run.
+
+Inspect these independent results:
+
+| Check | Required observation |
+| --- | --- |
+| Run | `completed`, with a final answer consistent with the actual work |
+| Fixed test | The execution ran `node acceptance.mjs`; exit status 0; all eight assertions passed |
+| Test integrity | Downloaded `acceptance.mjs` matches the uploaded hash |
+| Code | `filter.mjs` implements the requested predicates without changing the test |
+| Report | Actual stdout/stderr, exit status and fixed-test hash; no fabricated success |
+| Export | All six files are listed in the journal with IDs, local filenames and hashes |
+
+Downloaded files use generated local names such as `first-artifact-0.bin`. Map these to their original names through `runs.first.artifacts` in the journal. Remote paths never become local write destinations. A completed Run and matching test hash do not themselves establish passing tests or a working UI; these require the execution and browser checks above and below.
+
+## 4. Use the private preview
+
+Run `preview` after the first result is ready. Open `preview.url` from the private journal. The grant lasts 600 seconds. It provides access to port 3000; it does not start the HTTP server. The Agent was asked to launch `serve.py` and verify that port within the workspace.
+
+Perform these browser checks:
+
+| Action | Expected result |
+| --- | --- |
+| Empty query, all statuses | Four tasks |
+| Query `  api  `, all statuses | Launch API and Review API tests |
+| Query `API`, status done | Launch API only |
+| Query `missing` | Empty-state message and zero tasks |
+| Query `发布`, all statuses | 发布说明 only |
+
+Check that the count and error state agree with the cards. If the page cannot load, inspect server liveness, Session sleep, grant expiry and Provider private transport before changing any application code. See [private previews](/en/build/private-preview). A detached subprocess is not a guarantee of survival across every Harness exit or Sandbox sleep.
+
+The preview command refuses a second request after recording an intent, including a lost response. Inspect the recorded grant or Console first. If it is confirmed expired/revoked, create a new grant through Console or the SDK workflow in the preview guide; do not clear intent merely because the request timed out.
+
+## 5. Continue in the same Session
+
+After reviewing the first result, run `followup`, then `observe` again. The second task adds a Reset button and its event handler. It must preserve `filter.mjs` behavior and rerun the unchanged fixed test. Compare the two Run IDs: they must differ, while the Session ID stays the same.
+
+Refresh the preview to load the changed files. Select a status and enter a query; click Reset. Verify that the query becomes empty, status becomes all, and all four cards and the count update immediately without submitting the form. Repeat from an empty-results state. The existing eight assertions test filtering logic; they do not test this new DOM interaction. Review the actual `index.html` and `app.mjs` changes as well as the browser result.
+
+If the second submission response is lost, repeating `followup` uses the saved input and key, so it addresses the same submission. This command intentionally cannot generate a third task with a fresh key. Continue observing rather than resubmitting to restart a running Agent.
+
+## 6. Close and verify retained results
+
+After both Runs and browser checks, run `close`. It closes the same Session and redownloads every previously exported artifact, checking that its bytes match the saved digest. Investigate any exception through the same Session and resource operations. A missing response is not proof of cleanup.
+
+Confirm Console reports the Session closed and its owned resources cleaned up. Refresh the old preview and verify access is denied. Confirm both historical Runs and answers remain queryable. Keep downloaded code, reports and the private journal until you have confirmed cleanup. Exported artifacts are retained independently of the temporary preview and running server; arbitrary unexported workspace files are not covered by this check.
+
+`closed_and_downloads_checked` records closure and byte retention only. Full tutorial acceptance also requires your fixed-test, two-turn and browser observations. Do not label a journey successful just because the cleanup command completed.
+
+## Recover an interrupted stage
+
+| Journal state | Safe next action |
+| --- | --- |
+| Creation intent but no Session ID | Inspect Sessions and resource operations; creation may have succeeded. Do not run `start` again with a new journal |
+| `uploading` | Inspect the same Session and its uploaded files; reconcile a lost upload response before submitting anything |
+| `submitting_first` or `submitting_followup` | Use the saved input/key with the same Session via SDK `submit`; save the returned ID and current stage before observation |
+| Saved Run ID | Repeat `observe`; it does not submit a task |
+| Failure or missing/modified exports | Inspect events and retain the evidence; do not accept the task. Close after investigation or submit a separately recorded corrective task |
+| `closing` | Query the same Session and operations; repeat close to reconcile its resources |
+| Leftover `process.lock` | Check its PID and confirm that process has stopped before removing only the lock |
+
+For a stuck Run, use SDK `cancel`, observe its terminal state, then close the Session. Cancel does not undo external effects. This example does not automatically recover creation/upload uncertainty or rewrite the journal: its saved state is the starting point for [recovery](/en/build/recovery).
+
+Next: [Integrate your backend](/en/build/backend-integration), [human approvals](/en/build/approvals), or [retain artifacts](/en/build/artifacts).
+
+Related workflow contracts: [input files and context](/en/build/project-context), [private preview lifecycle](/en/build/private-preview), the [original manual journey](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/manual-journey/README.md), [user-supplied journey](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/journey-source.md) and [acceptance requirements](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/acceptance.md). The simplified tutorial does not remove their external authorization/approval requirements.

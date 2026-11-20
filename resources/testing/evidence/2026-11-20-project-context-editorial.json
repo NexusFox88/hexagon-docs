@@ -1,0 +1,14 @@
+{
+  "scope": "Source review plus local schema checks, Python syntax and TypeScript transpilation; no PostgreSQL transactions or cloud execution",
+  "sources": [
+    "modules/execution/inputs.ts",
+    "modules/execution/initialization.ts",
+    "modules/execution/runs.ts",
+    "apps/control-plane/server.ts"
+  ],
+  "python_syntax_snippets": 6,
+  "local_check_exit_code": 0,
+  "stdout": "{\"schema_checks\":[\"nested path accepted\",\"reject \\\"/absolute\\\"\",\"reject \\\"../escape\\\"\",\"reject \\\"a/../b\\\"\",\"reject \\\"a//b\\\"\",\"reject \\\"a/./b\\\"\",\"reject \\\"a\\\\\\\\b\\\"\",\"reject \\\"a\\\\u0000b\\\"\",\"empty batch rejected\",\"101 files rejected\",\"bad base64 rejected\",\"encoded per-file overflow rejected\",\"nine references rejected\"],\"typescript_transpilation_only\":6}\n",
+  "stderr": "",
+  "passed": true
+}

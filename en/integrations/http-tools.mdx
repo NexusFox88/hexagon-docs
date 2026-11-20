@@ -1,0 +1,128 @@
+---
+title: "Connect a protected HTTP API"
+---
+
+Hexagon exposes two distinct paths: named HTTP Tools discovered/called by a Harness, and protected HTTP connections called by Sandbox code through delegated access. Select by invocation model; their approval and call-record semantics are different.
+
+| Path | Connection | Session binding | Control |
+| --- | --- | --- | --- |
+| Agent HTTP Tool | kind=tool, provider=http-json | tools | Fixed named operations through ToolBroker, authorization, optional approval |
+| Protected HTTP | kind=http, provider=http | connections | Guest uses delegated URL; exact method/path policy, no automatic Tool approval |
+
+## Define fixed read/write operations
+
+Prepare a controlled test service: a Bearer-authenticated verification path, a read endpoint returning a known report, and a write endpoint storing reference/text that can be independently looked up by reference. Return JSON. Save this template as http-tool.json, **replace the base_url placeholder and implement the endpoints first**. These are not built-in Hexagon services.
+
+```json
+{
+  "base_url": "https://YOUR-TEST-SERVICE",
+  "verify_path": "/auth/check",
+  "operations": {
+    "read_report": {
+      "path": "/reports/read", "method": "GET",
+      "description": "Read a test report by ID",
+      "input_schema": {"type":"object","properties":{"id":{"type":"string"}},"required":["id"],"additionalProperties":false},
+      "approval": false, "replay": "never"
+    },
+    "save_report": {
+      "path": "/reports/save", "method": "POST",
+      "description": "Save a test report with a reconciliation reference",
+      "input_schema": {"type":"object","properties":{"reference":{"type":"string"},"text":{"type":"string"}},"required":["reference","text"],"additionalProperties":false},
+      "approval": true, "replay": "never"
+    }
+  }
+}
+```
+
+Operations fix path and GET/POST. GET puts arguments into query parameters, preserving strings and JSON-encoding other values. POST sends JSON arguments. Agent input cannot select arbitrary URLs, headers, methods, or path templates. input_schema must be a supported synchronous object JSON Schema; reject additional fields where appropriate. Paths exclude query, fragment, backslash, leading double slash, and `..` segments.
+
+The adapter injects Bearer authorization and a stable call idempotency-key. Custom authentication-header mapping is not exposed here. Receiving that header does not prove upstream deduplication, so this example uses replay=never. Consider idempotency_key only after verifying real upstream deduplication. GET alone does not establish absence of side effects.
+
+## Review the mapping and replay contract
+
+For `read_report`, arguments `{"id":"report-1"}` become a query parameter on the fixed `/reports/read` path. A numeric or object argument is JSON-encoded as a query value, not expanded into path segments. For `save_report`, `{"reference":"request-1","text":"Reviewed"}` becomes the JSON body. No mapping step interpolates arbitrary arguments into the upstream host or authentication header.
+
+In the current broker, an uncertain dispatched **GET can be retried even when its operation says `replay: never`**. The broker treats GET as replayable independently of the non-GET policy. Therefore only expose genuinely repeat-safe reads through GET; do not map a state-changing endpoint to GET and expect `replay: never` to prevent repetition. For POST, `idempotency_key` is appropriate only when the upstream actually honors the stable call key and preserves the same result across retries. Keep `never` for writes without that contract.
+
+Connection verification may return sanitized account/scope display metadata from a small JSON response. Missing metadata remains unknown; the displayed scope does not replace the selected operation policy or approve a write. A successful verification endpoint also does not prove permission to every operation path.
+
+## Create, validate, enable, and bind
+
+These local management examples read private credentials; see [self-hosting](/en/operate/self-host) for hosted initialization. Retain/reuse the returned ID.
+
+```python
+import json
+import os
+from pathlib import Path
+from hexagon import Hexagon
+client = Hexagon.local()
+config = json.loads(Path("http-tool.json").read_text(encoding="utf-8"))
+connection = client.create_connection(
+    kind="tool", provider="http-json", name="Test reports",
+    credential=os.environ["REPORT_SERVICE_KEY"], config=config,
+)
+checked = client.validate_connection(connection["id"])
+if checked["status"] != "ready":
+    raise RuntimeError("Inspect Tool connection diagnostics")
+client.update_connection(connection["id"], enabled=True)
+```
+
+```typescript
+import { readFile } from 'node:fs/promises';
+import { Hexagon } from '@hexagon/agent-sdk';
+const client = await Hexagon.local();
+const credential = process.env.REPORT_SERVICE_KEY;
+if (!credential) throw new Error('Set REPORT_SERVICE_KEY');
+const config = JSON.parse(await readFile('http-tool.json', 'utf8'));
+const connection = await client.createConnection({
+  kind: 'tool', provider: 'http-json', name: 'Test reports', credential, config,
+});
+const checked = await client.validateConnection(connection.id);
+if (checked.status !== 'ready') throw new Error('Inspect Tool connection diagnostics');
+await client.updateConnection(connection.id, { enabled: true });
+```
+
+Validation requests the fixed verify_path, which must not mutate data. Success does not prove every business operation. Follow [Tool binding](/en/build/tools), placing the ID in `tools: {reports: connection_id}` with a Tools-capable Harness, then preflight/create the Session. Required Tools need authorization during initialization. optional_tools does not bypass authorization or approval.
+
+First call read_report and verify actual content. Then request save_report and inspect reference/text before approving. approval=true controls invocation approval independently of existing connection credentials. Confirm rejection causes zero upstream writes, then test one authorized write to a dedicated record. See [approvals](/en/build/approvals).
+
+## Responses and unknown outcomes
+
+Requests time out after 20 seconds and reject redirects. 401/403 take the authentication-error path. Results must parse as JSON; response text exceeding 1048576 JavaScript code units fails. That check is not a byte-level download-limit guarantee.
+
+A remote write can succeed before its response is lost or fails parsing. A task error does not establish no side effect. Call records retain request hash and dispatched policy. Reconcile unknown outcomes instead of generating a new reference and repeating the business action.
+
+Inspect tool_calls / toolCalls, verify the original reference remotely, then use resolve_tool_call / resolveToolCall with completed/failed and evidence. Resolution does not send another remote request. Leave genuinely unknown outcomes waiting or cancel; do not invent success. Later connection edits cannot change the original call's replay qualification. See [reconciliation](/en/operate/reconciliation).
+
+## Test a write by its business reference
+
+Use a dedicated report reference such as `hexagon-acceptance-001`. The reference identifies the business record; the Tool call ID identifies one platform invocation. Preserve both. The following is an acceptance procedure for your controlled service, not an execution result from this documentation update.
+
+| Step | Observable result required |
+| --- | --- |
+| Read a known report | Tool result matches the stored report, not just a plausible final answer |
+| Request a write and leave approval pending | Service-side write count for the reference remains zero |
+| Reject that approval | Still zero writes; the rejected call cannot be treated as approved |
+| Submit a separate, explicitly authorized write and approve it | Exactly one matching record, correct text and one observed write |
+| In a disposable fault test, lose the response after the service stores a `replay: never` POST | The original call stays unresolved; repeated observation does not create a second write |
+| Independently look up the original reference, then resolve the call | Recorded resolution matches the external evidence and itself sends no write |
+
+If the service cannot query the reference or distinguish duplicate writes, it cannot support this reconciliation proof yet. Do not infer “not written” from a failed request, and do not reuse this procedure on production data. GET operations have the separate repeat-safe requirement described above. A direct protected HTTP binding bypasses ToolBroker approval, so it cannot substitute for the approved-write test.
+
+## Direct guest HTTP access
+
+Use kind=http/provider=http with endpoint, authentication, and access.rules, for example:
+
+```json
+{"endpoint":"https://YOUR-TEST-SERVICE","authentication":{"type":"header","name":"X-Service-Key"},"access":{"rules":[{"methods":["GET"],"path":"/reports/read"}]}}
+```
+
+This path supports bearer or a named header injected by the trusted backend. Upstreams must be public HTTPS; rules match exact paths/methods. Bind via connections; guest code reads base_url and delegated headers from HEXAGON_CONNECTIONS. Generic HTTP validation checks structure/header safety, not remote authentication. This channel has no automatic ToolBroker approval or per-Tool reconciliation state. Use Agent Tools when a write requires that approval flow.
+
+Original keys do not enter new Harness invocations. Delegated tokens still convey authority: never log them or include them in model context/artifacts. Delegation does not grant the entire upstream API. See [credential boundaries](/en/concepts/security-boundaries) and the [Secret contract](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/secret-management.md).
+
+This page was reviewed against both adapters and execution contracts without fresh test-service execution. Acceptance must independently prove read content, zero preapproval writes, one approved write, no duplicate after lost response, absence of raw keys in guests, both SDKs, and cleanup. Examples are not evidence those checks passed.
+
+Sources: [HTTP Tool](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/tools/http-json.ts), [protected HTTP policy](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/access/policy.ts), [Tool reconciliation](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/tool-reconciliation.md).
+
+Next: [approvals](/en/build/approvals), [reconciliation](/en/operate/reconciliation), [credential boundaries](/en/concepts/security-boundaries).

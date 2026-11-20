@@ -1,0 +1,85 @@
+---
+title: "Connect your own model endpoint"
+---
+
+A model connection specifies wire protocol, base URL, exact model ID, and credential. A vendor name is not a protocol; one vendor may expose multiple interfaces.
+
+Use a management identity and an endpoint/model you are authorized to access. Console Infrastructure → LLM offers the same configure/verify/enable flow. The examples read deployment-specific values from private environment configuration.
+
+## Configure Chat Completions
+
+```python
+import os
+from hexagon import Hexagon
+client = Hexagon.local()
+model = client.create_connection(
+    kind='model', provider='openai-compatible', name='Application model',
+    credential=os.environ['MODEL_API_KEY'],
+    config={'base_url': os.environ['MODEL_BASE_URL'], 'model': os.environ['MODEL_ID']},
+)
+checked = client.validate_connection(model['id'])
+if checked['status'] != 'ready':
+    raise RuntimeError('Model validation failed; inspect connection diagnostics')
+client.update_connection(model['id'], enabled=True)
+```
+
+```typescript
+import { Hexagon } from '@hexagon/agent-sdk';
+const client = await Hexagon.local();
+const key = process.env.MODEL_API_KEY;
+const base = process.env.MODEL_BASE_URL;
+const id = process.env.MODEL_ID;
+if (!key || !base || !id) throw new Error('Set model configuration');
+const model = await client.createConnection({
+  kind: 'model', provider: 'openai-compatible', name: 'Application model',
+  credential: key, config: { base_url: base, model: id },
+});
+const checked = await client.validateConnection(model.id);
+if (checked.status !== 'ready') throw new Error('Inspect connection diagnostics');
+await client.updateConnection(model.id, { enabled: true });
+```
+
+The base can end in /v1; do not append /chat/completions. Responses should not append /responses. Configure the appropriate root for Messages. See [protocol identifiers](/en/integrations/model-protocols).
+
+## What connection validation actually sends
+
+All three model connection schemas accept exactly `base_url` and `model` in config. The URL must use HTTPS without embedded username/password, query parameters or a fragment. The model ID is a nonempty string of at most 200 characters. Put credentials in the connection credential field, not in the URL or config.
+
+| Provider | Validation request | Minimum response shape accepted |
+| --- | --- | --- |
+| `anthropic-compatible` | POST `/v1/messages`, `x-api-key`, `anthropic-version: 2023-06-01`, user message `Reply OK.`, `max_tokens: 16` | `type: message` and an array `content` |
+| `openai-compatible` | POST `/v1/chat/completions`, Bearer authorization, user message `Reply OK.`, `max_tokens: 16` | A `choices` entry with assistant role and string content |
+| `openai-responses` | POST `/v1/responses`, Bearer authorization, `input: Reply OK.`, `max_output_tokens: 64`, `store: false` | `object: response`, status completed or incomplete, array `output` |
+
+Each validation request has a 30-second timeout and rejects redirects. It checks protocol shape, not that the answer literally equals OK. Responses may pass validation with an incomplete response, so ready is not proof of task completeness or sufficient output budget. No validation request exercises streaming, Tool calls or multi-turn conversation.
+
+For an illustrative base `https://model.example/service/v1/`, Chat Completions targets `https://model.example/service/v1/chat/completions`. A root ending in an operation such as `/chat/completions` is not automatically corrected. Configure the service's supported API root; do not guess a path from the vendor name. This example domain is not a usable endpoint.
+
+The creation snippets create a new connection every time. Persist the returned connection ID and use update/validate/enable for later changes. If creation's response is lost, inspect existing records before rerunning the create snippet. A friendly display name is not a unique request key.
+
+## Complete a task with a recorded endpoint
+
+For a concrete Chat Completions starting point, the [November 18 matrix](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-18-minimax-matrix.md) records `https://api.minimaxi.com/v1`, model `MiniMax-M3`, and built-in Pi 1.5.2 / OpenCode 1.2.27 through independent Python and TypeScript tasks. Supply your own authorized credential and these values to the configuration example only if this is your intended service. This is historical evidence, not a current account check.
+
+Save the enabled model connection ID, choose the exact Harness and a verified Sandbox combination, then use the [first Session programs](/en/start/first-session) with that selection. Keep their persistent journal, artifact-content checks, close and retention checks intact. Run both clients independently. The November 20 first-Session evidence uses a different configured Messages endpoint and does not prove this Chat configuration was rerun by that tutorial.
+
+| Failure observed | Inspect next | Avoid concluding |
+| --- | --- | --- |
+| DNS, TLS or request timeout | Control-plane route to the configured API root | The API key is necessarily wrong |
+| `model_validation_failed` | Account permissions, quota, exact model ID and provider diagnostics | This generic error uniquely identifies 401 or a missing model |
+| `model_response_invalid` after HTTP success | Protocol response shape and chosen operation | HTTP 200 proves compatibility |
+| `incompatible_model` at preflight | Selected Harness registration and wire protocol | Credential rotation will convert the protocol |
+| Validation passes but Run cannot reach model | Sandbox-to-credential ingress, then upstream network | Control-plane validation proves both network legs |
+| Text works but Tool/continuation fails | Exact Harness/model feature behavior and task evidence | A greeting test proves the full Agent journey |
+
+## Use and verify
+
+Pass the connection ID as model_connection_id with a compatible Harness. Verification sends a bounded model request and can consume usage. It does not establish complete Agent Tool or continuation behavior.
+
+Original keys remain in the control plane. Guests receive bounded grants or native placeholders through protected access, not account keys in ordinary environment. Do not repair networking by putting the original key into prompts.
+
+Check URL, protocol, model ID, account permissions, and quota, then distinguish control-plane upstream access from Sandbox credential ingress. model_response_invalid means an unexpected validation response shape; HTTP 200 alone does not establish compatibility. Revalidate/re-enable after edits and account for pinned Session configuration.
+
+Complete a real task, required Tools/continuation/streaming, and cleanup. Historical [model evidence](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/execution-matrix.md) helps select a starting combination but does not replace fresh evidence.
+
+Sources: [Chat Completions adapter](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/models/openai-compatible.ts), [Responses](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/models/openai-responses.ts). Next: [protocol compatibility](/en/integrations/model-protocols), [choose a combination](/en/integrations/choose), [network ingress](/en/operate/networking).

@@ -1,0 +1,93 @@
+---
+title: "Connect Freestyle VMs"
+---
+
+The current connector uses Freestyle VMs for files, commands, private preview, and pause/start. The repository pins `freestyle@0.2.23`; do not copy older SDK interfaces without checking compatibility. OCI Harness and domain allowlists are not currently declared.
+
+## Configure a connection
+
+Prepare an API key with VM management permissions. The only config field is snapshot, accepting `freestyle/ubuntu-sm` (default) or `freestyle/ubuntu`. This selects a provider snapshot, not an arbitrary OCI reference. There are no separate CPU/memory config fields; inspect allocated resources from provider information.
+
+These local management examples read a private key. See [self-hosting](/en/operate/self-host) for hosted initialization. Credentials stay in the control plane, not project files. Each execution creates a connection; retain and reuse its ID.
+
+```python
+import os
+from hexagon import Hexagon
+client = Hexagon.local()
+connection = client.create_connection(
+    kind="sandbox", provider="freestyle", name="Freestyle workspace",
+    credential=os.environ["FREESTYLE_API_KEY"],
+    config={"snapshot": "freestyle/ubuntu-sm"},
+)
+checked = client.validate_connection(connection["id"])
+if checked["status"] != "ready":
+    raise RuntimeError("Inspect Freestyle connection diagnostics")
+client.update_connection(connection["id"], enabled=True)
+```
+
+```typescript
+import { Hexagon } from '@hexagon/agent-sdk';
+const client = await Hexagon.local();
+const credential = process.env.FREESTYLE_API_KEY;
+if (!credential) throw new Error('Set FREESTYLE_API_KEY');
+const connection = await client.createConnection({
+  kind: 'sandbox', provider: 'freestyle', name: 'Freestyle workspace', credential,
+  config: { snapshot: 'freestyle/ubuntu-sm' },
+});
+const checked = await client.validateConnection(connection.id);
+if (checked.status !== 'ready') throw new Error('Inspect Freestyle connection diagnostics');
+await client.updateConnection(connection.id, { enabled: true });
+```
+
+Validation only lists VMs; ready does not establish allocation quota or every execution permission. Explicitly enable, then use connection.id for Session creation. Revalidate/enable after snapshot or credential changes; existing Sessions remain pinned.
+
+## Execution and file permissions
+
+Run the [first Session](/en/start/first-session) independently in Python and TypeScript. In addition to artifacts, verify that the Harness actually reads an uploaded file. File API success alone is insufficient.
+
+The filesystem API creates root-owned 0600 files. The connector explicitly runs foreground/background commands as guest root to avoid a mismatch with the provider's default uid. A non-root process launched by your task may not read those files. Set minimum required permissions explicitly when another user needs access; do not make the whole workspace publicly readable.
+
+Guest root does not provide control-plane account credentials or isolation between untrusted processes in the same Sandbox. Original provider credentials are not injected into the guest. Commands have remote deadlines, defaulting to 60 seconds with a 1–3600 range. A background pid still requires Runtime/service health checks.
+
+## Check the reader, not only the upload
+
+Use the [project input workflow](/en/build/project-context) to upload `permission-check.txt` with known content. Ask the Harness to run `id`, inspect that file's owner/mode with `stat`, and read its bytes from the task workspace. Save the actual exit status and compare the content with the uploaded input. A successful upload followed by permission denied is a failed task. If the application intentionally drops privileges, repeat the read through that application's actual user and grant access only to the needed file and parent directories. A read by root does not prove a read by the application user.
+
+After confirmed pause/start, repeat the read in the original Session, check conversation continuation and required service health, and finally close and confirm VM absence. These are verification instructions, not fresh cloud results. The local connector test verifies that both foreground and background requests specify `linuxUser: root`; it does not exercise live guest ownership or application users.
+
+## Private preview and transport
+
+[Private preview](/en/build/private-preview) carries HTTP over raw PTY bytes without creating public domains or ingress. Browsers use Hexagon authorization; the provider key stays in the control plane.
+
+The current relay has a 45-second remote execution deadline, an 8 MiB queued-output bound, and a 16 MiB cumulative-input bound. 8 MiB is not a total response size limit. Input includes protocol bytes, not just uploaded file contents. Verify long requests, slow consumers, and large transfers under real workloads; unlimited preview streams are not promised. Treat interrupted transfers as failures rather than complete files.
+
+Diagnose running VM state, listening application, PTY setup, Runtime health, and user authorization. Do not bypass failures with public ports or browser-exposed keys.
+
+## Idle pause and active deadlines
+
+The platform uses native pause/start with a memory-and-filesystem preservation strategy. This does not prove that every Harness, connection, or service is immediately usable after arbitrary suspension. The next turn still needs health checks and exact-combination evidence. Submit to the same Session for automatic wake; the application need not call provider start.
+
+Creation disables provider TTL, automatic deletion, idle timeout, and automaticRestart. The control plane manages active deadlines and idle policy. Downtime can delay pause/cleanup. Pause is not deletion and does not establish zero billing.
+
+Following [idle and wake](/en/build/idle-and-wake), verify first-turn writes, second-turn reads, conversation, required preview, and close. A preservation strategy is not proof of fault-free recovery.
+
+## Ownership and cleanup
+
+Creation derives an account-unique slug from the persisted operation ID. Reconciliation matches both slug and metadata.hexagon_operation. Never reassign an existing slug to overwrite an unknown outcome. Transport/authentication errors do not mean absence.
+
+Close deletes the VM and inspects again. Confirm deletion only after absence; a still-visible VM produces freestyle_deletion_unconfirmed. Keep original IDs and [reconcile](/en/operate/reconciliation) rather than replacing uncertain resources with another Session.
+
+| Symptom | Investigate |
+| --- | --- |
+| Validation/allocation failure | API key, snapshot, account permissions/quota |
+| Upload succeeds but task cannot read | Actual process user, owner, and 0600 permissions |
+| freestyle_sandbox_not_running | VM state and normal Session wake |
+| freestyle_command_completion_unknown | Original command before repeating effects |
+| freestyle_tunnel_disconnected | PTY, deadline, consumption rate, service/connection state |
+| freestyle_deletion_unconfirmed | Original VM deletion state |
+
+This page is reviewed against the SDK dependency, connector, and transport, without new cloud execution. Historical tasks are scoped in the [execution matrix](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/execution-matrix.md); recovery evidence is in the [serverless ledger](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-harness-serverless-matrix.json).
+
+The [scoped retained-evidence review](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-docs-provider-recovery-reuse.json) connects the recorded paths: the real OpenCode 1.2.27 project journey uploaded seven files, verified their input receipt, produced `filter.mjs` and `test-report.txt`, retained the unchanged fixed test, passed independent tests through both SDK journeys, and confirmed deletion. Separate OpenCode idle/wake records verify workspace and native conversation retention through both SDKs, followed by closure. This supports the tested execution-user path; it does not guarantee readability under arbitrary users or prove arbitrary process/memory retention.
+
+Sources: [connector](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/sandboxes/freestyle.ts), [transport](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/sandboxes/freestyle-transport.ts). Next: [project files](/en/build/project-context), [idle and wake](/en/build/idle-and-wake), [troubleshooting](/en/operate/troubleshooting).

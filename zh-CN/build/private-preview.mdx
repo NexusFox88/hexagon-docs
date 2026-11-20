@@ -1,0 +1,83 @@
+---
+title: "安全地预览 Agent 创建的 Web 应用"
+---
+
+私有预览把 Session 内某个 HTTP 端口通过短期授权提供给浏览器。适用于检查 Agent 创建的页面和交互；它不等于生产应用发布。
+
+需要尚未关闭的 Session、已创建的云 Sandbox、支持私有访问的 Provider，以及正在监听的 HTTP 服务。创建授权不会替你启动 Web 服务。
+
+## 启动被预览的服务
+
+要求 Agent 在工作区创建一个简单 HTML 页面并启动 HTTP 服务，明确端口，例如 3000。先让任务通过本地 HTTP 请求确认服务返回预期内容，再申请预览。
+
+需要进程跨越 Harness 退出继续运行时，应使用对应 Runtime / Provider 可支持的后台方式；不要只看到一条“started”文本就认为进程仍然存活。初次测试使用不依赖 WebSocket、外部资源或登录 cookie 的静态页面，更容易定位传输问题。
+
+## 创建和撤销授权
+
+以下片段接续已初始化的 `client` 和已授权的 Session ID。需要在撤销前实际打开 URL 完成验证。
+
+```python
+preview = client.create_preview(session_id, port=3000, ttl_seconds=600)
+# 在有权访问的浏览器中打开 preview['url']；不要写入公共日志。
+# 完成页面检查后：
+client.revoke_preview(preview['id'])
+```
+
+```typescript
+const preview = await client.createPreview(sessionId, 3000, 600);
+// Open preview.url in an authorized browser; do not write it to public logs.
+// After completing the inspection:
+await client.revokePreview(preview.id);
+```
+
+可选端口范围为 3000—8999，但排除 Runtime 管理端口 8765。授权寿命为 30—3600 秒，默认 600 秒。返回包含授权 ID、到期时间和访问 URL。
+
+## 访问边界
+
+本地预览默认使用 8788 端口，每个授权具有不同的 `<id>.localhost` origin。入口 ticket 换取 host-only HttpOnly cookie，并从地址栏移除。每次请求检查授权是否到期、撤销，以及 Session 是否仍可用。关闭 Session 会使预览失效。
+
+Provider 访问凭据由服务端使用，不交给浏览器。URL 的 ticket 本身也是访问凭据，分享 URL 就可能授予接收者访问能力。应用只应把它交给已通过业务权限检查的用户。
+
+hosted 部署需要独立预览域名、通配路由和 TLS。预览内容不能与 Console 共用 origin；Agent 生成的 HTML 是不可信应用内容。
+
+## 当前支持范围
+
+支持同一预览 origin 下的 HTTP 页面、静态资源、表单和 API 请求。当前不支持 WebSocket upgrade、上游应用 cookie、任意外部重定向与外部浏览器资源。因此依赖 HMR WebSocket 的开发页面或依赖外部 CDN 的页面可能不完整；先验证普通 HTTP 页面，再逐项定位需求。
+
+Run 完成不意味着预览服务被自动关闭，也不保证它一定仍在运行。后台进程、空闲暂停、到期和 Session 关闭都会影响访问。暂停后的内存 / 进程连续性依赖 Provider，不能把预览当永久网址。
+
+## 更新访问而不重做任务
+
+grant 的有效期与 HTTP 进程、Run 和 Session 的生命周期分别独立。撤销 grant 只撤销该次访问，不停止服务器或关闭 Session；反过来，尚未过期的 grant 也不能让暂停、关闭或已到资源期限的 Session 可用。重新创建 grant 不会修复已退出的进程。
+
+| 情况 | 处理方式 |
+| --- | --- |
+| 已知 grant 过期，Session 开放且服务健康 | 显式申请新 grant，为有权限的用户更新链接。 |
+| 链接不应继续可用 | 用保存的 grant ID 撤销，验证旧 URL/cookie 已被拒绝。 |
+| 创建 grant 的响应丢失 | 保留请求时间、Session 和申请时长。此流程没有 grant 创建幂等键或公开列表端点；不能声称原 grant 不存在或已撤销，应考虑其可能仍有效的时段，再决定是否申请另一个。 |
+| 浏览器已关闭 | 若访问仍有效，可重新打开；仅观察同一服务器不需要新 Run。 |
+| Session 已关闭 | 使用保留产物交付；新 grant 不能恢复已移除的工作区。 |
+
+私下保存返回的 grant ID 和到期时间，便于之后撤销。新 grant 使用不同 origin，不是稳定 URL 别名，也不继承旧 origin 的浏览器存储。不要将生产应用数据和凭据放进生成的预览页面。
+
+## 故障与成功条件
+
+`preview_session_unavailable` 表示先检查 Session 是否 open、有云资源、未过期；创建授权成功但加载失败时，检查服务端口和进程、Provider 私有访问、控制平面代理，再检查浏览器 origin / TLS。不要为预览问题重复创建 Run 或公开供应商端口。
+
+用真实浏览器操作页面，随后分别验证无授权、自然过期、显式撤销和关闭 Session 后的拒绝行为。不同授权的 cookie 不应相互通用。当前文章依据实现核对，未宣称本轮完成这些浏览器验收。
+
+实现依据：[授权生命周期](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/previews.ts)、[现有 SDK 支持范围](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/README.md#web-previews)。下一步：[获取产物](/zh-CN/build/artifacts)，将需要保留的交付文件独立导出。
+
+## 区分浏览器行为、访问控制与进程存活
+
+使用[项目教程](/zh-CN/start/project-task)取得具体交互页面。第一轮 Run 完成、Session 仍打开时，检查筛选和空结果；追问后检查重置。私下记录 grant ID 与到期时间，含 ticket 的 URL 不进入共享截图或日志。
+
+匿名访问使用没有 ticket、也没有已有预览 cookie 的独立浏览器上下文。自然过期检查使用短期 grant，对照实际时钟与声明的到期时间；保持 Session 和 HTTP 进程存活，避免把服务停止误判为到期控制。显式撤销时只撤销保存的测试 grant，再检查旧 cookie 和 ticket。最后关闭 Session、确认清理，再检查原本有效的旧预览不再返回页面。这些访问控制检查都不能替代页面功能检查。
+
+| 已有记录 | 能证明的范围 |
+| --- | --- |
+| [11 月 20 日项目教程](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-project-docs-cloud.json) | Python、TypeScript 独立 Vercel/Pi 项目执行、真实浏览器筛选与重置、导出留存、关闭后拒绝；不覆盖自然过期。 |
+| [11 月 15 日自然过期](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-preview-natural-expiry.md) | E2B/OpenCode 云 HTTP 服务、实际等待 30 秒、旧 ticket/cookie 被拒、跨 grant 拒绝、撤销和匿名及关闭访问。网络传输保留虚拟 Host，与浏览器交互检查不同。 |
+| [11 月 15 日浏览器旅程](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-web-preview-journey.md) | 实际浏览器筛选交互、地址栏移除 ticket、HttpOnly cookie 不可读，以及 Run 完成后仍能访问页面。 |
+
+这些记录均有日期与范围；历史文档中的 Provider 能力说明不代表当前支持矩阵。请按目标组合核对[当前 Sandbox 能力](/zh-CN/integrations/sandboxes)。依据：[预览代理](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/preview-server.ts)、[验收旅程](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/acceptance.md)。下一步：[预览网络配置](/zh-CN/operate/networking)、[持久化](/zh-CN/concepts/persistence)、[Sandbox 能力](/zh-CN/integrations/sandboxes)。

@@ -1,0 +1,126 @@
+---
+title: "Let idle Sessions sleep and wake automatically"
+---
+
+Between Runs, a Session can use an idle strategy and prepare execution automatically on the next submission. Keep the same Session ID; an explicit resume call is not required before each submit.
+
+Select a compatible Sandbox/Harness lifecycle combination. A single successful turn does not establish recovery coverage. Check the exact combination and SDK in the [Harness serverless ledger](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-harness-serverless-matrix.json).
+
+## Configure idle policy
+
+```python
+session = client.create_session(
+    harness={'id': 'pi', 'version': '1.5.2'},
+    sandbox_connection_id=sandbox_connection_id,
+    model_connection_id=model_connection_id,
+    resources={'idle_timeout_seconds': 60},
+)
+```
+
+```typescript
+const session = await client.createSession({
+  harness: { id: 'pi', version: '1.5.2' },
+  sandbox_connection_id: sandboxConnectionId,
+  model_connection_id: modelConnectionId,
+  resources: { idle_timeout_seconds: 60 },
+});
+```
+
+The current default is 60 seconds, minimum 15, with eligibility polled every five seconds. This is not an exact suspension-completion deadline. Provider-managed standby can happen earlier on its own schedule.
+
+Authorization and approval waits are active Runs, not idle time between turns. Expose an action to resolve the wait rather than trying to pause it away.
+
+## Explicit pause and resume through the SDK
+
+Use an initialized owner client, the saved Session ID and a lifecycle-compatible Sandbox. These independent helpers are operational actions; defining them makes no request. Do not call them as a pause/resume loop. The TypeScript examples use `Hexagon` imported during SDK setup.
+
+```python
+def request_session_pause(client, session_id, scope):
+    if scope not in ('session', 'sandbox'):
+        raise ValueError('Choose session or sandbox scope explicitly')
+    transition = client.pause(session_id, scope=scope)
+    observed = client.session(session_id)
+    return {'transition': transition, 'observed_session': observed}
+
+
+def request_session_resume(client, session_id):
+    transition = client.resume(session_id)
+    observed = client.session(session_id)
+    return {'transition': transition, 'observed_session': observed}
+```
+
+```typescript
+async function requestSessionPause(
+  client: Hexagon, sessionId: string, scope: 'session' | 'sandbox',
+) {
+  if (scope !== 'session' && scope !== 'sandbox') {
+    throw new Error('Choose session or sandbox scope explicitly');
+  }
+  const transition = await client.pause(sessionId, scope);
+  const observed = await client.session(sessionId);
+  return { transition, observed_session: observed };
+}
+
+async function requestSessionResume(client: Hexagon, sessionId: string) {
+  const transition = await client.resume(sessionId);
+  const observed = await client.session(sessionId);
+  return { transition, observed_session: observed };
+}
+```
+
+
+Choose `session` for the logical pause scope or `sandbox` only when native compute suspension is supported and intended. The helper deliberately requires scope rather than silently treating logical pause as stopped billing. The server remains authoritative for capability, ownership and active-Run checks. Pause cannot settle a pending authorization/approval Run; finish or deliberately cancel that work through its own flow first.
+
+Each helper returns the transition response and a later Session GET. They are separate observations: another operation can occur between them. A repeated request may return only state/scope, so missing `compute_paused` or `provider_managed_standby` must not be interpreted as a new provider inspection. The helpers do not wait for Runtime readiness or assert process/memory survival; use the task and preservation checks below.
+
+HTTP/network failures propagate. `session_transition_pending`, `session_pause_scope_conflict` and `sandbox_pause_unsupported` need state/scope/capability investigation, not rapid retries or an opposite transition. If the mutation succeeded but the following GET failed, the helper throws even though the transition may already have happened. Read the original Session and resource operations before any further action. Closed Sessions cannot be resumed. For normal next-turn work, submitting to the same paused Session can trigger wake automatically; explicit resume is not a prerequisite. Full shapes and errors: [Session lifecycle contract](/en/reference/sessions).
+
+## Preservation boundaries
+
+| Strategy | Current Provider examples | Dependency boundary |
+| --- | --- | --- |
+| Memory pause | E2B, Freestyle, Instabox | Memory and files under the current strategy; verify the exact combination |
+| Filesystem retention / Runtime restart | Vercel, Upstash, Boat, Agent37 | Managed workspace, not arbitrary temporary paths or processes |
+| Snapshot and recreate | Modal | Stable Session identity, changing cloud resource ID |
+| Suspend with cold-boot fallback | Fly Machines | Filesystem is authoritative; memory is not guaranteed |
+| Provider-managed standby | Blaxel, Sprites | Platform waiting time does not prove billing state |
+
+Agent37 clears `/tmp`. Temporary files, sockets, background services, and arbitrary memory are not portable persistence guarantees. Original managed model/Tool keys are not added to snapshots as ordinary guest configuration; user-supplied environment values retain their normal readability boundary.
+
+## Read the effective policy and current state
+
+Inspect `session_initialization` / `sessionInitialization` for the pinned lifecycle policy and `session` for current `state`, `pause_scope` and Sandbox binding. The effective idle interval is capped at `timeout_seconds - 10`; the configured idle value alone does not describe the complete deadline behavior. For example, requesting idle 60 with timeout 60 produces an effective idle interval of 50 seconds. Polling and Provider operations can add delay.
+
+A Session can be logically paused without proof that compute billing stopped. Check `pause_scope` and the Provider's documented strategy. Likewise, `resuming` is not evidence that Runtime readiness has completed. Keep the submitted Run ID and observe its initialization and execution; do not issue a second task merely because waking takes time.
+
+For an idle/wake acceptance exercise, record the first Run, its file hash, a conversation fact, the observed Session state and pause scope, the second Run, and its independent file/recall checks. Do not replace an observed transition with a fixed sleep and an assumption. Preserve both old and new cloud resource IDs when the strategy recreates resources, then confirm final cleanup.
+
+## Continue and verify
+
+In turn one, write a managed workspace file and supply a recognizable conversation fact. Observe the lifecycle transition, then submit turn two to the same Session with a new idempotency key. Check file contents and conversation recall independently.
+
+If the resource ID changes, use the Session's current binding instead of a cached Provider ID. Waking is not permission to replay an invocation with an unknown outcome.
+
+Sleep differs from terminal close. Closing ends the Session and removes cloud resources. Sleeping may still incur storage costs and remains subject to retention/account limits. Explicitly close and confirm cleanup when finished.
+
+Source: [Serverless strategies and evidence](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/serverless-sessions.md). For interrupted work, follow [recovery](/en/build/recovery).
+
+## Measure the idle transition rather than browser inactivity
+
+The idle selector requires an open Session with allocated Sandbox and supported lifecycle capability, with no nonterminal Run. Its timer uses the later of Session `updated_at` and the latest Run `updated_at`. Closing a browser or receiving the last token does not start an independent browser-idle clock. An authorization/approval wait keeps a Run nonterminal; Session/resource expiry is a separate limit and can still end the task.
+
+For example, a 60-second effective interval makes the Session eligible only after the recorded activity boundary plus that interval. The five-second sweep and remote operation then add delay. If it remains open, inspect policy, active Runs and lifecycle diagnostics rather than repeatedly issuing pause or wake requests.
+
+## Record preservation as separate observations
+
+| Property | Evidence needed | What not to infer |
+| --- | --- | --- |
+| File content | Independent workspace bytes/hash before and after wake | Model readback alone is not a byte-integrity check. |
+| Conversation | Same recorded native conversation identity where supported, plus a checkable earlier fact | File retention alone does not prove conversational continuity. |
+| Process or memory | Explicit before/after process and in-memory-state probes | A provider strategy label or retained native ID does not prove arbitrary process survival. |
+| Compute identity | Original and current resource IDs plus restore/checkpoint operation | Stable Session ID does not mean the same VM. |
+| Cleanup | Confirmed compute and owned checkpoint/image disposition | Successful follow-up or paused state does not prove deletion. |
+
+The [November 19 serverless record](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-harness-serverless-ui.md) explains real idle/wake attempts, independent file/native-session checks and failures. Its linked matrix records per-SDK results; it does not contain a universal arbitrary-process or memory-retention assertion. Record those unmeasured properties as unverified for an exercise instead of adding them to a “passed” claim. The later [E2B OCI preparation record](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-e2b-oci-preparation.md) adds scoped evidence after that matrix snapshot; do not rewrite an earlier unsupported cell as a test that happened then.
+
+Sources: [idle eligibility](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/lifecycle.ts), [worker restoration](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/worker.ts). Next: [Serverless lifecycle](/en/concepts/serverless-lifecycle), [Sandbox capabilities](/en/integrations/sandboxes), [capacity and cost](/en/operate/capacity-and-cost).

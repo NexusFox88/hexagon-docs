@@ -1,0 +1,179 @@
+{
+  "results": [
+    {
+      "path": "docs/product/en/concepts/events-and-recovery.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/events-and-recovery.md",
+      "index": 2,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/events-and-recovery.md",
+      "index": 3,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/execution-architecture.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/execution-architecture.md",
+      "index": 2,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/execution-architecture.md",
+      "index": 3,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/execution-architecture.md",
+      "index": 4,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/initialization.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/initialization.md",
+      "index": 2,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/initialization.md",
+      "index": 3,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/security-boundaries.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/serverless-lifecycle.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/en/concepts/sessions-runs-agents.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/events-and-recovery.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/events-and-recovery.md",
+      "index": 2,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/events-and-recovery.md",
+      "index": 3,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/execution-architecture.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/execution-architecture.md",
+      "index": 2,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/execution-architecture.md",
+      "index": 3,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/execution-architecture.md",
+      "index": 4,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/initialization.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/initialization.md",
+      "index": 2,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/initialization.md",
+      "index": 3,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/security-boundaries.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/serverless-lifecycle.md",
+      "index": 1,
+      "passed": true
+    },
+    {
+      "path": "docs/product/zh-CN/concepts/sessions-runs-agents.md",
+      "index": 1,
+      "passed": true
+    }
+  ],
+  "svgCount": 26,
+  "scope": "Temporary loopback gallery in ego-browser space 79, closed after review. Not the final documentation site.",
+  "mermaid_version": "12.3.0",
+  "configuration": {
+    "theme": "neutral",
+    "securityLevel": "strict",
+    "htmlLabels": false,
+    "flowchart": {
+      "htmlLabels": false
+    }
+  },
+  "visual_review": {
+    "desktop_samples": [
+      "en/execution-architecture diagram 2",
+      "zh-CN/execution-architecture diagram 2 before and after fix"
+    ],
+    "fixed": "Chinese Harness word split and verbose connector label; explicit line break and shorter edge labels now visible.",
+    "narrow_sample": {
+      "page": "en/events-and-recovery diagram 2",
+      "viewport_width": 390,
+      "svg_css_width": 292,
+      "svg_viewbox_width": 1727.5,
+      "verdict": "unreadable when auto-shrunk; final site must provide readable scrolling or zoom"
+    },
+    "remaining": "Other diagram visual reviews and final-site responsive/accessibility checks remain open."
+  },
+  "screenshots": [
+    ".local/docs-diagram-review/concept-responsibility-bilingual.png",
+    ".local/docs-diagram-review/concept-responsibility-zh-fixed.png",
+    ".local/docs-diagram-review/concept-worker-narrow.png"
+  ],
+  "source_sha256": {
+    "docs/product/en/concepts/events-and-recovery.md": "603ea1d3a3d78a2a08b3dbc1d3c00c03fc5fe062c1824880aae82ccb9a4228fb",
+    "docs/product/en/concepts/execution-architecture.md": "9d05cff27367b0ed150105347b1fc806e48c2be3392a21d5b1f85ae9f78de580",
+    "docs/product/en/concepts/initialization.md": "94b8fe902eed136e1b01fb59c752705265212a5ae39887231cb0b0abacc4e711",
+    "docs/product/en/concepts/security-boundaries.md": "5b8cff0779a768ea38658bb1df06acfcccb149f33954ced27988fe60d630fd1d",
+    "docs/product/en/concepts/serverless-lifecycle.md": "20fd2229d47af7227337c1df19c4f89f0cf26e50e55030e65cd33dfbec3b280e",
+    "docs/product/en/concepts/sessions-runs-agents.md": "327b5d53166f773d58fa82031678fc3bfbf2ec0457ee54d227f65ce4ca1f1d64",
+    "docs/product/zh-CN/concepts/events-and-recovery.md": "b7b89dce4dd7768b7b58d5b52f5350797d87fe64e97d0365ab6e2a929952f01e",
+    "docs/product/zh-CN/concepts/execution-architecture.md": "c77559aa1f654a4f5201dde89a1049d1504c656e5b72ead98b04db50deaf088e",
+    "docs/product/zh-CN/concepts/initialization.md": "67667bc02964c71d934978d12670984bf99575572647f1921836cc1aa7931b9a",
+    "docs/product/zh-CN/concepts/security-boundaries.md": "b1f0ca0070e552ffa926d10d8b069acf1389c6e8b807f450ab9644aca34dc520",
+    "docs/product/zh-CN/concepts/serverless-lifecycle.md": "e3ca738e0a32e687f081999d7c2813518aabb0dee47aa8189471df87274add0d",
+    "docs/product/zh-CN/concepts/sessions-runs-agents.md": "c8d9359d83b4c20f41ae2572f3bfac0e5aa3ea22a419399164dc64efbb484737"
+  }
+}

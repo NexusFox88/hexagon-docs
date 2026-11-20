@@ -1,0 +1,42 @@
+{
+  "scope": "O10/O11 bilingual content and source review; hypothetical cost arithmetic and dated fault case, not a new load test or cloud fault injection.",
+  "page_sha256": {
+    "docs/product/en/operate/capacity-and-cost.md": "e60782b02d0b261e33c5639d0fa4a76d807fee5fb19deab87b4f93d6d5326404",
+    "docs/product/en/operate/troubleshooting.md": "a527cbd389ea538c320bc7c2536dd2e6315dfdaccd5e92dd40d2eaf01c23a5fb",
+    "docs/product/zh-CN/operate/capacity-and-cost.md": "76cbded55521750ebfe88a47c4bf61ede69c58be6e099e7e3d8dbcfbd031bfbf",
+    "docs/product/zh-CN/operate/troubleshooting.md": "c043e4cafc5d5f74d00e048554ebbd81e4ec8c80723adf9603075d24e1097f46"
+  },
+  "findings": [
+    "Occupancy sensitivity includes startup, retention and additional attempts; resource interval union avoids double counting shared resources.",
+    "Default startup creates one serial worker; leases do not prove arbitrary horizontal scale.",
+    "Added explicit authorization, approval, model failure and unknown Tool write symptoms with completion signals.",
+    "Seven diagnostic layers separated; historical ingress recovery is dated and scoped.",
+    "Cleanup wording follows Provider-specific deletion completion evidence instead of universal absence-only rule."
+  ],
+  "sources": [
+    "apps/control-plane/main.ts",
+    "modules/execution/worker.ts",
+    "docs/serverless-sessions.md",
+    "examples/documentation/inspect-run.py",
+    "examples/documentation/inspect-run.ts",
+    "testing/evidence/2026-11-18-automatic-credential-ingress.md"
+  ],
+  "arithmetic": {
+    "startup_resource_hours": 4.0,
+    "retention_resource_hours": 8.0,
+    "retry_resource_hours": 1.6,
+    "total_resource_hours": 29.6
+  },
+  "checks": [
+    {
+      "command": "python3 tooling/check-product-docs.py --report testing/evidence/2026-11-20-product-docs-structure.json",
+      "exit_code": 0,
+      "scope": "82 assets, 193 Markdown files; file targets/fences/index only."
+    }
+  ],
+  "limitations": [
+    "No Provider price quoted or current account tariff verified.",
+    "No new cloud fault injection or load test; historical recovery applies only to recorded combination.",
+    "No rendered article or external-link check in this review; global publication gates remain."
+  ]
+}

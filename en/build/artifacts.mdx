@@ -1,0 +1,129 @@
+---
+title: "Retrieve, retain, and deliver artifacts"
+---
+
+An Artifact is an exported Run file snapshot stored by the control plane. It remains downloadable after the Session's cloud resources are closed.
+
+Continue from the [first Session guide](/en/start/first-session) with an authorized Run ID and initialized client.
+
+## Ask for exported deliverables
+
+Tell the Agent to write deliverables into its supplied Run artifact directory, currently `artifacts/<run-id>/` within the workspace. Each Run has its own directory. Saving somewhere in the project does not automatically export a file.
+
+The worker exports files after the Harness exits and before completing the Run. Limit violations fail visibly rather than silently dropping files. Query actual artifact metadata instead of relying on the assistant's claim that it created a file.
+
+## Download and verify
+
+```python
+from pathlib import Path
+import hashlib
+import json
+import tempfile
+output = Path(tempfile.mkdtemp(prefix='hexagon-downloads-'))
+items = client.artifacts(run_id)['artifacts']
+manifest = []
+for index, item in enumerate(items):
+    data = client.download_artifact(item['id'])
+    if len(data) != item['size'] or hashlib.sha256(data).hexdigest() != item['sha256']:
+        raise RuntimeError('Artifact integrity mismatch')
+    filename = f'output-{index}.bin'
+    with (output / filename).open('xb') as destination:
+        destination.write(data)
+    manifest.append({
+        'filename': filename, 'artifact_id': item['id'],
+        'original_name': item['name'], 'run_id': run_id,
+        'size': len(data), 'sha256': item['sha256'],
+    })
+with (output / 'manifest.json').open('x', encoding='utf-8') as destination:
+    json.dump(manifest, destination, ensure_ascii=False, indent=2)
+    destination.write('\n')
+print(output)
+```
+
+```typescript
+import { mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createHash } from 'node:crypto';
+const output = await mkdtemp(join(tmpdir(), 'hexagon-downloads-'));
+const { artifacts } = await client.artifacts(runId);
+const manifest: Array<{
+  filename: string; artifact_id: string; original_name: string;
+  run_id: string; size: number; sha256: string;
+}> = [];
+for (const [index, item] of artifacts.entries()) {
+  const bytes = await client.downloadArtifact(item.id);
+  if (bytes.length !== item.size || createHash('sha256').update(bytes).digest('hex') !== item.sha256)
+    throw new Error('Artifact integrity mismatch');
+  const filename = `output-${index}.bin`;
+  await writeFile(join(output, filename), bytes, { flag: 'wx', mode: 0o600 });
+  manifest.push({
+    filename, artifact_id: item.id, original_name: item.name,
+    run_id: runId, size: bytes.length, sha256: item.sha256,
+  });
+}
+await writeFile(join(output, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n',
+  { flag: 'wx', mode: 0o600 });
+console.log(output);
+```
+
+Each execution creates a private temporary directory and writes generated filenames exclusively. The printed directory is retained for inspection; move verified downloads to your application storage and remove temporary copies when finished. The example writes `manifest.json`, mapping each generated filename to its Artifact ID, original name, Run ID, size and hash. The manifest is written only after every listed download passes integrity checks. If execution stops earlier, the directory can contain partial downloads; an absent manifest means this batch was not completed. An empty manifest still does not satisfy a task that requires deliverables. Never use a remote name directly as a local destination.
+
+Metadata includes name, size, SHA-256, Session ID, Run ID, and creation time. Downloads return binary content. Authorize business users again before delivery and select a safe response content type and download filename.
+
+## Decide whether a deliverable is complete
+
+A matching hash proves that downloaded bytes match the exported snapshot; it does not prove that code is correct, a report is accurate or the Agent ran the requested tests. Define required artifact names and task-specific checks before execution. An empty list satisfies none of those requirements even if the Run is completed. Keep the final assistant answer, Run outcome and artifact validation as separate records.
+
+The worker attempts capture for non-interrupted terminal invocations, including failed or cancelled execution. Such files may be useful partial results, not approved deliverables. An interrupted Runtime skips that capture path; do not assume its unexported workspace is available as artifacts. An export failure can also make an otherwise successful Harness task fail. Inspect the Run error and timeline before deciding to repeat any work.
+
+For delivery through your application, authenticate the requester, resolve the Artifact ID through that user's business task, fetch bytes on the backend, verify integrity, and return a download. Use a controlled filename and `Content-Disposition: attachment`; do not render generated HTML on the application's trusted origin. A private preview is the separate mechanism for running generated pages.
+
+## Limits and retention
+
+Current exports allow 64 files, 4 MiB per file, and 8 MiB per Run. Symbolic links and nonregular files are rejected. See the [artifact implementation](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/artifacts/artifacts.ts) and Runtime export logic.
+
+Bytes reside in PostgreSQL. Session closure does not delete them, and subsequent Runs do not overwrite earlier snapshots. This is not an unlimited-capacity or permanent archival guarantee; backups, storage capacity, and deployment retention remain operational responsibilities.
+
+## Diagnose and verify
+
+For an empty list, check terminal state, output directory, actual Harness execution, and export errors. Do not resubmit merely to inspect files. Cross-tenant artifact reads must fail; your application must also check business ownership.
+
+Verify metadata, size, digest, task-specific content, and a second download of the same Artifact ID after Session closure. Keep unresolved cleanup records even when artifact export succeeds.
+
+## A two-file retention exercise
+
+In a dedicated Session, submit a task to write `message.txt` containing exactly `Hello from Hexagon` plus a newline, and `status.json` containing exactly `{"ok":true}` plus a newline, both in the supplied Run artifact directory. Save the submission intent and Run ID as in [backend integration](/en/build/backend-integration). Wait for a terminal Run and require `completed` for this success exercise; inspect errors before proceeding otherwise.
+
+Use the download loop above and additionally compare required names and expected bytes. Do not require the list to contain only these files if the task legitimately exports additional deliverables. Keep the two Artifact IDs and hashes, explicitly close the Session, confirm resource cleanup, then download those same IDs again. The bytes must equal the pre-close downloads. A successful download is evidence of retention, not evidence that resource deletion finished.
+
+Run the complete [Python program](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/artifact-retention.py) or [TypeScript program](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/artifact-retention.ts) from the repository root. Use the SDK installation and enabled connection IDs from the [first Session guide](/en/start/first-session). These programs create independent cloud Sessions and incur Provider/model usage:
+
+```sh
+.local/docs-example-venv/bin/python examples/documentation/artifact-retention.py
+```
+
+```sh
+npm --prefix sdk/typescript run build
+./node_modules/.bin/tsx examples/documentation/artifact-retention.ts
+```
+
+Each program requires the two exact filenames and exact bytes, verifies every exported file's size/hash, waits for `completed`, explicitly closes the Session, and downloads every same Artifact ID again. Additional exports are permitted and also checked. Local files use generated names; original metadata and IDs remain in the private journal. This example's journal is its download record; the earlier reusable snippet instead writes a separate `manifest.json`.
+
+Python records `.local/docs-artifacts-python/`; TypeScript records `.local/docs-artifacts-typescript/`. Success ends at journal phase `closed_and_retention_checked`. A ten-minute observation timeout does not cancel execution. On any error, keep the journal, inspect the recorded Session/Run and resource operations, and follow the first Session recovery table. The program refuses to overwrite an existing journal; do not delete it to retry. After verified cleanup, archive the directory before another independent experiment.
+
+Both programs passed independent real-cloud execution on 2026-11-20 using Vercel, built-in Pi 1.5.2 and the configured Messages endpoint with `deepseek-ai/DeepSeek-V4-Flash`. The [two-file execution record](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-artifact-retention-docs-cloud.json) confirms exact bytes and hashes for both files, completed Runs, closed Sessions, completed resource-deletion records, and identical downloads after closure. This does not certify another combination, infinite retention or a fresh over-limit cloud test. The runnable [project tutorial](/en/start/project-task) provides a broader implemented example: its [dated dual-SDK record](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-project-docs-cloud.json) verifies six required exports per Run, including code and fixed-test results, with retained byte equality after closure on the documented Vercel/Pi/Messages combination.
+
+## Interpret export failures
+
+| Observation | Meaning and response |
+| --- | --- |
+| More than 64 files, a file over 4 MiB, or aggregate over 8 MiB | Runtime raises `artifact_limit_exceeded`. Reduce the intended export set in subsequent authorized work; files are not silently truncated into valid deliverables. |
+| Invalid name or excessive nesting | Names are limited to 512 characters; Runtime rejects control characters/backslashes and nesting beyond eight directory levels. Keep a shallow, regular-file export tree. |
+| Symlink or nonregular file | Export refuses to follow or publish it. Produce an actual regular file in the artifact directory. |
+| Manifest integrity or duplicate-name failure | Control-plane validation rejects invalid content/hash/manifest. Inspect the error; do not treat partial-looking output as confirmed capture. |
+| Same Run/name captured with different bytes | `artifact_conflict` protects the existing snapshot. Query the original artifact rather than assuming it was replaced. |
+
+The Runtime snapshot and the control-plane capture are separate boundaries. Runtime errors can be surfaced through the worker's Run error, rather than as the exact public code of a direct artifact-download request. See [limits](/en/reference/limits) and [errors](/en/reference/errors).
+
+Sources: [capture and download storage](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/artifacts/artifacts.ts), [stored bytes migration](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/storage/006-artifact-content.sql), [Runtime export](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/runtime/server.py). Next: [private previews](/en/build/private-preview), [persistence boundaries](/en/concepts/persistence), [backup and restore](/en/operate/backup-restore).

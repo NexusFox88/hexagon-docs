@@ -1,0 +1,128 @@
+---
+title: "CLI and local management commands"
+---
+
+Hexagon currently exposes npm scripts and a local management launcher. There is no standalone `hexagon deploy` command. Run source commands from the repository root after `npm ci`. The source of truth is [package.json](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/package.json) and [tooling/local.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/tooling/local.ts).
+
+## Invocation and environment
+
+```sh
+npm run local -- status
+npm run local -- doctor
+```
+
+`npm run local` with no subcommand defaults to `status`. Arguments after npm's `--` reach the launcher. It uses positional arguments, not a general option parser. There is no dedicated `--help` branch: unknown subcommands print usage and fail. Do not treat ignored extra arguments as supported flags.
+
+| Variable | Launcher behavior |
+| --- | --- |
+| `HEXAGON_DATA_DIR` | Data directory, resolved relative to the invoking directory; default `.local/control-plane` |
+| `DATABASE_URL` | Database used by doctor, migrations, backup and restore; default `postgres://hexagon@127.0.0.1:55432/hexagon` |
+| `PORT` | Local management health target; default `8787` on `127.0.0.1` |
+| `CLOUDFLARED_BINARY` | Executable checked by doctor; default `cloudflared` |
+| Proxy and credential-ingress environment | Applied with saved deployment settings when starting the managed service; explicit environment can override saved settings |
+
+Use the same data directory, database and port across commands for one installation. The default database URL does not create PostgreSQL or its database. `TEST_DATABASE_URL` belongs to test scripts; it does not select the launcher's database. More deployment settings are covered in [networking](/en/operate/networking).
+
+Every launcher invocation first creates the data directory if absent, including `status`. All subcommands except `status` also acquire an exclusive `operation.lock` there, released on normal completion. A lock conflict is not permission to remove the file: establish whether an operation is still active before investigating a stale lock.
+
+## Managed-service commands
+
+| Command | Output and effects | Failure or limitation |
+| --- | --- | --- |
+| `status` | Prints authenticated health JSON, or `state: stopped` / `unreachable` based on the recorded PID | A stopped/unreachable status can still exit zero; inspect the JSON. No authenticated health means no proof of readiness. |
+| `doctor` | Prints Node, Python, OpenSSH, cloudflared and database checks; database probe is `SELECT 1` | Nonzero when Node or DB is not ready. Missing optional executables are reported but do not alone set failure. It does not verify every dependency version or cloud account. |
+| `start` | Applies DB migrations, loads deployment settings, starts a detached process, appends private `service.log`, records PID and waits for authenticated health | Existing healthy service returns `already_running`. An existing inaccessible managed process blocks another start. Startup deadline is 90 seconds; timeout does not establish process termination. |
+| `stop` | Checks health and process identity, sends SIGTERM, waits up to approximately 30 seconds | Active Runs/busy execution, unverified identity or still-running shutdown cause failure. No forced kill. It does not destroy cloud resources. |
+| `restart` | Executes stop and then start | Stop failure prevents start; not a zero-downtime restart. |
+
+Successful start output includes `state`, Console URL, the owner credential file/field location and credential-access status; it does not print the owner token. Source `npm run dev` starts the control plane in the foreground and is not the managed launcher or a file watcher. Use `npm run db:migrate` before that direct path. Do not run foreground and managed instances against the same dataset accidentally.
+
+Caught launcher failures print a message to stderr and set exit code 1. Normal commands exit zero unless their check sets a failure code. npm also prints its own script wrapper, so the entire `npm run` stdout should not be assumed to be a single JSON document. Do not classify readiness or cleanup using exit code alone.
+
+## Configure deployment settings
+
+```sh
+npm run local -- configure /absolute/path/deployment.json
+```
+
+The file contains the deployment config object, not an API envelope. For a development instance intentionally using no credential ingress:
+
+```json
+{
+  "no_proxy": ["localhost", "127.0.0.1"],
+  "ingress": {"mode": "disabled"}
+}
+```
+
+This replaces the saved config after schema validation and revision checking; it is not a partial merge. Fields omitted from the file take schema defaults. Allowed ingress modes are `cloudflare`, `disabled` and `external` (with an HTTPS origin in `url`). `outbound_proxy` is optional; `no_proxy` defaults to an empty array. See [settings.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/deployment/settings.ts) for exact URL/schema constraints.
+
+The result contains the revision and `restart_required: true`; the command does not restart the service. An explicitly supplied process environment may still override the saved file. Disabled ingress prevents protected cloud execution from reaching the control-plane credential service; it is not a substitute for configuring a working cloud connection. Use [networking](/en/operate/networking) for external ingress and proxy setup.
+
+## Export diagnostics
+
+```sh
+npm run local -- diagnostics /absolute/path/new-diagnostics.json
+```
+
+The destination must not exist and its parent directory must exist. The command writes a mode-0600 JSON file and prints `{"written":true}`. It uses the allowlisted [support projection](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/diagnostics/support.ts): timestamp, platform/architecture/Node, reachability and service-state indicators. It does not bundle raw logs, arbitrary health fields, tokens or user prompts. An unreachable service can still produce a useful report and a successful command exit; check `reachable` and the state fields. Review the report before sharing.
+
+## Offline backup and restore
+
+```sh
+npm run local -- backup /absolute/path/new-private-backup
+```
+
+Stop the service and close all Sessions first. Select the matching source database and data directory explicitly. The destination must be new; its parent must exist. Backup checks local identity and encryption compatibility, dumps the selected database schema with `pg_dump`, and includes `master.key`, `owner.json`, optional deployment settings, a database dump and integrity manifest. Output reports directory, schema, files and `state: verified`. The bundle contains secrets and must remain private. A failed attempt can leave a partial destination; do not reuse it as a verified backup.
+
+```sh
+DATABASE_URL='postgres://hexagon@127.0.0.1:5432/hexagon_restore' \
+HEXAGON_DATA_DIR='/absolute/path/empty-restored-data' \
+npm run local -- restore /absolute/path/private-backup
+```
+
+The destination database must already exist and contain no user tables/views/sequences. The data directory must be absent or empty apart from the launcher's lock. Restore verifies the manifest/hashes, uses `pg_restore`, validates the restored identity, and returns `requires_start: true` and the restored schema. It does not start the service or recreate cloud resources. Configure the restored schema's search path when it is not the default. Backup/restore require PostgreSQL client tools and suitable privileges.
+
+Do not blindly retry a failed restore: database or staging changes may remain. Inspect the failure and use the recovery procedure in [backup and restore](/en/operate/backup-restore). Errors such as `backup_close_sessions_first`, `backup_identity_mismatch`, `restore_database_not_empty` and `restore_integrity_failed` identify distinct corrective actions; never bypass them by deleting the source identity.
+
+## Failure, timeout and partial progress
+
+| Observation | What may already have happened | Next action |
+| --- | --- | --- |
+| `start` reaches its health deadline | Migrations applied, detached child launched, PID/log written | Inspect authenticated status, recorded process identity and private log before another start; the deadline does not kill the child |
+| `stop` reports graceful shutdown pending | SIGTERM sent; worker and listeners may still be draining | Recheck the same process and health; do not infer it stopped or replace it with another instance |
+| `configure` rejects the schema | Existing deployment file remains unchanged | Correct the complete JSON and rerun; no service restart occurred |
+| `diagnostics` reports destination exists | Existing report remains unchanged | Select a new destination; do not assume a new report was produced |
+| `backup_postgres_timeout` | A partial dump/bundle or restore staging directory can remain | Identify whether backup or restore was running, inspect the target, and retain the original source bundle |
+| Restore fails after PostgreSQL work | The database can be restored even though identity validation or file promotion failed | Inspect database and staging together; do not rerun against that now-nonempty target |
+
+The PostgreSQL subprocess helper has a 120-second deadline, sends SIGTERM, then may send SIGKILL after five more seconds. This applies to its `pg_dump`/`pg_restore` child, **not** to the local launcher's control-plane stop command, which does not force-kill. The restore subprocess uses a single PostgreSQL transaction; subsequent identity checks and moving private files are separate steps, so the whole restore procedure is not one atomic operation.
+
+The backup result `state: verified` means the backup routine completed its source-identity checks and wrote a dump plus hashes. It does not mean that bundle has been restored in a rehearsal. Similarly, `requires_start: true` after restore means service startup and readiness still need verification. Use the [backup/restore runbook](/en/operate/backup-restore) for the full procedure.
+
+## Source development and verification scripts
+
+| Script | Purpose / side effects |
+| --- | --- |
+| `npm run check` | TypeScript type check without emitting code |
+| `npm test` | Vitest; full DB coverage requires test database configuration |
+| `npm run verify` | Requires `TEST_DATABASE_URL`; runs check and tests |
+| `npm run verify:packages` | Requires test DB and Python packaging dependencies; builds/installs SDK packages in temporary consumers and runs selected API tests |
+| `npm run verify:startup` | Uses `DATABASE_URL`; creates isolated schema/data, launches and restarts services |
+| `npm run verify:backup` | Uses test DB; creates a restore database and private backup material; requires create-database privileges |
+| `npm run build:local -- <new-directory>` | Builds a local distribution and SDK output; default target is a new `.local/releases/local-<uuid>` directory; parent must exist |
+| `npm run release:check` | Checks source inventory/provenance and writes `.local/release-audit/latest.json`; does not publish |
+| `npm run release:public-check` | Also fails on configured public-release blockers; does not publish |
+
+The release checker accepts `--artifact <directory>` after npm's separator to inspect an artifact. Its pattern scan is not comprehensive secret detection. See [testing](/en/contribute/testing) for evidence scope, private artifacts and required checks.
+
+Real-cloud scripts are separate: `verify:cloud -- <private-config> [harness ...]`, `verify:compatibility -- <private-config>` and `verify:serverless -- <provider> <harness-key>`. They may create resources and incur cloud/model charges; their inputs and scope differ. Read [testing](/en/contribute/testing) before use. Internal fault-injection scripts are not installation steps.
+
+A distribution produced by build:local has a different generated package manifest: `local`, `start` and `db:migrate`. Install its dependencies with `npm ci --omit=dev`, then use `npm run local -- start` or `npm start`. Do not expect source verification commands to exist in that distribution. No public package/download availability is implied by a successful local build.
+
+## Verification scope
+
+The command inventory was checked using `npm run` (exit 0), which lists scripts without executing them. A subsequent [isolated launcher check](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-cli-reference-review.json) executed seven cases in a temporary data directory: stopped status, valid configuration, unreachable-service diagnostics, diagnostics overwrite refusal, unknown command, missing configure input and invalid configuration. It confirmed exit codes, preserved existing files, private file modes and lock release; temporary files were removed afterward.
+
+Those checks did not use a database or start/stop a service. Migration, backup/restore, live readiness and cloud acceptance were not executed by this check. Their semantics above were reviewed against the launcher, settings, backup, diagnostics and build implementations; historical operational evidence retains its own scope and date.
+
+Next: [installation](/en/start/install), [local workspace](/en/operate/local-workspace), [testing](/en/contribute/testing).

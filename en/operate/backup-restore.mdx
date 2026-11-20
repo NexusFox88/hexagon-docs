@@ -1,0 +1,71 @@
+---
+title: "Back up and restore the control plane"
+---
+
+This page covers existing local offline commands. A bundle contains one database schema and matching private identity/key material, not a complete live Sandbox snapshot or hosted infrastructure backup.
+
+## Know what the bundle can recover
+
+| Component | Included or reconstructed | Boundary |
+| --- | --- | --- |
+| Selected PostgreSQL schema | Custom-format database dump | Not every schema/database on the server |
+| Exported artifacts | Stored `artifacts.content` bytes in that schema | Files never exported from a Sandbox are not included |
+| Encrypted credentials | Database envelopes plus matching `master.key` | Neither component alone restores usable credentials |
+| Local owner/settings | `owner.json` and optional `deployment.json` | Hosted external identity, environment and TLS require separate backup |
+| Discovery/PID files | Regenerated at startup | Old process identity must not be reused |
+| Cloud compute, snapshots, templates and external Tool records | Not copied into the bundle | Keep provider identifiers and reconcile independently |
+
+A closed-Session guard is not a provider-wide orphan audit. Confirm the resources associated with the backed-up workload and retain unresolved records separately. Offline consistency also requires that no other process writes the selected database/settings while the backup is taken; stopping one launcher is not proof that every external writer is stopped.
+
+## Prepare an offline backup
+
+Install pg_dump/pg_restore and select the correct DATABASE_URL/HEXAGON_DATA_DIR. Settle Runs, close every cloud Session with confirmed cleanup, and stop the local service. The implementation rejects running services, unclosed Sessions, and mismatched identity/decryption.
+
+```sh
+npm run local -- stop
+npm run local -- backup /absolute/private/new-backup-directory
+```
+
+The destination must be new. Bundles contain database.dump, master.key, owner.json, optional deployment.json, hashes, and migration metadata. Private permissions are used; do not commit or publicly upload bundles.
+
+## Restore into a fresh target
+
+Create an empty PostgreSQL database and an absent/empty data directory. Replace this illustrative connection with your dedicated target:
+
+```sh
+DATABASE_URL='postgres://YOUR_USER@127.0.0.1:5432/hexagon_restored' \
+HEXAGON_DATA_DIR='/absolute/private/restored' \
+npm run local -- restore /absolute/private/new-backup-directory
+```
+
+Restore validates the manifest, file types, and hashes, rejects a nonempty database, restores transactionally, then verifies owner identity and decryption of encrypted records. For a non-public returned schema, configure the subsequent connection search_path. Start with the target database/data directory rather than accidentally starting the old workspace.
+
+Discovery and PID files are regenerated. If failure occurs after database restoration, the target may no longer be empty. Preserve diagnostics and inspect staging/database state instead of blindly repeating or removing data.
+
+## Recover from an interrupted restore
+
+| Failure point | Possible target state | Safe next step |
+| --- | --- | --- |
+| Manifest, file type or checksum rejected | Database restore has not started | Inspect the trusted source bundle; do not edit hashes to conceal corruption |
+| Target nonempty check rejected | Existing target data was preserved | Select a genuinely empty dedicated target |
+| `pg_restore` fails | Its single transaction should roll back; staging files can remain | Inspect the actual database and private staging record before retrying |
+| Identity/decryption or private-file installation fails after `pg_restore` | Database can already be populated; private files may be staged or partly installed | Keep the target offline, preserve diagnostics, and recover into another fresh target after identifying the cause |
+| Restore returns verified | Database and identity checks passed, service is not yet running | Configure returned schema/search_path, then start and perform task-level acceptance |
+
+The entire command is not one atomic transaction across PostgreSQL and the filesystem. A second attempt against a populated target is correctly refused. Do not delete that target as a generic retry step or start both old and restored deployments against the same remote resources.
+
+## Trust and consistency
+
+Restore only trusted bundles. Hashes establish integrity against a manifest, not author trust. The database and key must match.
+
+The local command requires closed Sessions to avoid resurrecting live operations. Independently restoring older or online database copies requires additional reconciliation of later cloud resources and external writes; do not assume safe replay.
+
+Hosted external key storage, identity, TLS, and deployment configuration need their own backup process. Local restore success does not establish hosted recovery.
+
+## Verify
+
+In an isolated target, read history, initialization, events, and artifacts; verify decryption; run a fresh task and confirm cleanup; ensure old state did not unexpectedly recreate resources. Record commands, schema, scope, and failures without publishing backup files or secrets.
+
+Implementation: [offline backup/restore](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/deployment/backup.ts). Next: [reconciliation](/en/operate/reconciliation), [upgrades](/en/operate/upgrades), [persistence](/en/concepts/persistence).
+
+The [November 18 isolated restore drill](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-18-local-beta-delivery.md) compared all 27 then-existing tables by sorted-row hash, including Sessions, Runs, events, artifacts, connections and encrypted secrets, and subsequently ran both SDK cloud journeys from the restored deployment. These counts describe that checkpoint, not today’s schema inventory. It is local-mode evidence; no new restore was performed for this page.

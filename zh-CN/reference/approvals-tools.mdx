@@ -1,0 +1,162 @@
+---
+title: "审批与 Tool 恢复 HTTP 契约"
+---
+
+这些接口用于检查待处理操作、记录审批决定、拒绝单次调用的补授权请求，或记录已经独立核实的远端结果。这些决定不能混用：审批不提供账户凭据，拒绝补授权不撤销账户，确认结果不会重新发送远端写入。
+
+路径中的所有 ID 必须是 UUID。读取允许 owner 和应用 Token；三个写入操作要求 owner Token。Run、审批和 Tool call 均检查租户归属。示例使用可信后端 Token，HEXAGON_API_URL 不带 `/v1`。请求文件必须填入真实标识、哈希和相应证据；示例不是执行记录。
+
+## 列出审批
+
+`GET /v1/runs/{run_id}/approvals` 返回 **200**、`{approvals:[...]}`，按创建时间排序，无分页契约。每项包含 id、run_id、action（JSON）、state、可空 decision、created_at。State 包括 pending、approved、denied、expired；已记录的 decision 包含 `{approved:boolean}`。Run 不存在或属于其他租户时返回 `404 run_not_found`。
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/runs/$HEXAGON_RUN_ID/approvals"
+```
+
+界面应呈现真实操作内容及对应调用，而不是只有通用“继续”按钮。Action 由 Tool 工作流产生，不是跨 Provider 的通用 schema。客户端保存的旧 pending 快照不能证明决定仍会被接受。
+
+## 作出审批决定
+
+`POST /v1/approvals/{approval_id}/decision` 接受严格 `{approved:boolean}`。成功返回 **200**、`{id,run_id,state}`，不返回完整审批或外部执行结果。
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data '{"approved":false}' \
+  "$HEXAGON_API_URL/v1/approvals/$HEXAGON_APPROVAL_ID/decision"
+```
+
+示例执行拒绝。只有确实批准已审阅的具体操作时才使用 true。新决定要求审批为 pending、Run 为 waiting_approval；记录 approved/denied 后，将 Run 变为 running 并持久化 approval.decided，由 worker 消费决定。HTTP 成功不证明外部操作已经成功。
+
+重复相同决定返回已有状态，不再产生转换，即使 Run 已继续执行。反转已记录决定、决定已过期项，或不满足 pending/waiting 条件时返回 `409 stale_approval`。审批不存在或属于其他租户时返回 `404 approval_not_found`。取消先锁定 Run，再使 pending 审批过期；过期决定不能被理解为创建替代写入的许可。
+
+## 列出 Tool calls
+
+`GET /v1/runs/{run_id}/tool-calls` 返回 **200**、`{calls:[...]}`，按创建时间和 ID 排序，无分页。Run 不存在或属于其他租户时返回 `404 run_not_found`。
+
+| 字段 | 含义 |
+| --- | --- |
+| id | 恢复接口使用的调用标识 |
+| binding、operation | Tool 绑定名称与请求操作 |
+| arguments | 已记录的调用参数，可能包含用户数据 |
+| request_hash | 精确请求指纹，恢复时复制该值 |
+| state | 调用状态，与 Run/审批状态不同 |
+| approval_id | 关联审批（如果有） |
+| execution_policy | 保存的派发策略，不代表允许修改策略 |
+| resolution | 已提供时的调用方核实结果 |
+| is_error | 从 result.isError 提取的布尔值，缺失时为 null；null 不能证明成功 |
+| updated_at | 服务端时间戳 |
+
+列表不返回完整 Tool result。Arguments、结果文本和证据应作为私有应用数据处理。
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/runs/$HEXAGON_RUN_ID/tool-calls"
+```
+
+## 拒绝单次待补授权
+
+`POST /v1/runs/{run_id}/tool-calls/{call_id}/deny-authorization` 接受严格 `{request_hash:string}`。哈希必须是与该调用匹配的 64 位小写十六进制。将实际哈希保存到 authorization-refusal.json：
+
+```json
+{"request_hash":"0000000000000000000000000000000000000000000000000000000000000000"}
+```
+
+全零哈希只是占位符，不是你的调用指纹。
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data-binary @authorization-refusal.json \
+  "$HEXAGON_API_URL/v1/runs/$HEXAGON_RUN_ID/tool-calls/$HEXAGON_CALL_ID/deny-authorization"
+```
+
+成功返回 **200**、`{id,state:"completed",result}`。Result 包含 isError:true、code:tool_authorization_denied 和解释拒绝原因的文本。此处 completed 表示调用已有可交付错误结果，不表示请求操作成功。接口不会发送进一步远端请求，也不撤销已存储的账户凭据。
+
+新拒绝要求 call 为 waiting_authorization，Run 为 running、waiting_authorization 或 waiting_approval。接口将等待授权的 Run 恢复为 running，但保留其他调用的审批等待；持久化 authorization.denied 和 tool.completed。相同哈希的重复拒绝返回原结果。错误见下表。
+
+## 确认未知远端结果
+
+`POST /v1/runs/{run_id}/tool-calls/{call_id}/resolve` 记录你已独立核实的结果。接口不会代查 Provider、重发请求或撤销写入。使用前必须检查 Provider 实际记录，并与本次调用对应。
+
+| 请求字段 | 限制 |
+| --- | --- |
+| request_hash | 必填，与调用匹配的 64 位小写十六进制指纹 |
+| outcome | 必填 completed 或 failed |
+| text | 必填字符串，1–65,536 字符，作为结果交给 Harness |
+| evidence | 必填字符串，1–4000 字符，说明可追溯的外部核实依据 |
+
+未知字段会被拒绝。使用真实证据填写 tool-resolution.json。以下只展示形状，不能原样提交：
+
+```json
+{
+  "request_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "outcome": "completed",
+  "text": "Replace with the verified result of this exact invocation.",
+  "evidence": "Replace with provider record identity and how its outcome was checked."
+}
+```
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data-binary @tool-resolution.json \
+  "$HEXAGON_API_URL/v1/runs/$HEXAGON_RUN_ID/tool-calls/$HEXAGON_CALL_ID/resolve"
+```
+
+成功返回 **200**、`{id,state:"completed",resolution}`。Completed 和 failed 两种 outcome 都产生 completed Tool call；failed 会交付 isError:true。原 Run 变为 running。服务持久化包含 evidence 和 source:caller_verified 的 tool.outcome_resolved，再持久化 tool.completed。它不会将 Run 标记完成。
+
+首次确认要求 call 为 unknown，Run 为 running、waiting_authorization 或 waiting_approval，不能将 cancelling 或终态 Run 恢复为活动工作。重复完全相同的 resolution 返回原记录而不重复转换；更改任何字段返回 `409 tool_resolution_conflict`。响应丢失时保留并重发精确请求体。匹配旧记录的检查先于活动状态校验，因此 Run 后续推进后仍可用相同请求找回已经保存的结果。
+
+## SDK：提交已验证的结果记录
+
+在可信后端使用 owner 客户端。先从 `tool_calls` / `toolCalls` 取得准确的 Run、调用 ID 和 `request_hash`，独立验证外部操作，并私下持久化上文定义的四个请求字段。以下函数原样转发已保存请求体，不推断结果，也不联系外部服务。
+
+```python
+def record_verified_tool_outcome(client, run_id, call_id, saved_resolution):
+    return client.resolve_tool_call(run_id, call_id, **saved_resolution)
+```
+
+```typescript
+type VerifiedToolResolution = {
+  request_hash: string;
+  outcome: 'completed' | 'failed';
+  text: string;
+  evidence: string;
+};
+
+async function recordVerifiedToolOutcome(
+  client: Hexagon, runId: string, callId: string, savedResolution: VerifiedToolResolution,
+) {
+  return await client.resolveToolCall(runId, callId, savedResolution);
+}
+```
+
+
+`saved_resolution` / `savedResolution` 的形状为 `{request_hash, outcome, text, evidence}`。`text` 是交给 Harness 的已验证结果，`evidence` 应说明对应外部记录和验证方法，不包含凭据。原始 request hash 必须来自正在调查的调用，不能为了消除冲突改取另一个 hash。如果外部结果仍不确定，不要猜测 `completed` 或 `failed` 后调用函数。
+
+成功返回 `{id, state: "completed", resolution}`，即使 `resolution.outcome` 为 `failed` 也是如此。这表示 Tool 调用记录已完成，不表示外部写入成功，也不表示 Run 已完成；继续观察原 Run。HTTP 或网络错误会向调用方传播，不会被转换为外部失败结果。
+
+响应丢失后，为恢复这次结果登记，应使用相同 Run/调用 ID 和相同已保存请求体重放。网络重试时不要重新生成 evidence 文本或改变 outcome；已有记录时，字段不同会产生冲突。服务端检查原 hash、派发锁和允许状态，辅助函数不绕过这些条件。首次登记与匹配重放的状态前提不同，以上文契约为准。本地示例不能代替处理真实调用时所需的独立 Provider 证据。
+
+## 错误与并发
+
+请求体或 UUID 不合法返回 `400 invalid_request`；未认证为 401，应用 Token 调用写接口为 `403 owner_token_required`。拒绝与确认接口的领域错误：
+
+| 错误码 | 状态码 | 下一步 |
+| --- | --- | --- |
+| run_not_found / tool_call_not_found | 404 | 核对租户和 Run/call 关联 |
+| tool_call_conflict | 409 | 读取实际请求哈希，不能绕过不匹配 |
+| tool_call_in_flight | 409 | 其他派发或恢复持有调用锁，先观察再决定 |
+| tool_run_not_active | 409 | 检查 Run 状态，不复活已取消或终态任务 |
+| tool_authorization_not_pending | 409 | 当前调用状态不适用补授权拒绝 |
+| tool_outcome_not_unknown | 409 | 当前调用状态不适用首次结果确认 |
+| tool_resolution_conflict | 409 | 已有不同结果记录，调查差异 |
+
+Advisory lock 阻止结果确认与仍在进行的远端请求竞争，即使 worker 租约已过期也如此。Unknown 表示需要证据，不代表可以重发副作用。参见[对账](/zh-CN/operate/reconciliation)与[应用内审批](/zh-CN/build/approvals)。
+
+来源：[HTTP 投影与校验](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts)、[审批决定与取消](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts)、[Tool 恢复](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/reconciliation.ts)。本文经过源码审阅，不宣称发生了远端副作用或完成新一轮审批/恢复验收。

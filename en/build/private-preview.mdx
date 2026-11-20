@@ -1,0 +1,83 @@
+---
+title: "Privately preview generated Web applications"
+---
+
+A private preview gives a browser temporary authorized access to an HTTP port inside a Session. Use it to inspect Agent-generated pages and interactions. It is not a production publishing service.
+
+You need an open Session with allocated cloud resources, a Provider supporting private access, and a running HTTP server. Creating a grant does not start the server.
+
+## Start the application
+
+Ask the Agent to create a simple HTML page and start an HTTP server on a specific port, such as 3000. Have it verify the response locally before requesting a preview.
+
+Use a background-process mechanism supported by the Runtime and Provider when the service must survive Harness exit. A “started” message alone does not establish continued liveness. Begin with a static page that needs no WebSocket, external resources, or login cookie to isolate transport problems.
+
+## Create and revoke access
+
+Continue with an initialized client and an authorized Session ID. Open the URL and complete inspection before revoking it.
+
+```python
+preview = client.create_preview(session_id, port=3000, ttl_seconds=600)
+# Open preview['url'] in an authorized browser; do not write it to public logs.
+# After completing the inspection:
+client.revoke_preview(preview['id'])
+```
+
+```typescript
+const preview = await client.createPreview(sessionId, 3000, 600);
+// Open preview.url in an authorized browser; do not write it to public logs.
+// After completing the inspection:
+await client.revokePreview(preview.id);
+```
+
+Allowed ports are 3000–8999 except Runtime management port 8765. Lifetime is 30–3600 seconds, defaulting to 600. The response includes a grant ID, expiry, and access URL.
+
+## Authorization boundary
+
+Local previews use port 8788 by default, with a distinct `<id>.localhost` origin per grant. The entry ticket becomes a host-only HttpOnly cookie and is removed from the address bar. Requests check expiry, revocation, and Session availability. Closing the Session invalidates preview access.
+
+Provider traffic credentials remain on the server. The URL ticket itself is a credential: sharing it can grant access. Deliver it only after checking your application's business permissions.
+
+Hosted deployments require a dedicated preview domain with wildcard routing and TLS. Keep generated content on a separate origin from Console; treat Agent-generated HTML as untrusted application content.
+
+## Supported behavior
+
+Current support covers HTTP pages, assets, forms, and API requests within the preview origin. WebSocket upgrades, upstream application cookies, arbitrary external redirects, and external browser resources are unsupported. Development pages relying on HMR sockets or external CDNs may not work fully; establish ordinary HTTP behavior first.
+
+Run completion neither guarantees that the preview process is still alive nor automatically means it was stopped. Background-process lifetime, idle suspension, expiry, and Session closure affect access. Provider-specific process preservation is not a permanent-URL guarantee.
+
+## Renew access without restarting the task
+
+A grant's lifetime is separate from the HTTP process, Run and Session lifetimes. Revoking a grant only removes that grant's access; it does not stop the server or close the Session. Conversely, a still-unexpired grant cannot make a paused, closed or expired Session available. Recreating a grant does not repair a dead process.
+
+| Situation | Action |
+| --- | --- |
+| Known grant expired; Session open and server healthy | Explicitly request a new grant and replace the link shown to the authorized user. |
+| Link should no longer be usable | Revoke the saved grant ID, then verify the old URL/cookie is rejected. |
+| Grant creation response lost | Preserve the request time, Session and requested lifetime. There is no grant-creation idempotency key or public grant-list endpoint in this flow. Do not claim the first grant was absent or revoked; account for its possible lifetime before deciding whether another grant is needed. |
+| Browser was closed | Reopen still-valid access if available; no new Run is needed just to inspect the same server. |
+| Session was closed | Use retained artifacts for delivery. A new preview grant cannot reopen its removed workspace. |
+
+Persist the returned grant ID and expiry privately so access can be revoked later. A new grant has a different origin; it is not a stable URL alias and does not preserve the previous origin's browser storage. Keep production application data and credentials out of the generated preview.
+
+## Diagnose and verify
+
+For `preview_session_unavailable`, inspect Session state, allocated resources, and expiry. If a grant exists but loading fails, inspect the process and port, Provider private transport, control-plane proxy, then browser origin and TLS. Do not create duplicate Runs or expose Provider ports to work around the issue.
+
+Test real browser interaction, anonymous rejection, natural expiry, explicit revocation, and denial after Session closure. Cookies from different grants must not be interchangeable. This article is source-reviewed; it does not claim a new browser acceptance run.
+
+Sources: [grant lifecycle](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/previews.ts), [SDK support boundaries](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/README.md#web-previews). Next: [Artifacts](/en/build/artifacts) for deliverables that must outlive the preview.
+
+## Reproduce browser checks without confusing access and liveness
+
+Use the [project tutorial](/en/start/project-task) for a concrete interactive page. While its first Run is completed and Session remains open, inspect filtering and empty results. After the follow-up, inspect Reset. Record the grant ID/expiry privately and keep any ticket-bearing URL out of shared screenshots or logs.
+
+Test anonymous access in a separate browser context without the ticket or existing preview cookie. For natural expiry, use a short-lived grant and compare the wall clock with its declared expiry; keep the Session and HTTP process alive so a dead server does not masquerade as expiry enforcement. For explicit revocation, revoke only the saved test grant, then retry its old cookie and ticket. Finally close the Session, confirm cleanup, and check that an otherwise valid old preview no longer serves the page. None of these access checks replaces checking the page's behavior.
+
+| Existing record | What it establishes |
+| --- | --- |
+| [November 20 project tutorial](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-project-docs-cloud.json) | Independent Python/TypeScript Vercel/Pi project execution, real browser filtering/Reset, retained exports and denial after closure. It does not cover natural expiry. |
+| [November 15 natural expiry](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-preview-natural-expiry.md) | E2B/OpenCode cloud HTTP service, wall-clock 30-second expiry, rejection of old ticket/cookie, cross-grant rejection, revocation and anonymous/closed access. Network transport preserves virtual Host; this is distinct from browser interaction. |
+| [November 15 browser journey](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-web-preview-journey.md) | Actual browser filter interactions, ticket removed from address bar, inaccessible HttpOnly cookie and access while Run was completed. |
+
+These are dated, bounded records; historical provider capability descriptions are not the current support matrix. Check [current Sandbox capabilities](/en/integrations/sandboxes) for your target combination. Sources: [preview proxy](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/preview-server.ts), [acceptance journey](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/acceptance.md). Next: [preview networking](/en/operate/networking), [persistence](/en/concepts/persistence), [Sandbox capabilities](/en/integrations/sandboxes).

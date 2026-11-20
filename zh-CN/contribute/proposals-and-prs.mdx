@@ -1,0 +1,88 @@
+---
+title: "提出设计变更并准备贡献"
+---
+
+先描述用户遇到的具体问题和期望行为，再决定需要修改哪些模块。主仓库为 [NexusFox88/Hexagon](https://github.com/NexusFox88/Hexagon)，使用仓库实际提供的贡献入口，并遵循[贡献说明](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/CONTRIBUTING.md)，附上补丁、设计背景和真实验证记录。
+
+项目代码许可证见 [Apache-2.0 LICENSE](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/LICENSE)。本页不额外声明 CLA、维护者响应时间或尚未建立的治理流程。
+
+## 什么时候需要设计说明
+
+局部修复可用简短问题、触发条件、前后行为与验证说明。跨模块状态、公共 API、凭据、租户、生命周期或数据迁移变化先写设计：用户旅程、责任边界、替代方案、失败模式、迁移与回退、验证和文档影响。
+
+修改行为前阅读[架构](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/architecture.md)、[验收](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/acceptance.md)和[代码地图](/zh-CN/contribute/codebase)。不能为通过当前测试删除用户要求；不能把 Provider 特例散入通用执行流程，或用原始凭据进入 guest 作为兼容回退。
+
+## 用真实改动解释提案
+
+仓库的 E2B OCI 准备是一个跨模块例子：用户选择公开 OCI Harness 后，需要先准备 Session 自有 Template，再创建计算资源。设计必须说明 Template/build 回执、构建未知结果、恢复与 compute-before-template 清理，不能只给一个镜像拉取函数。其[专项证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-e2b-oci-preparation.md)保留了模型输出失败与后续限定范围成功，可作为描述验证边界的范例，不是本次新运行结果。
+
+建议设计稿结构：问题与成功旅程 → 当前限制 → 对象/API/状态变化 → 备选方案及取舍 → 凭据与租户边界 → 不确定结果和清理 → 迁移/回退 → 实际检查与未验证项。
+
+## 准备可审阅的变更
+
+使用仓库实际 [PR 模板](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/.github/PULL_REQUEST_TEMPLATE.md)：
+
+```text
+Problem and resulting behavior
+- 触发条件、原行为、修改后的可观察结果。
+
+Affected contracts
+- API / Python / TypeScript / Console / Runtime / Connector 中实际受影响部分。
+
+Verification actually run
+- 实际命令、退出结果、证据路径、验证范围。
+
+Remaining limitations
+- 未运行内容、已知限制、未决资源与下一步。
+```
+
+描述最终实现，不把讨论过程或放弃的方案堆进变更摘要；确有取舍才解释。用户界面变更附两种语言与键盘/焦点/可访问性检查；遵守[Console 规范](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/console-design.md)，不用浏览器原生产品对话框替代应用组件。
+
+## 示例：把已验证的局部修复写成 PR 说明
+
+下面根据[2026-11-16 Fleet 配额诊断记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-16-fleet-quota-audit.md)整理，展示说明方式；不是新建或已发布的 PR，也不是本轮重新运行的验证。
+
+**建议标题：让 Fleet 显示被拒绝创建操作的配额原因**
+
+**Problem and resulting behavior**
+
+当 Provider 明确拒绝 Sandbox 创建时，数据库已保存 `sandbox_quota_exceeded`，但 Fleet 只为 unknown 操作返回 reason，导致 Console 无法显示已有的配额说明。让 rejected 操作也返回安全的 reason；completed 操作继续省略该字段，使用户能区分明确拒绝与创建结果未知。
+
+**Affected contracts**
+
+修改 Fleet 资源操作投影及其回归断言。保持租户过滤，既不增加上游原始响应，也不改变创建或清理语义。Console 可使用已有中英文说明。
+
+**Verification actually run**
+
+历史记录报告了 54 个文件 / 154 项本地 PostgreSQL 回归通过；随后类型检查发现新增测试 fixture 缺少构造依赖，修正后 `npm run check` 和完整 worker 套件 8 项检查通过。另有 32 条保留旅程 / 64 个主 Run 的历史状态审计，范围包括已存回复、产物摘要和指定记录中的清理状态。
+
+**Remaining limitations**
+
+以上不是新一轮云执行，也不是账户全局资源盘点；不能据此认证其他新增连接器或全部 SaaS 账户。具体命令与历史范围保留在原证据中。
+
+这个例子包含触发条件、用户可见变化、接口影响和真实验证边界。没有将修复前的失败删掉，也没有用“全部测试通过”掩盖不同检查的执行时间与范围。
+
+## 跨模块提案应回答的具体问题
+
+以 E2B OCI 准备为例，设计说明至少回答：
+
+| 问题 | 需要写清的决定 |
+| --- | --- |
+| 谁拥有新资源？ | Template 是否属于单个 Session，如何记录所有权，是否允许跨 Session 共享 |
+| 何时保存意图与回执？ | image_prepare 与 Sandbox create 如何分开；构建句柄在轮询前如何持久化 |
+| 响应丢失怎么办？ | 以原操作精确查找，零个或多个匹配时如何保留不确定性 |
+| 关闭顺序是什么？ | 先清计算资源，再清其拥有的 Template；任一步未确认如何阻止 closed |
+| 用户在哪里看见进度？ | API 操作记录、Console 状态、中英文文案与错误出口 |
+| 哪些内容不在本次范围？ | 私有镜像、共享缓存或未验证协议不能从公开镜像成功自动推导 |
+
+设计稿把方案与实际验证分开：尚未执行的步骤写入验收计划，执行后再追加有范围的结果。读者应能从提案判断哪里可能发生不可逆副作用、谁负责恢复、哪些旧 Session 或旧配置受影响，而不必从代码差异中猜测。
+
+## 检查和证据
+
+按改动范围运行 package.json 中已有检查；用专用测试数据库，区分确定性 fixture 与实际 Provider/模型。API 变更检查双 SDK 等价性，生命周期变化检查失败、恢复和清理。不要在普通文档变更或外部贡献流水线中隐式使用个人云凭据。
+
+公开报告写脱敏结论，原始资源 ID 留在私有证据以便失败清理。不要提交密钥、数据库备份、用户提示或 .local。历史失败不因后续通过而删除，缺少证据就写未验证。
+
+提交前确认实现、示例、相关文档和翻译一致，并保留剩余限制。是否创建 commit、打开 PR 或发布，由当前任务授权与项目入口决定；本次产品文档工作不执行这些动作。
+
+下一步：[测试与证据](/zh-CN/contribute/testing)、[文档维护](/zh-CN/contribute/documentation)。

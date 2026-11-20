@@ -1,0 +1,116 @@
+---
+title: "限制与可配置边界"
+---
+
+本页按当前源码列出接口和执行边界，不是 Provider 账户配额表。MiB = 1048576 字节，KiB = 1024 字节。JS code units 指 JavaScript 字符串长度，不能等同 UTF-8 字节；中文和 emoji 尤其需要同时检查字节限制。数值是当前实现快照，升级后核对源码。
+
+## 请求与执行
+
+| 项目 | 上限或范围 | 作用与注意事项 | 来源／符号 | 可配置性／拒绝方式 |
+| --- | --- | --- | --- | --- |
+| HTTP 请求体 | 12 MiB | Fastify 请求体限制，计入 JSON 与 Base64 开销。 | [createServer / bodyLimit](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts) | 固定；HTTP 413 invalid_http_request |
+| Run input | 1–100000 JS code units | 还须非空白；input 加编译后的背景 context 总计不超过 120000 UTF-8 字节。 | [POST sessions/:id/runs](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts) | 固定；invalid_request / input_too_large |
+| Idempotency-Key | 1–256 JS code units | 提交响应丢失后复用相同内容和 key。 | [Idempotency-Key schema](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts) | 固定；invalid_request |
+| origin 标识 | message_id/request_id ≤256; channel ≤100 | 提供时非空，属于提交身份的一部分。 | [runOriginInput](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) | 固定；invalid_request |
+| 每个 Session 活动 Run | 1 | 另一个活动 Run 导致 session_busy（409），由应用排队。 | [Runs.submit active query](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) | 固定；session_busy |
+| 事件查询每页 | 500 events | 按最后 ID 继续查询，空页不证明任务终止。 | [Runs.events LIMIT 500](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) | 固定每页上限；用 after 继续 |
+| 资源操作分页 | limit 1–100; default 50; offset ≥0 | 按返回分页继续，不是账户资源配额。 | [GET resource-operations query](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts) | 调用方在范围内选页数；invalid_request |
+
+主要来源：[apps/control-plane/server.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts).
+
+## Session 策略与初始化
+
+| 项目 | 上限或范围 | 作用与注意事项 | 来源／符号 | 可配置性／拒绝方式 |
+| --- | --- | --- | --- | --- |
+| Session／Agent 名称 | 1–200 JS code units | Session 名称可选，Agent 名称必填。 | [agentInput / sessionInput](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts) | 固定字段上限；invalid_request |
+| 空闲阈值 | 15–3600 seconds; default 60 | 创建定义时可配置；实际阈值为 min(idle_timeout_seconds, timeout_seconds − 10)。生命周期能力因 Provider 而异。 | [agentInput.resources / lifecycle](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts) | 定义值可配置；超范围 invalid_request |
+| 资源 timeout | 60–3600 seconds; default 600 | 不是统一模型回复期限，也不保证按墙上时钟准时删除。 | [agentInput.resources](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts) | 定义值可配置；超范围 invalid_request |
+| identity 字段 | name ≤200; description ≤4000; role ≤2000 | name 非空；行为描述不等于授权。 | [behaviorFields.identity](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/initialization.ts) | 固定；invalid_request |
+| instructions／context.text | each ≤32768 JS code units | 拒绝 NUL。 | [behaviorFields / text](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/initialization.ts) | 固定；invalid_request |
+| 内联 context documents | ≤8; name 1–200; text ≤16384 | 同时受初始化总字节上限约束。 | [behaviorFields.context.documents](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/initialization.ts) | 固定；invalid_request／总量检查 |
+| 引用 context files | ≤8; path ≤500; each file ≤32768 bytes | 需匹配上传 SHA-256，内容为不含 NUL 的有效 UTF-8。 | [Runs.submit context files](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) | 固定字节上限；context_file_too_large；字段 schema 见 behaviorFields |
+| 编译后的初始化 | ≤65536 bytes | 分别检查序列化 behavior，以及编译后的 system 加 context。 | [compileInitialization](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/initialization.ts) | 固定；initialization_too_large |
+| 环境变量 | ≤64; JSON ≤65536 bytes | 名称最多 128、值最多 16384 JS code units；拒绝保留名称和 NUL。 | [environmentInput](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/environment.ts) | 固定；schema 拒绝 |
+
+主要来源：[modules/execution/sessions.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts).
+
+## 输入与导出文件
+
+| 项目 | 上限或范围 | 作用与注意事项 | 来源／符号 | 可配置性／拒绝方式 |
+| --- | --- | --- | --- | --- |
+| 每次上传文件数 | 1–100 | 不是 workspace 生命周期文件总数配额。 | [uploadInput.files](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/inputs.ts) | 固定；invalid_request |
+| 上传路径 | 1–500 JS code units | 相对路径；拒绝目录穿越、空段、反斜杠和 NUL。 | [uploadInput.files.path](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/inputs.ts) | 固定；invalid_request |
+| 上传 content_base64 | ≤2097152 characters per file | 检查 Base64 格式和长度；该编码长度最多对应 1572864 解码字节，即 1.5 MiB。客户端应生成规范编码；上传不会重新编码比对填充位。 | [uploadInput.files.content_base64](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/inputs.ts) | 固定；invalid_request |
+| 上传解码总量 | ≤8 MiB per request | 仍受 HTTP 请求体限制；超限为 upload_too_large（413）。 | [SessionInputs.upload](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/inputs.ts) | 固定；upload_too_large |
+| 产物 manifest | ≤64 files; ≤8 MiB decoded total | 每个捕获 manifest，拒绝重复名称。 | [manifest / Artifacts.capture](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/artifacts/artifacts.ts) | 固定；schema 拒绝／invalid_artifact_manifest |
+| 单个导出产物 | ≤4 MiB decoded bytes | Base64 字段最多 5592408 字符；核对规范编码与 SHA-256。 | [file / Artifacts.capture](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/artifacts/artifacts.ts) | 固定；schema 拒绝／artifact_integrity_failed |
+| 产物名称 | 1–512 JS code units | 相对路径，拒绝目录穿越、反斜杠和控制字符。 | [file.name](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/artifacts/artifacts.ts) | 固定；捕获 schema 拒绝 |
+
+主要来源：[modules/execution/inputs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/inputs.ts).
+
+## 预览与 Harness 分发
+
+| 项目 | 上限或范围 | 作用与注意事项 | 来源／符号 | 可配置性／拒绝方式 |
+| --- | --- | --- | --- | --- |
+| 预览端口 | 3000–8999, excluding 8765 | 整数；Runtime 端口保留。 | [previewInput.port](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/previews.ts) | 调用方选择允许端口；invalid_request |
+| 预览授权 TTL | 30–3600 seconds; default 600 | 每次请求可配置，不延长 Sandbox 生命周期。 | [previewInput.ttl_seconds](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/previews.ts) | 调用方在范围内选择 TTL；invalid_request |
+| OCI 架构 | linux/amd64 | 多架构标签不代表支持其他架构。 | [resolveImage platform checks](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/registry.ts) | 固定；image_platform_unsupported |
+| OCI 镜像引用 | 1–512 JS code units | 解析为固定 digest，仍受仓库及 Provider 限制。 | [imageRegistration.image](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/images.ts) | 固定字段上限；invalid_request |
+| OCI 命令 argv | 1–32 items; each 1–65536 JS code units | 拒绝 NUL；OS 或 Runtime 的限制可能更紧。 | [imageRegistration.command](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/images.ts) | 命令可配置，边界固定；invalid_request |
+| 源码包 | 1–32 files; total ≤512 KiB UTF-8 | 每个 content 最多 262144 JS code units；相对路径最多 240。 | [harnessPackageInput](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/harness-packages.ts) | 固定；invalid_request |
+| 原生继续标识 | ≤512 characters in hexagon-json-v1 parsing | 源码包提供该值时必须非空；特定协议适配器有各自检查。 | [ociAdapter result parser](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/runtime-adapter.ts) | 固定协议检查；先标记解析结果 failed，再由 worker 确定结果 |
+
+主要来源：[modules/sandboxes/previews.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/previews.ts).
+
+
+## 交叉检查来源
+
+上表还依据 [Run 输入与事件](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts)、[初始化](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/initialization.ts)、[环境变量](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/environment.ts)、[产物](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/artifacts/artifacts.ts)、[OCI 注册](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/images.ts)、[镜像解析](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/registry.ts)和[源码包](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/harness-packages.ts)。多数 schema 数值没有独立管理配置可调整；不要把 Session 可配置期限与部署层可随意扩容的上限混淆。
+
+## Registry 与网络限制
+
+[镜像引用解析](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/registry.ts)接受 Docker Hub（`docker.io`，省略时默认）和 GHCR（`ghcr.io`），不接受任意 registry URL。固定解析器对其他来源或不合法引用返回 `invalid_image_reference`（400）。认证 token 响应限制为 65536 字节，所读取的 manifest／配置响应限制为 4 MiB；超限产生 `image_manifest_too_large`（400）。这些是元数据读取边界，不是全部镜像层或安装后文件系统的 4 MiB 上限。blob 重定向也有明确目标策略，添加凭据不会绕过检查。Provider 是否支持私有镜像仍需单独判断。
+
+[Session 网络 schema](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts)允许 `unrestricted` 或 `allowlist`，默认 unrestricted、空主机列表。主机条目为非空字符串；这个 schema 没有定义统一的条目数量或单主机长度最大值，不能由此推断 Provider 支持无限配置。[组合解析器](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/compatibility.ts)用 `network_policy_unsupported` 或 `credential_proxy_not_allowed_by_network_policy` 拒绝不支持的 allowlist 或缺少凭据入口访问权限；创建时将兼容性原因作为 400 返回。应保留所需策略并选择支持的 Provider。这些检查不证明实云防火墙执行效果。
+
+## Tool、Provider 与账户限制
+
+[Remote MCP](/zh-CN/integrations/mcp)当前限制发现最多 100 个工具、最多 20 页和单个响应 2 MiB，具体检查见 [remote.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/mcp/remote.ts)。具名应用响应体限制为 1 MiB，见[应用请求实现](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/apps/registry.ts)。这些是协议传输限制，不是 workspace 文件大小。
+
+Provider 的内存、CPU、创建并发、存储、镜像权限及 API 配额取决于连接配置和实际账户。按 [Sandbox 集成](/zh-CN/integrations/sandboxes)查对应 Provider；不能把试用账户的并发限制写成 Hexagon 全局配额。私有 OCI、网络 allowlist、暂停恢复必须由当前连接器声明支持，不支持的策略不能静默降级。
+
+一些连接器有更小的文件或命令限制。传输队列上限约束缓冲区，不一定限制整个响应总长。不要把它与上传请求、导出产物或 Provider 磁盘容量互换。容量和成本规划见[容量指南](/zh-CN/operate/capacity-and-cost)。
+
+## 按接口实际检查的方式计算大小
+
+文本需要同时计算 JavaScript UTF-16 code units 与 UTF-8 字节。包含 41000 个 `中` 的任务有 41000 个 code units，却有 123000 个 UTF-8 字节：字段长度合格，仍超过输入与背景合计 120000 字节的上限。一个 `😀` 占两个 code units、四个 UTF-8 字节。Python 的 `len(text)` 统计 Unicode 码点，不能直接代替 schema 的 JavaScript 长度。
+
+上传 `n` 个二进制字节时，标准 Base64 长度为 `4 × ceil(n / 3)`。1572864 字节的文件编码后为 2097152 字符，符合字段上限；再增加一个字节，编码长度就变成 2097156，超过上限。JSON 中的路径、键名、引号和分隔符还会增加 HTTP 请求体大小。需要同时检查最终序列化请求与解码字节。六个各为 1.5 MiB 的文件可以通过分批解决单请求 8 MiB 总量限制，但分批不能让超限的单文件合法。
+
+所有上传批次必须在**首个 Run 或 Sandbox 分配之前**完成。之后上传会产生 `workspace_already_started`；按[项目上下文](/zh-CN/build/project-context)准备初始输入，后续由 Agent 工作修改活动工作区。同一请求内重复路径产生 `duplicate_input_path`；执行开始前，后一次请求可以替换此前上传的同一路径。核对返回的大小与 SHA-256，不要假定每次上传都会追加一个新文件。
+
+环境变量限制统计 `JSON.stringify(env)` 的字节，包括键名和转义。初始化限制也包含序列化结构及编译后的背景包装文字，因此多个单独合法的文档仍可能合计超限。每个字段的最大值不代表所有字段都能同时填满。
+
+## 定位拒绝发生在哪一层
+
+| 失败阶段 | 可观察结果 | 对应处理 |
+| --- | --- | --- |
+| HTTP 请求体解析 | 请求体超限返回 HTTP 413、`invalid_http_request` | 缩小完整序列化请求；Base64 字段合法不能证明请求体合法 |
+| 公共请求 schema | HTTP 400、`invalid_request`，附带违规 `fields` 路径 | 修正数量、类型、长度或路径；内部 schema 消息不一定作为公共错误码返回 |
+| 上传解码总量 | HTTP 413、`upload_too_large` | 在执行开始前分批上传单独合法的文件 |
+| 编译初始化／Run 输入 | HTTP 413、`initialization_too_large`／`input_too_large` | 缩小编译背景或任务文本，检查字节而不只看字符数 |
+| 产物捕获 | 捕获路径中的 `invalid_artifact_manifest` 或 `artifact_integrity_failed` | 检查实际导出列表、大小、重名、编码和哈希；捕获属于 worker 活动，不是客户端上传端点 |
+
+产物捕获在数据库事务之前检查 manifest。被拒绝的 manifest 不会成为部分接受的列表，也不会删除此前已提交的产物。Run 到达终态不能证明所有预期文件都已导出；需要查询已记录的产物列表并验证所需字节。
+
+## 超限后如何处理
+
+schema 拒绝与领域错误分别检查；例如输入和背景合计超限返回 `input_too_large`（413），初始化超限为 `initialization_too_large`（413）。产物总量或重复名称可触发 `invalid_artifact_manifest`，单文件大小、编码或哈希不符可触发 `artifact_integrity_failed`。这些错误不应通过重复同一请求解决。
+
+缩小输入、分批上传、只导出必要文件，或选择能力合适的组合。不能通过分批上传绕过单文件边界，也不能把用户要求的 allowlist 改成 unrestricted 来“通过”。网络错误或 Provider 配额拒绝与 Hexagon 输入超限分开处理；创建请求结果未知时先对账原操作，不能换 key 反复创建。
+
+本页数值经过源码核对；局部编码和 schema 求值结果见[限制参考核对记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-limits-reference-review.json)。这些检查不代表完整边界覆盖或实云压力测试。没有明确列出的账户总容量、整体吞吐量或价格不代表无限，也不构成服务级别承诺。
+
+下一步：[项目上下文](/zh-CN/build/project-context)、[产物](/zh-CN/build/artifacts)、[故障排查](/zh-CN/operate/troubleshooting)。
+
+组合约束见 [Sandbox 能力](/zh-CN/integrations/sandboxes)，容量规划见[容量与成本](/zh-CN/operate/capacity-and-cost)，具体错误响应见[错误码](/zh-CN/reference/errors)。

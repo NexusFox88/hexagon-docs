@@ -1,0 +1,54 @@
+{
+  "scope": "R07 source review and focused local pure evaluations only. No database, HTTP body-limit request, real cloud or exhaustive boundary/load testing.",
+  "command": "node --import tsx --input-type=module (encoding and exported schema assertions)",
+  "checks": [
+    {
+      "name": "Chinese length differs from UTF-8 budget",
+      "passed": true
+    },
+    {
+      "name": "emoji occupies two code units/four bytes",
+      "passed": true
+    },
+    {
+      "name": "Base64 encoded length at upload bound and one byte above",
+      "passed": true
+    },
+    {
+      "name": "upload checks syntax but accepts noncanonical padding bits",
+      "passed": true
+    },
+    {
+      "name": "upload file count 100 accepted / 101 rejected",
+      "passed": true
+    },
+    {
+      "name": "environment entry count 64 accepted / 65 rejected",
+      "passed": true
+    },
+    {
+      "name": "individually legal environment values exceed aggregate JSON bytes",
+      "passed": true
+    },
+    {
+      "name": "individually legal initialization fields exceed aggregate bytes",
+      "passed": true
+    }
+  ],
+  "sources": [
+    "modules/execution/inputs.ts",
+    "modules/execution/environment.ts",
+    "modules/execution/initialization.ts",
+    "modules/execution/sessions.ts",
+    "modules/execution/runs.ts",
+    "modules/artifacts/artifacts.ts",
+    "apps/control-plane/server.ts"
+  ],
+  "passed": true,
+  "existing_tests": {
+    "command": "npm test -- modules/execution/initialization.test.ts modules/execution/environment.test.ts",
+    "exit_code": 0,
+    "passed": 6,
+    "scope": "Deterministic behavior/environment validation and built-in adapter context handling; not cloud execution."
+  }
+}

@@ -1,0 +1,145 @@
+---
+title: "添加 Tool 或应用连接器"
+---
+
+应用连接器在控制平面通过租户所属 Connection 发起上游请求。共享 Tool broker 管理授权、审批、请求身份和未知结果。Sandbox 与 Harness 消费已有 Tool 契约，不需要应用专有代码或账户凭据。
+
+改变行为前阅读[应用架构](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md)、[broker 实现](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/broker.ts)与[验收要求](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/acceptance.md)。
+
+## 选择接入方式
+
+| 需要 | 实现路径 |
+| --- | --- |
+| 有固定操作目录的具名应用 | integrations/apps 中的 AppDefinition，加共享应用注册表与 broker |
+| 自己提供固定 JSON 操作的服务 | 优先使用已有 [HTTP Tools](/zh-CN/integrations/http-tools)配置；契约无法表达时再扩展适配器 |
+| 已有远程 MCP 服务 | 使用 [Remote MCP](/zh-CN/integrations/mcp)发现和绑定流程 |
+| guest 代码访问受保护 HTTP 接口 | HTTP Connection 访问策略，与 broker 的 Tool 审批不同 |
+
+不要新增凭据存储，也不要把应用请求移到 guest 来绕过审批。复用请求映射时保留出处和许可；当前复用映射的来源保存在 third_party/activepieces。
+
+## 定义有边界的读写操作
+
+[types.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/apps/types.ts)定义 AppDefinition、AppOperation 与 RequestSpec。每个操作提供严格对象 schema、表达实际副作用的 `write` 标记和固定请求映射。路径标识要编码，字符串和分页要有上限，拒绝未知字段，不能让模型参数随意选择主机或 HTTP 方法。POST 也可能是读取，例如 Notion 搜索；按语义判断副作用。
+
+以下示意放在 integrations/apps 模块内。`.invalid` 服务故意不可访问，需要针对自己的受控服务实现并测试后才能注册：
+
+```ts
+import { operation, id, string, encode } from './types.js';
+
+export const reportOperations = {
+  read_report: operation(
+    'Read one report.', false, { report_id: id }, ['report_id'],
+    a => ({ url: `https://reports.example.invalid/reports/${encode(a.report_id)}`,
+            method: 'GET' }),
+  ),
+  create_report: operation(
+    'Create a report after approval.', true,
+    { title: string, text: string }, ['title', 'text'],
+    a => ({ url: 'https://reports.example.invalid/reports', method: 'POST',
+            body: { title: a.title, text: a.text } }),
+  ),
+};
+```
+
+把操作放入 AppDefinition，补充 id、name、category、credential_url 和只读 `verify` 请求，然后加入 [registry.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/apps/registry.ts)的 applications 列表。可参考 [productivity.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/apps/productivity.ts)中的 Todoist `get_task` 与 `create_task`。
+
+当前注册表缺省只选择非写操作；显式选择的写操作要求审批，并使用 `replay: 'never'`。供 broker 使用的方法由 `write` 推导，真实上游 HTTP 方法来自 RequestSpec，审查时不能认为二者一定相同。Session 绑定还会限制 Harness 可用的连接和操作。
+
+## 接入认证与限定范围的验证
+
+缺省认证为 Bearer。Provider 要求其他请求头、组合凭据或令牌交换时，使用 AppDefinition 的认证钩子。操作参数、schema、结果、URL 和诊断信息中都不能包含秘密。共享请求路径拒绝重定向、限制结果大小并替换已知凭据值，但这不能替代对 Provider 返回内容的审查，也不能替代源头防泄漏。
+
+API key 使用受管凭据存储。OAuth 复用[现有模块](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/apps/oauth.ts)、加密 token envelope 和租户或部署所属的应用配置，声明真实端点、scope 与客户端认证规则。复用绑定租户、连接版本、Provider 和 redirect URI 的过期单次事务，不另做临时 callback，不向浏览器返回 Token。账户或权限变更使旧审批失效；刷新 Token 有单独的并发和版本语义。
+
+身份请求成功不能证明全部选定操作有权限。有依据时补充操作 scope、安全权限探测或对象元数据检查，否则保持未知。不能静默发送消息或创建真实对象来验证写权限；实测写入需要明确授权的可丢弃目标。断开本地连接不代表上游授权已经撤销。
+
+连接、Secret、OAuth 事务、Session 绑定和 Tool call 查询都检查租户所有权。知道上游对象 ID 不代表拥有引用它的 Hexagon 资源。
+
+## 保留审批与未知结果语义
+
+broker 在执行前保存调用与 request hash；相同调用 ID 使用不同参数会冲突，并固定实际执行的连接版本和策略。授权建立账户访问条件，审批允许具体副作用，二者不能替代。
+
+使用共享错误分类。当前应用传输中，401 触发重新认证；除 408 外的大多数其他 4xx 返回拒绝结果；5xx、传输失败及响应处理歧义可能留下未知结果。还需要解析应用错误信封，例如 Linear mutation 返回 GraphQL errors，即使 `data: null` 也可能已经发生写入。不能把全部 HTTP 200 当成功，或把全部错误响应当作没有副作用的证明。
+
+写入响应丢失时，保留原调用并停止重发。通过安全读操作或 Provider UI 查询真实记录，再按 [Tool 对账](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/tool-reconciliation.md)使用精确 `request_hash`、观察到的结果、返回文字和证据完成 resolve。resolve 记录操作者结论，不会发出新的上游请求。重复相同结论幂等，冲突或过期决定失败。无法确定结果时保持未知或取消 Run，不能编造成功或再次创建。
+
+## 三种相似等待，三种不同决定
+
+| 观察 | 含义 | 贡献者必须保持的行为 |
+| --- | --- | --- |
+| Run waiting_authorization，Tool call 等待授权 | 当前账户访问条件不足 | 走共享重新授权或拒绝本次授权流程；不把更换 call ID 当作恢复 |
+| Run waiting_approval，存在待批准操作 | 这一次副作用尚需授权决定 | 审批前不向上游派发；决定绑定原请求身份与策略 |
+| Run waiting_approval，Tool call unknown | 上游操作可能已生效，只是结果不明 | 调查原操作并 resolve；不能把再点一次批准当作安全重试 |
+
+第三行尤其容易被新适配器处理错：Run 的等待状态本身不能区分审批与未知结果。查看 Tool call 的 state、approval_id、execution_policy 和 resolution，必要时查询审批记录。派发后的 `executing` 状态在 worker 故障后同样需要按持久策略判断，而不是假定请求没有发送。
+
+broker 对可重放读取或明确 `idempotency_key` 策略有自己的规则；具名应用写操作当前固定为 `replay: never`。实际 POST 读取在 broker 的语义策略中可能是 GET，不应直接复制供应商 HTTP 方法作为重放依据。若原调用固定的 connection_version 与当前版本不同，未知结果不能沿新配置继续重放。扩展策略必须同时验证上游去重约束，不能只添加一个字段就宣称 exactly-once。
+
+## completed 不一定意味着上游操作成功
+
+Tool call 的 completed 表示已经有可交付结果；该结果可以是 `isError: true`。`AppRequestError` 会形成已完成的错误结果，授权拒绝也会完成原调用并返回错误。人工 resolve 选择 `outcome: failed` 同样将调用置为 completed，并让 Harness 收到失败内容。
+
+因此，测试应同时断言调用状态、`isError` / 错误码、外部写入次数和 Run 是否按预期继续。只断言 completed 会把权限拒绝或失败对账误判为业务成功。
+
+## 对账接口的重复与竞争
+
+resolve 使用与 broker 相同的调用锁；请求仍在执行时返回 `tool_call_in_flight`，即使 worker lease 已到期也不能抢先填写结论。首次决定要求原 Run 仍处于允许状态、调用为 unknown，并提供精确 request_hash。
+
+已保存的完全相同决定可以幂等返回，检查发生在首次决定的活动状态要求之前；这不意味着旧终态 Run 能接受一个新决定。不同 text、evidence 或 outcome 会与原 resolution 冲突。测试取消与对账竞争时，要区分“重复读取既有决定”和“试图提交新决定”，不能笼统写成取消后所有 resolve 都失败。
+
+实现依据：[ToolBroker](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/broker.ts)、[对账事务](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/reconciliation.ts)和[应用请求分类](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/apps/registry.ts)。HTTP 请求及错误契约见[审批与 Tool 恢复参考](/zh-CN/reference/approvals-tools)。
+
+## 验证具体读写示例
+
+使用 fake transport 与数据库 broker 测试。上述示例可以在 fixture 中维护内存报告存储和请求计数：读请求返回固定报告，写请求先保存报告再故意丢失响应，稳定触发未知结果。
+
+| 场景 | 必须断言 |
+| --- | --- |
+| 读映射 | 主机、路径和方法固定，ID 编码，无意外请求体，schema 拒绝多余字段 |
+| 写入等待审批 | 上游请求为零，新增报告为零 |
+| 授权或审批被拒绝 | 零写入，原调用不能绕过拒绝 |
+| 写入获批 | 恰好一份报告，结果返回原调用 |
+| 重复相同决定或调用 | 不重复报告，同 ID 改参数冲突 |
+| 保存后响应丢失 | 调用保持 unknown，重建 broker 不重复写入 |
+| 核实后 resolve | 要求精确 hash，只保存一次结果，不增加上游执行 |
+| 轮换凭据或取消 | 按状态拒绝旧审批或旧 resolve，迟到结果不重启已取消 Run |
+| 跨租户访问 | 无法访问他人连接、Secret、调用，Provider 请求为零 |
+| 认证与负载边界 | 分别验证重新认证、权限拒绝、超大或畸形结果及脱敏 |
+
+已有回归入口：
+
+```sh
+npx vitest run integrations/apps/registry.test.ts modules/tools/applications.test.ts modules/tools/authorization-denial.test.ts modules/tools/cancellation.test.ts
+```
+
+按[测试指南](/zh-CN/contribute/testing)配置隔离的 `TEST_DATABASE_URL`。为新 Provider 增加断言，不能用已有测试通过代替新接入覆盖。OAuth 变更还需测试 state 重放与过期、并发刷新和权限变更。
+
+### 添加新示例之前先复用仓库中的测试
+
+上面的报告映射用于解释扩展位置，不要求为了验证共享 broker 再建设第二个应用。按职责复用现有具体测试：
+
+| 所需行为 | 已有实现与断言 |
+| --- | --- |
+| 有界读写请求映射及写入语义分类 | [应用注册表测试](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/apps/registry.test.ts)核对目录 schema、请求映射、审批元数据、拒绝重定向和未知副作用分类 |
+| 批准前不发送、批准后一次写入、重复调用不增加写入 | [应用 broker 测试](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/applications.test.ts)以模拟传输和真实测试数据库覆盖 Todoist、Linear、飞书和 Lark |
+| 写入后响应丢失或含糊，重建 broker 后不重放 | 同一 broker 测试基于已持久化调用重建 ToolBroker，要求写入计数不增加 |
+| 拒绝授权后零外部写入、租户边界与重复决定 | [授权拒绝测试](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/authorization-denial.test.ts)使用两套 SDK 和可控本机 HTTP 服务 |
+| 取消后不继续派发或恢复执行 | [取消测试](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/cancellation.test.ts)覆盖相关 broker / Run 边界 |
+
+这些测试是共享契约的已有可执行示例，不证明新加入的 Provider 已经可用。只为新 Provider 添加请求映射 / 鉴权差异和确实缺少的契约用例。缺少 `TEST_DATABASE_URL` 时数据库相关测试会跳过，跳过不能作为通过证据；真实账户状态仍按下文单独记录。
+
+## 请求映射测试与调度测试分开
+
+对 `read_report`，含 `/` 的 ID 必须编码为单一路径段，额外参数必须在发送请求前被 schema 拒绝。对 `create_report`，独立检查固定 POST 地址和 JSON body，不把审批测试混入映射断言。映射测试无需账户即可证明请求形状，但不能证明 broker 会等待、拒绝租户不匹配或避免重复写入。
+
+模拟响应丢失时，先向假上游存储插入报告，再抛错。使用同一数据库重建 broker，保留上游存储与计数器。按业务引用读回报告，再用保存的 request_hash 对账原调用；断言对账前后上游写入计数都为一。重新创建空数据库或空上游存储会让测试失去检测重放的能力。真实账户验证仍是独立步骤。
+
+## 完成用户旅程与证据
+
+按需更新应用发现、操作描述、凭据说明及 Console 表单。遵守 [Console 契约](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/console-design.md)：完整 en/zh-CN 文案、应用自有的可访问控件、键盘操作、账户选择和凭据输入清空。检查两种语言及 OAuth 取消、返回流程。Agent Tools 与 Sandbox 平台设置保持分开。
+
+两种 SDK 都通过公开 API 和真实云 Agent 调用实际读操作；在授权的可丢弃目标上验证写入、审批、可控情况下的响应丢失恢复与确认清理。记录精确账户权限范围，不公开秘密或私有内容。向外部发送消息需要明确授权，本文不构成发送授权。没有真实账户时，分别报告契约覆盖与真实账户未验证。
+
+把 Provider、操作说明补充到[应用集成](/zh-CN/integrations/apps)，更新对应范围的证据，保留失败尝试。连接器测试通过不能支持笼统的真实账户验证标记。
+
+下一步：[应用集成](/zh-CN/integrations/apps)、[未知结果对账](/zh-CN/operate/reconciliation)、[测试与证据](/zh-CN/contribute/testing)。

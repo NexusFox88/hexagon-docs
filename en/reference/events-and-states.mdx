@@ -1,0 +1,313 @@
+---
+title: "Events, states and transitions"
+---
+
+State belongs to a specific object. A Run can be completed while its Session remains open; a Sandbox can be running while a Run waits for approval. Runtime unreachable does not prove compute absence. Track client connectivity separately.
+
+## Session
+
+| State | Meaning |
+| --- | --- |
+| `open` | Accepts work; does not imply compute already exists or a task is running. |
+| `pausing / paused / resuming` | Pause/wake lifecycle; inspect pause_scope because Session and Sandbox suspension differ. |
+| `closing / closed` | Closure pending/confirmed; retain cleanup records while closing. |
+
+Source: [modules/sandboxes/lifecycle.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/lifecycle.ts).
+
+## Run
+
+| State | Meaning |
+| --- | --- |
+| `queued` | Durably accepted, not yet executed; allocation is not established. |
+| `provisioning` | Preparing compute/image/Runtime; image-build waiting is not another Run. |
+| `running` | Executing; use events to inspect activity. |
+| `waiting_authorization` | Account authorization needs attention; inspect the bound connection and Tool call. |
+| `waiting_approval` | Approval or an uncertain Tool outcome needs attention; inspect approvals and Tool calls before choosing an action. |
+| `cancelling` | Cancellation settling; dispatched external requests can still return. |
+| `completed / failed / cancelled` | Terminal Run states; completed does not mean the Session is closed. |
+
+Source: [modules/execution/runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts).
+
+## Runtime binding
+
+| State | Meaning |
+| --- | --- |
+| `reserved / preparing / starting` | Control-plane reservation, preparation and startup phases. |
+| `ready` | Binding ready; not a permanent reachability or task-success guarantee. |
+| `restoring / restoring_preparing / restoring_starting` | Runtime preparation after restoration. |
+| `unreachable` | Reachability uncertain; recover without assuming resource loss. |
+| `interrupted` | Execution interrupted; investigate workspace/effects before reuse. |
+
+Source: [modules/execution/worker.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/worker.ts).
+
+## Sandbox resource
+
+| State | Meaning |
+| --- | --- |
+| `provider-derived state` | Connector-returned string, not a closed cross-provider enum; interpret running/paused through that connector. |
+| `confirmed absence / unknown` | inspect null means confirmed absence; authentication/network failure must not become null. |
+
+Source: [modules/sandboxes/connector.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/connector.ts).
+
+## Resource operation
+
+| State | Meaning |
+| --- | --- |
+| `pending` | Persisted intent, not proof of remote acceptance. |
+| `completed` | This operation completed; create completion does not mean task or deletion completion. |
+| `unknown` | Remote outcome uncertain; reconcile original operation/receipts. |
+| `rejected` | Definitive allocation refusal or a failed image build; does not universally prove remote resource absence. |
+| `deleted` | Cleanup of an image-preparation or checkpoint resource was recorded; interpret with operation kind. A completed delete operation uses `completed`. |
+| `review_state: automatic / needs_review / acknowledged` | Separate review axis; acknowledged does not turn unknown into completed. |
+
+Source: [modules/sandboxes/operations.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/operations.ts).
+
+## Transitions and observation
+
+The normal Run path is queued → provisioning → running → completed. Failure, authorization, approval, cancellation and worker recovery add branches; this is not a strictly increasing UI progress bar. `run.claimed` describes worker ownership/generation, not a Run state named claimed. `run.recovery_needed` can record recovery error information without changing the current state; it is not a new terminal state.
+
+Runtime invocations have their own starting, running, cancelling, exited, cancelled, failed and interrupted states; see [Runtime](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/runtime/server.py). Exited only means process termination. The worker still parses results and exports artifacts before Run completion. The persisted Runtime binding and invocation state are also separate fields.
+
+## Transition conditions and separate state examples
+
+These examples show selected fields from separate objects, not a combined API response or a real execution receipt. Read current records to decide the next action.
+
+| Object / example | Trigger and condition | Next state or action |
+| --- | --- | --- |
+| Session `{"state":"open","pause_scope":null}` | Pause requires no active Run and no pending/unknown create operation; Sandbox scope also requires supported capabilities | `pausing` → `paused`; inspect `pause_scope` before interpreting compute suspension |
+| Session `{"state":"paused","pause_scope":"sandbox"}` | Resume follows the saved scope; native pause/restore must settle before completion | `resuming` → `open`; restored Runtime bindings require preparation before execution |
+| Session `{"state":"closing"}` | Explicit close refuses an active Run; unresolved creation/checkpoint/cleanup can delay closure | Remains `closing` until lifecycle cleanup completes, then `closed`; retain operation receipts |
+| Run `{"state":"queued"}` | Cancel before execution | Directly `cancelled`, without requiring an intermediate `cancelling` state |
+| Run `{"state":"running"}` | Cancel an active, nonterminal Run | `cancelling` → `cancelled` or `failed`; already dispatched effects still need investigation |
+| Run `{"state":"waiting_approval"}` | A matching approval or uncertain Tool outcome must be resolved through its own handler | Can return to `running`; an approval decision and outcome reconciliation are different operations |
+| Runtime binding `{"state":"restoring"}` | Worker prepares and starts the restored binding | `restoring_preparing` → `restoring_starting` → `ready`; failure is not proof that the Sandbox is absent |
+| Runtime binding `{"state":"unreachable"}` | Recovery checks the original Runtime | Confirmed reconnection can restore `ready`; do not allocate a replacement solely because connectivity failed |
+| Resource operation `{"kind":"image_prepare","state":"rejected"}` | Image inspection reported a failed build | Preserve the build/template handle; image cleanup can later set `deleted` |
+| Resource operation `{"state":"unknown","review_state":"acknowledged"}` | An operator acknowledged the uncertainty | Outcome remains `unknown`; acknowledgement is not remote confirmation |
+
+An ordinary Run follows `queued → provisioning → running → completed`. The worker transition method also allows failure from queued, provisioning, running, either waiting state, and cancelling. Authorization, approval and Tool handlers add their own waiting/resume transitions; the worker transition map alone is not the entire state machine. Cancelling a terminal or already-cancelling Run leaves that state unchanged.
+
+For pause/resume, an existing matching target state is returned without starting another transition; a different pause scope is a conflict. A pending transition with the same scope follows reconciliation. The control plane inspects the original resource after uncertain native pause/resume outcomes rather than blindly repeating the remote operation. Provider-managed automatic standby is distinct from explicit compute suspension.
+
+Expiry cleanup is different from explicit close: it can fence active Runs, expire pending approvals and record `run.cancelling` with `reason: sandbox_expired` before completing resource cleanup. Therefore a close button and an expiry worker do not have identical preconditions.
+
+`session.pausing`, `session.paused`, `session.resuming` and `session.resumed` are persisted in the separate internal `session_lifecycle_events` table. They are not promised events in the Run event API documented below. Refresh the Session record when observing lifecycle actions.
+
+Sources: [Session lifecycle](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/lifecycle.ts), [Run transitions and cancellation](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts), [Runtime worker](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/worker.ts), [image preparation and cleanup](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/image-preparation.ts), [Tool broker](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/broker.ts).
+
+## Event envelope and cursor
+
+```json
+{"id":"42","type":"run.queued","data":{"session_id":"00000000-0000-0000-0000-000000000001"},"created_at":"2026-11-19T00:00:00Z"}
+```
+
+This is an illustrative sanitized shape, not an observed log. JSON event queries return `{events:[...]}` with id/type/data/created_at. SSE uses id/event/data fields; SDK-parsed stream events do not add the database created_at field. Example SSE:
+
+```text
+id: 42
+event: run.queued
+data: {"session_id":"00000000-0000-0000-0000-000000000001"}
+
+```
+
+The cursor is the database sequence as a numeric string: increasing within a Run query, not necessarily contiguous, and distinct from Runtime cursor. Events are persisted before streaming. JSON queries return up to 500 rows. SSE after takes precedence over Last-Event-ID, defaulting to 0. Deduplicate by Run/id and save event plus cursor atomically in your application.
+
+A keepalive comment may arrive about every 15 seconds. Once terminal and drained, `stream.end` carries `{state: ...}` without an id; it is not durable. Disconnecting only stops observation. Empty pages do not prove terminal state; query the Run after stream completion. Sources: [HTTP SSE](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts), [Runs](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts).
+
+## Main events and payloads
+
+| Event | Payload fields / meaning |
+| --- | --- |
+| `run.queued` | `session_id` |
+| `run.claimed` | `generation, recovery` |
+| `run.provisioning / run.running` | `transition data (often {})` |
+| `run.completed` | `final assistant output` |
+| `run.failed` | `failure details including code` |
+| `run.cancelling / run.cancelled` | `{} or lifecycle reason; expiry cleanup can include resource_cleanup` |
+| `run.recovery_needed` | `generation and diagnostic fields` |
+| `runtime.reconnected` | `{}` |
+| `sandbox.image_building` | `{}` |
+| `workspace.inputs_verified` | `session_id, files (path, sha256, size)` |
+| `authorization.required` | `connection_id`; refresh account authorization, not operation approval |
+| `tool.outcome_unknown` | `call_id`; reconcile the original external result |
+| `agent.initialized` | `schema_version, digest, harness, context_delivery, files, session_id, agent_id, agent_revision`; context delivery is `none`, `initial_input` or `native_history` |
+| `approval.required` | `id, action` |
+| `approval.decided` | `id, approved` |
+| `artifact.created` | `id, name, sha256, size` |
+| `authorization.denied` | `call_id, source: caller, outcome: authorization_denied` |
+| `tool.outcome_resolved` | `call_id, outcome, evidence, source: caller_verified` |
+| `tool.completed` | `call_id; additional fields depend on direct/caller-verified/denied path` |
+| `tool.result_after_cancellation` | `call_id, outcome` |
+
+Fields depend on the emitting path; the summary is not a strict JSON schema. Tool sources: [broker](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/broker.ts), [reconciliation](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/reconciliation.ts); artifacts: [capture](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/artifacts/artifacts.ts). `tool.outcome_unknown` requires investigation, not a new approval. Inspect the original call's hash, policy and state.
+
+## Model and protected-API transport events
+
+`model.response` and `protected_api.response` record authenticated transport facts for grants associated with a Run. Their data contains `connection_id`, nullable HTTP `status`, `transport` (`received` when status is known, otherwise `failed`), and `connection_version` when supplied. The emitter excludes headers, prompts and response bodies. A public grant without a Run ID does not produce this Run event.
+
+`status: 200` means an HTTP response was received, not that the model completed the task or a Tool write succeeded. Conversely, `status: null` leaves the remote outcome uncertain. These events are separate from ToolBroker's `tool.completed` and from final `run.completed`. Source: [ConnectionAccess.recordModelOutcome](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/access/access.ts).
+
+## Runtime and derived activity events
+
+Runtime ingest stores source events with deduplication keys, then may emit one additional normalized activity event from `harness.stdout`. The extra event has its own durable event ID; it is not a second Runtime cursor. These are observable process/output records, not private model reasoning.
+
+| Event | Payload / interpretation |
+| --- | --- |
+| `runtime.interrupted` | `{"reason":"supervisor_restarted"}` when startup discovers an interrupted invocation |
+| `harness.starting` | `{}`; process startup intent |
+| `harness.failed` | `{"code":"harness_start_failed"}` on launch failure |
+| `harness.running` | `{"pid":123}`; illustrative process ID, not a Run ID |
+| `harness.stdout` / `harness.stderr` | `{"text":"..."}`; redacted output chunks, potentially Harness-specific JSON |
+| `harness.exited` | `exit_code, state`; Runtime termination, not proof of successful Run result parsing/export |
+| `agent.activity.started` / `agent.activity.completed` | `kind`, optional `name`, `id`, `is_error`; normalized kinds include `tool`, `command_execution`, `mcp_tool_call`, `file_change` |
+| `agent.message` / `agent.message.delta` | `text`; visible message or text increment, not authoritative final Run output |
+
+The [activity projector](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/activity.ts) accepts only a complete newline-terminated JSON string of at most 65536 JavaScript code units. It recognizes selected OpenClaw, item-based and tool/text event shapes; it does not normalize arbitrary output or every Harness. Names are truncated to 256 units, IDs to 512, and message text to 32768. Missing normalized activity does not mean no work happened. Do not concatenate `agent.message` and `agent.message.delta` indiscriminately or overwrite the authoritative Run output with either.
+
+Source envelopes come from [Runtime](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/runtime/server.py); native JSON inside `text` remains version-specific. Preserve unknown records safely and consult the exact Harness contract when interpreting them. The examples here illustrate source-defined payloads, not logs from an executed task.
+
+## Choose the action from related records
+
+| Observed condition | Inspect next | Application action |
+| --- | --- | --- |
+| `waiting_authorization` with `authorization.required` | Connection and original Tool call | Complete or explicitly deny account authorization |
+| `waiting_approval` with a pending approval | Approval `id`, action, and call arguments | Ask for the decision on that exact operation |
+| `waiting_approval` with `tool.outcome_unknown` | Tool call state `unknown`, request hash, original execution policy and external evidence | Verify the original result and use outcome reconciliation; do not create a replacement approval or dispatch again blindly |
+| `approval.decided` or `tool.completed` | Current Run plus affected call | Refresh state; these paths can restore `running` without a `run.running` event |
+| `harness.exited` | Current Run and artifact list | Keep observing until the control plane settles the Run |
+| `run.completed` while Session remains open | Result/artifacts and Session lifecycle | Allow a follow-up or close; successful work does not prove resource deletion |
+
+For example, `{"type":"tool.outcome_unknown","data":{"call_id":"example-call"}}` directs the UI to investigation. It contains no approval ID. Conversely, `{"type":"approval.required","data":{"id":"example-approval","action":{"summary":"illustrative operation"}}}` identifies a decision record; `action` depends on its emitter. These are illustrative payloads, not UUID-valid requests to replay.
+
+Events describe what happened; fetch current object state to resolve present actions. The broker and decision handlers update Run state directly in some paths, so deriving state solely by stripping `run.` from event names is incomplete.
+
+## Consumer requirements
+
+Preserve or safely ignore unknown event types without crashing or manufacturing state transitions. Narrow payloads before reading fields. Tool completed can deliver an error or an authorization-denial result; it is not proof a side effect succeeded. caller_verified identifies a caller's checked conclusion, not a fresh provider request by the server.
+
+Reconnect to the original Run rather than resubmitting. Reconcile unknown outcomes. Display Run result, Session state, connectivity and cleanup separately so a success badge cannot conceal unresolved resources.
+
+For the underlying recovery model, see [durable events](/en/concepts/events-and-recovery); for operational inspection, see [observability](/en/operate/observability). SDK event parsing is implemented in [Python](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/python/hexagon/__init__.py) and [TypeScript](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/typescript/index.ts).
+
+## Payload examples by emitted event
+
+These source-shaped examples cover the current fixed event families described above, including the unnumbered transport marker. Each row shows only `data`, not the full envelope. IDs, digests, timestamps and content are illustrative; zero hashes are placeholders, not byte-integrity receipts. They are not one chronological execution trace. Empty transition data is valid; recovery diagnostics, approval actions and native output may contain additional path-specific fields. Future or provider-specific records must still be handled as unknown types safely.
+
+| Event | Illustrative `data` |
+| --- | --- |
+| `run.queued` | `{"session_id":"00000000-0000-4000-8000-000000000001"}` |
+| `run.claimed` | `{"generation":2,"recovery":true}` |
+| `run.provisioning` | `{}` |
+| `run.running` | `{}` |
+| `run.completed` | `{"role":"assistant","text":"Example result","artifacts":[]}` |
+| `run.failed` | `{"code":"runtime_interrupted","runtime_state":"interrupted"}` |
+| `run.cancelling` | `{}` |
+| `run.cancelled` | `{"reason":"sandbox_expired","resource_cleanup":"confirmed"}` |
+| `run.recovery_needed` | `{"generation":2}` |
+| `runtime.reconnected` | `{}` |
+| `runtime.interrupted` | `{"reason":"supervisor_restarted"}` |
+| `sandbox.image_building` | `{}` |
+| `workspace.inputs_verified` | `{"session_id":"00000000-0000-4000-8000-000000000001","files":[{"path":"notes.txt","sha256":"0000000000000000000000000000000000000000000000000000000000000000","size":5}]}` |
+| `agent.initialized` | `{"schema_version":1,"digest":"0000000000000000000000000000000000000000000000000000000000000000","harness":{"id":"pi","version":"1.5.2"},"context_delivery":"none","files":[],"session_id":"00000000-0000-4000-8000-000000000001","agent_id":null,"agent_revision":null}` |
+| `approval.required` | `{"id":"00000000-0000-4000-8000-000000000001","action":{"summary":"Illustrative action"}}` |
+| `approval.decided` | `{"id":"00000000-0000-4000-8000-000000000001","approved":false}` |
+| `authorization.required` | `{"connection_id":"00000000-0000-4000-8000-000000000001"}` |
+| `authorization.denied` | `{"call_id":"00000000-0000-4000-8000-000000000001","source":"caller","outcome":"authorization_denied"}` |
+| `tool.outcome_unknown` | `{"call_id":"00000000-0000-4000-8000-000000000001"}` |
+| `tool.outcome_resolved` | `{"call_id":"00000000-0000-4000-8000-000000000001","outcome":"failed","evidence":"Checked original external record","source":"caller_verified"}` |
+| `tool.completed` | `{"call_id":"00000000-0000-4000-8000-000000000001"}` |
+| `tool.result_after_cancellation` | `{"call_id":"00000000-0000-4000-8000-000000000001","outcome":"unknown"}` |
+| `artifact.created` | `{"id":"00000000-0000-4000-8000-000000000001","name":"report.txt","sha256":"0000000000000000000000000000000000000000000000000000000000000000","size":5}` |
+| `model.response` | `{"connection_id":"00000000-0000-4000-8000-000000000001","status":200,"transport":"received","connection_version":1}` |
+| `protected_api.response` | `{"connection_id":"00000000-0000-4000-8000-000000000001","status":null,"transport":"failed","connection_version":1}` |
+| `harness.starting` | `{}` |
+| `harness.failed` | `{"code":"harness_start_failed"}` |
+| `harness.running` | `{"pid":123}` |
+| `harness.stdout` | `{"text":"Example visible output\n"}` |
+| `harness.stderr` | `{"text":"Example diagnostic\n"}` |
+| `harness.exited` | `{"exit_code":0,"state":"exited"}` |
+| `agent.activity.started` | `{"kind":"command_execution","id":"example-command"}` |
+| `agent.activity.completed` | `{"kind":"tool","name":"example","is_error":true}` |
+| `agent.message` | `{"text":"Example visible message"}` |
+| `agent.message.delta` | `{"text":"Example fragment"}` |
+| `stream.end` | `{"state":"completed"}` |
+
+## Emitter boundaries and open event types
+
+The fixed payload examples above cover 35 durable event names and the separate `stream.end` transport marker. This is a current-source inventory, not a closed event-type enum: `Runs.ingest` persists a Runtime item's `type` as supplied, and the shared Runtime contract can evolve. Unknown event types must remain safe to store or ignore. A future value does not authorize inferring a new Run state.
+
+| Emitting boundary | Source of names and payloads |
+| --- | --- |
+| Run domain | `Runs.submit`, `claim`, `advance`, `cancel`, approval and recovery methods; `advance` expands `run.${state}` only over its allowed transitions |
+| Preparation and expiry | Input verification, image-build wait and initialization; lifecycle expiry emits cancelling/cancelled with cleanup-specific data |
+| Tool broker and reconciliation | Authorization, approval, unknown/resolved outcomes and completion; cancellation can replace the wait event with `tool.result_after_cancellation` |
+| Protected access | `ConnectionAccess.recordModelOutcome` chooses `model.response` or `protected_api.response`; no prompt/body is emitted |
+| Artifact capture | `Artifacts.capture` emits only when an artifact row is inserted |
+| Runtime supervisor | Startup, stdout/stderr, exit and restart interruption; the stdout/stderr event name is expanded from its stream name |
+| Activity projection | `harnessActivity` derives bounded visible activity/message events from selected stdout JSON shapes |
+| SSE transport | `stream.end` is generated when the Run is terminal and its durable event query is drained; it is not inserted into the event table |
+
+There are also Session lifecycle events in a different table. Their existence does not add them to the Run stream. The event emitter list must be reviewed together with direct state updates: approving, denying authorization or completing a Tool can change Run state without emitting a matching `run.running` event.
+
+## Minimal examples for each state value
+
+Each cell contains independent illustrative projections, not a response containing alternative states simultaneously. Required identifiers and other fields are omitted. Read these with the transition conditions above; they are not commands to force a state.
+
+| Object / field | Illustrative projections | Source |
+| --- | --- | --- |
+| Session / `state` | `{"state":"open"}`&lt;br/>`{"state":"pausing"}`&lt;br/>`{"state":"paused"}`&lt;br/>`{"state":"resuming"}`&lt;br/>`{"state":"closing"}`&lt;br/>`{"state":"closed"}` | [modules/sandboxes/lifecycle.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/lifecycle.ts) |
+| Run / `state` | `{"state":"queued"}`&lt;br/>`{"state":"provisioning"}`&lt;br/>`{"state":"running"}`&lt;br/>`{"state":"waiting_authorization"}`&lt;br/>`{"state":"waiting_approval"}`&lt;br/>`{"state":"cancelling"}`&lt;br/>`{"state":"completed"}`&lt;br/>`{"state":"failed"}`&lt;br/>`{"state":"cancelled"}` | [modules/execution/runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| Runtime binding / `state` | `{"state":"reserved"}`&lt;br/>`{"state":"preparing"}`&lt;br/>`{"state":"starting"}`&lt;br/>`{"state":"ready"}`&lt;br/>`{"state":"restoring"}`&lt;br/>`{"state":"restoring_preparing"}`&lt;br/>`{"state":"restoring_starting"}`&lt;br/>`{"state":"unreachable"}`&lt;br/>`{"state":"interrupted"}` | [modules/execution/worker.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/worker.ts) |
+| Resource operation / `state` | `{"state":"pending"}`&lt;br/>`{"state":"completed"}`&lt;br/>`{"state":"unknown"}`&lt;br/>`{"state":"rejected"}`&lt;br/>`{"state":"deleted"}` | [modules/sandboxes/image-preparation.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/image-preparation.ts) |
+| Resource operation review / `review_state` | `{"review_state":"automatic"}`&lt;br/>`{"review_state":"needs_review"}`&lt;br/>`{"review_state":"acknowledged"}` | [modules/storage/013-resource-review.sql](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/storage/013-resource-review.sql) |
+| Runtime invocation / `state` | `{"state":"starting"}`&lt;br/>`{"state":"running"}`&lt;br/>`{"state":"cancelling"}`&lt;br/>`{"state":"exited"}`&lt;br/>`{"state":"cancelled"}`&lt;br/>`{"state":"failed"}`&lt;br/>`{"state":"interrupted"}` | [runtime/server.py](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/runtime/server.py) |
+
+Sandbox state remains an open Provider-derived string. One additional control-plane projection matters: successful Session closure stores `{"state":"destroyed"}` inside the saved Sandbox object when one existed. That is a retained lifecycle projection, not a fresh Provider inspect response or a universal provider enum. A connector's `inspect(id) === null` is a separate absence result, not a resource whose `state` equals null. See [closure](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/lifecycle.ts).
+
+## Lifecycle actions are conditional transitions
+
+The same Session state can represent different compute strategies. Use `pause_scope`, declared capabilities and persisted operation receipts together with the state. These are action preconditions and observation rules, not a client-side state machine that can replace server checks.
+
+| Action and source | Before remote work | Confirmation or remaining uncertainty |
+| --- | --- | --- |
+| Pause with `scope: session` | Reject closing/closed; require no active Run and no pending/unknown create; persist `pausing` and scope | Records `paused` without asserting compute suspension. Do not equate this with stopped billing. |
+| Native Sandbox pause | Require `pause_resume` and supported connector methods; persist intent before the first remote call | Inspect the original resource for `paused`; missing resource is `sandbox_lost`, a different state leaves `session_transition_pending`. |
+| Native Sandbox resume | Start from `paused` or continue `resuming`; retain the saved scope | First attempt invokes resume; recovery may use `reconcileResume`, then inspects the same resource for `running`. It does not allocate a substitute to resolve uncertainty. |
+| Provider-managed standby | Declared `automatic_standby` selects a separate policy | Session can become `paused` without Hexagon invoking a native pause or certifying that the Provider has already stopped compute. Inspect `provider_managed_standby` separately from `compute_paused`. |
+| Snapshot pause / restore | Persist checkpoint or restore operation and original handles | Resume uses the saved checkpoint; a lost restore result adopts exactly one operation match. Zero or multiple matches leave `unknown`, not a new restore request. |
+| Repeated target action | Already `paused` for pause or `open` for resume | Returns the target state without repeating remote work; a different requested pause scope conflicts. Opposite in-progress transitions return `session_transition_pending`. |
+| Finish Sandbox resume | Native or Provider-managed resume reaches its lifecycle target | Session becomes `open`; a non-interrupted Runtime binding becomes `restoring`. Runtime preparation still precedes the next invocation. An interrupted binding is not silently repaired. |
+
+Sources: [changePause](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/lifecycle.ts), [checkpointTransition](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/checkpoints.ts), [worker preparation](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/worker.ts).
+
+## Review state does not resolve operation outcome
+
+Only an operation currently in `unknown` accepts the review actions below. Review history and scheduling changes are persisted before optional reconciliation. A successful HTTP response can still contain `reconciliation_error`; inspect the returned operation outcome rather than using the status code as a cleanup receipt.
+
+| Review action | Review-state change | Work triggered |
+| --- | --- | --- |
+| `acknowledge` | `acknowledged`, next check cleared | Records human attention and suspends automatic review; does not confirm remote success or absence |
+| `reopen` | `automatic`, next check scheduled now | Returns to automatic handling; does not itself invoke the lifecycle reconciliation branch |
+| `reconcile` | `automatic`, next check scheduled now | Immediately dispatches by current Session/operation: closing or delete → close; checkpoint → Sandbox pause; restore → resume; other kinds → provision |
+
+A `completed`, `rejected` or `deleted` operation does not become reviewable merely because its Session is still closing. Use the actual unresolved operation and preserve its private identifiers. Source: [ResourceOperations.review](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/operations.ts); operational procedure: [reconciliation](/en/operate/reconciliation).
+
+## Defaults and parameterized writes
+
+New rows start as Session `open`, Run `queued`, Runtime binding `reserved` and resource operation `pending`; operation review starts as `automatic`. These defaults come from the [initial schema](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/storage/001-initial.sql), [Runtime binding schema](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/storage/004-runtime-bindings.sql) and [review schema](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/storage/013-resource-review.sql). Most lifecycle state columns are text rather than database-enforced enums. The values listed here describe current implementation writes; callers must tolerate future values without inventing transitions.
+
+| Parameterized write | Values and controlling decision |
+| --- | --- |
+| `Runs.advance` | `provisioning`, `running`, `completed`, `failed`, `cancelled`, restricted by the explicit transition map and live lease |
+| `Runs.cancel` | `cancelled` for queued, otherwise `cancelling`; terminal/already-cancelling calls return unchanged |
+| `ToolBroker.wait` | `waiting_authorization` or `waiting_approval` at current call sites; never overwrites cancelling |
+| `changePause` pending / target | `pausing` / `paused` or `resuming` / `open`, selected by action and validated scope |
+| Worker preparation | `preparing` versus `restoring_preparing`, then `starting` versus `restoring_starting`, selected from prior binding state |
+| Image inspection | `ready` maps to operation `completed`; `failed` to `rejected`; building remains `pending` |
+| Review scheduling | `acknowledged` stays acknowledged; repeated uncertain attempts can become `needs_review`; otherwise automatic; explicit review actions use the table above |
+
+Close reconciliation differs from adoption for continued execution. Provision/restore requires a unique matching resource. Close can retain multiple exact operation matches in `reconciled_ids` and attempt to clean all of those owned resources; zero matches still leaves creation unconfirmed. Marking the original create operation `completed` during this cleanup reconciliation does not prove a successful Agent invocation, nor does it complete the separate delete operations. Source: [closeSession](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/lifecycle.ts).
+
+The [source-write inventory](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-state-write-sites.json) records 45 insert/state-write query sites for these four tables across the current non-test TypeScript application/modules/integrations. Dynamic query expressions are listed separately for review. This inventory is source coverage, not evidence that all transitions were executed against a database or Provider.
+
+Next: [streaming guide](/en/build/stream-events), [recovery](/en/build/recovery), [reconciliation](/en/operate/reconciliation).

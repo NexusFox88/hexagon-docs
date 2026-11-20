@@ -1,0 +1,104 @@
+---
+title: "Connect E2B"
+---
+
+Run a Harness in E2B while Hexagon manages tasks, private previews, and resource lifecycle. This page describes the current E2B connector. Use an account credential authorized to create and delete the target Sandboxes; the OCI path also needs Template build and deletion permissions.
+
+## Template and connection
+
+Prepare an E2B API key and an available template identifier. The connection schema contains only `template`, defaulting to `base`. Do not add undefined CPU or memory fields to config. Built-in Harnesses use this template; its configuration determines machine resources.
+
+Built-in OpenCode requires at least 2048 MiB. Do not assume the default base meets that requirement. Choose an explicitly configured template and inspect actual resource information. Pi and custom Harnesses also require interpreter, dependency, and real memory checks; successful installation is insufficient.
+
+Supply the following environment values through private configuration. These examples create a new connection; rerunning creates additional connections, so retain and reuse the returned ID. The local client targets a local workspace; see [self-hosting](/en/operate/self-host) for hosted client initialization.
+
+```python
+import os
+from hexagon import Hexagon
+
+client = Hexagon.local()
+connection = client.create_connection(
+    kind="sandbox", provider="e2b", name="E2B workspace",
+    credential=os.environ["E2B_API_KEY"],
+    config={"template": os.environ["E2B_TEMPLATE"]},
+)
+checked = client.validate_connection(connection["id"])
+if checked["status"] != "ready":
+    raise RuntimeError("Inspect E2B connection diagnostics")
+client.update_connection(connection["id"], enabled=True)
+sandbox_connection_id = connection["id"]
+```
+
+```typescript
+import { Hexagon } from '@hexagon/agent-sdk';
+
+const client = await Hexagon.local();
+const credential = process.env.E2B_API_KEY;
+const template = process.env.E2B_TEMPLATE;
+if (!credential || !template) throw new Error('Set E2B_API_KEY and E2B_TEMPLATE');
+const connection = await client.createConnection({
+  kind: 'sandbox', provider: 'e2b', name: 'E2B workspace',
+  credential, config: { template },
+});
+const checked = await client.validateConnection(connection.id);
+if (checked.status !== 'ready') throw new Error('Inspect E2B connection diagnostics');
+await client.updateConnection(connection.id, { enabled: true });
+const sandboxConnectionId = connection.id;
+```
+
+Validation performs `list_sandboxes`. It does not run a model or a full Harness and does not prove that the template can allocate successfully. Explicitly enable after ready validation. Revalidate and enable after template or credential changes; existing Sessions retain their pinned configuration.
+
+## Complete a first task
+
+Use the returned ID as the Sandbox input in the [first Session tutorial](/en/start/first-session), with an enabled, validated model connection and compatible Harness. Its Python and TypeScript examples independently cover creation, Run, artifacts, and close. Success in one SDK does not substitute for the other.
+
+Start with a small task writing fixed content to the export directory. Check terminal state, actual response, and downloaded bytes. For previews, have the task start a service and use the authorized Hexagon [private preview](/en/build/private-preview) entry. Public traffic is disabled; the control plane uses the provider traffic token in its proxy, never as a browser credential or share-link parameter.
+
+Completion means successful execution, readable artifacts, correct preview authorization where required, and confirmed resource cleanup after close. Listing or allocating alone is insufficient.
+
+## OCI image path
+
+For a registered public OCI Harness, E2B builds a Session-owned Template, currently with 2 CPU / 4096 MiB. This path selects the prepared template; putting an image name into the connection template field does not invoke OCI preparation. Image preparation and compute creation have separate operation records.
+
+Follow the [OCI guide](/en/integrations/harnesses/oci) to register, record the digest, and preflight. E2B currently does not declare private_oci_image. Do not bypass this by placing registry passwords in ordinary environment. A completed image build does not verify Harness, Tool, or conversation behavior.
+
+After a lost build receipt, reconciliation looks for the Template belonging to the original operation. If the current build cannot be reliably identified, the outcome remains unknown instead of blindly rebuilding. Close handles compute before deleting the Session-owned Template. A shared user-configured template is not deleted as a Session-owned image.
+
+## Networking, idle, and recovery
+
+E2B declares network_allowlist. It restricts Sandbox egress; include required destinations following [network policy](/en/build/sandbox-policy) and verify real allowed/denied probes. Do not troubleshoot by putting account credentials into the Sandbox.
+
+Idle uses native pause, with connect on the next turn. Submit another Run to the same Session; no direct provider resume call is needed. The strategy preserves memory and filesystem, but independently verify the selected Harness's second turn, conversation, and file continuity. Active Runs, including authorization/approval waits, are not idle suspension candidates.
+
+Close is terminal; pause is not deletion. E2B also reports provider runtime expiry. Hexagon lifecycle and reconciliation track resources; stopping a local process does not prove cloud absence.
+
+## Diagnose and verify
+
+| Symptom | Check |
+| --- | --- |
+| Validation fails | API key, account permissions, control-plane connectivity to E2B |
+| Validation succeeds but create fails | Template availability, resource quota, actual template specification |
+| harness_requires_2048mb | Actual memory of the built-in OpenCode template |
+| OCI remains preparing / unknown | Original build receipt, Template state, operation records; do not duplicate creation |
+| Preview unavailable | Listening service/port, Hexagon authorization, provider private transport |
+| Close remains incomplete | Separate Sandbox deletion and owned Template cleanup results |
+
+The E2B SDK owns its dispatcher; the connector explicitly selects environment proxy settings. `NODE_USE_ENV_PROXY=0` disables that selection. Diagnose control-plane outbound connectivity as well as Sandbox network policy.
+
+This page is implementation-reviewed; cloud tasks were not rerun. Historical built-in dual-SDK results are in the [execution matrix](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/execution-matrix.md), with idle branches in the [serverless ledger](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-harness-serverless-matrix.json). Do not extend built-in success to a new OCI image.
+
+Sources: [E2B connector](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/sandboxes/e2b.ts), [image contract](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/harness-images.md). Next: [first task](/en/start/first-session), [idle and wake](/en/build/idle-and-wake), [cleanup reconciliation](/en/operate/reconciliation).
+
+Later evidence: the [E2B OCI increment](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-e2b-oci-preparation.md) records independent OpenCode Python/Chat and TypeScript/Messages journeys, byte-level recovery and template cleanup. It does not cover every SDK/protocol intersection; failed attempts remain recorded. See [reading combination evidence](/en/integrations/verified-combinations).
+
+## Keep three template/resource identities separate
+
+| Identity | Selected by | Cleanup responsibility |
+| --- | --- | --- |
+| User-configured template | Connection `config.template` for built-in Harnesses | Shared input; Session close does not delete this template. |
+| Session-owned prepared template | Registered public OCI Harness and its image-preparation operation | Confirm template/build receipt and delete the owned template after its compute is cleaned. |
+| Actual Sandbox | A particular compute creation operation | Confirm deletion separately; a ready template is not an allocated or cleaned Sandbox. |
+
+The `base` schema default is a name, not a verified memory specification. The [serverless record](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-harness-serverless-ui.md) preserves an E2B/OpenCode failure on a 1 GiB base template and the subsequent selection of the configured 2 GiB template. For an OCI path, the connector's build request explicitly uses 2 CPUs and 4096 MiB; this does not change the resources of the built-in connection template.
+
+For domain enforcement, the [public API network record](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-network-api-journey.md) compares allowed and denied requests inside real E2B resources. It uses a deterministic probe Harness and TypeScript, not a model-driven dual-SDK task. For built-in Web execution and browser access, use the [Web journey](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-web-preview-journey.md) and [independent Python journey](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-python-web-journey.md), preserving their dates and combinations. Do not relabel a later version or a new template as having passed those historical runs.

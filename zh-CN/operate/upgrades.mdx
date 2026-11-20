@@ -1,0 +1,69 @@
+---
+title: "升级版本与迁移数据"
+---
+
+升级同时涉及控制平面代码、数据库 schema、SDK 和云执行协议。先明确目标代码与迁移来源，保留可恢复的旧版本和匹配备份，再替换运行环境。
+
+## 升级前
+
+记录当前源码 revision 或分发版本、锁文件、SDK 版本、迁移清单和部署配置。本地构建不自动成为具名公开发布版本，不要自行发明 release 名称。
+
+完成或取消活动 Run，关闭 Session 并确认云清理。保留待调查操作记录；若仍有未知结果，先[对账](/zh-CN/operate/reconciliation)。在离线状态创建[完整匹配备份](/zh-CN/operate/backup-restore)，并确认有旧代码可用于恢复。
+
+不要指望新 worker 兼容任何历史 invocation。涉及凭据边界、Runtime 协议或 Harness 行为的变更，可能需要创建新 Session；先阅读相应迁移说明。
+
+## 执行升级
+
+在保留旧分发的独立目标中准备新代码，安装其锁定依赖。local 受管理启动会运行迁移：
+
+```sh
+npm ci
+npm run local -- start
+npm run local -- status
+```
+
+编译分发使用其 production 安装说明。底层前台部署需要先 `npm run db:migrate`，再启动对应服务；hosted 身份与密钥仍按[部署要求](/zh-CN/operate/self-host)提供。不要在新旧服务同时管理同一部署的情况下凭经验切换版本。
+
+迁移在数据库事务和 advisory lock 下执行。已应用迁移的 checksum 改变会被拒绝；数据库包含当前代码未知的迁移时返回 `database_schema_newer_than_code`。不要通过删除迁移记录或编辑旧 SQL 来让检查通过。
+
+## 升级后检查
+
+1. 服务身份、数据库与密钥匹配，管理和凭据入口可用。
+2. 历史 Session 初始化、Run、事件和产物仍可读取。
+3. 新 Session 使用预期 Harness / 模型 / Provider 组合完成任务。
+4. 两个 SDK 对受影响契约分别检查，涉及完整旅程变更时分别实云验证。
+5. 私有预览、授权 / 审批和清理按此次变更范围复查。
+
+单独通过 TypeScript 类型检查不能证明数据迁移或云恢复成功。记录实际命令、结果和版本范围；失败记录同样保留。
+
+## 保存精确的升级版本对
+
+记录源、目标发行包内容指纹，可用时保存各自 `release.json` 元数据、锁文件哈希、已应用迁移名称/checksum、SDK 包版本及备份 manifest。内容指纹不是 Git revision 或签名发布。保留旧发行包本身，目录名不能重建它。
+
+[11 月 18 日本地发行包演练](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-18-local-beta-delivery.md)记录了恢复数据库在较新编译发行包上启动、历史内容与解密保留，以及后续独立云任务。它不定义通用的正式版本升级矩阵。在实际运行的源/目标构建对与验证结果建立关联前，将其作为有范围的流程实例，并保存自己升级的版本对。
+
+本次演练保留的构建清单可识别以下**未发布构建指纹**：
+
+| 构建 | 构建时间（11 月 18 日 UTC） | 记录中的作用 |
+| --- | --- | --- |
+| `beta-candidate-2` · `3f0b9043cc2edba0…` | 12:37:11 | 原始生产依赖安装与初始恢复上下文 |
+| `beta-recovery` · `88913006ad76316c…` | 12:58:09 | 后续保存的本地恢复上下文 |
+| `beta-delivery` · `6f3262ed25e2451e…` | 13:05:44 | 最终分发包；历史记录包含此后启动与历史数据查看 |
+
+恢复工作区后的 Python 与 TypeScript 记录均通过产物验证并确认清理。云任务发生在最终构建之前，其中 TypeScript 旅程于 13:04:39 UTC 开始，因此不能将这些任务标成 `beta-delivery` 的执行结果。矩阵没有绑定当时服务进程的精确构建指纹。这是一条已验证的安装、恢复与升级**流程实例**，其中恢复的 27 张表行数与哈希一致，不是独立认证的最终构建版本对。下一次升级应将实际运行的源/目标指纹与新任务结果共同记录，再声称该精确版本对通过。
+
+| 条件 | 是否继续 |
+| --- | --- |
+| 新代码认识所有已应用迁移，已有 checksum 匹配 | 进入隔离任务验证；schema 兼容本身不是产品验收 |
+| `database_schema_newer_than_code` | 停止，使用匹配代码，或把对应旧备份恢复到全新目标 |
+| `database_migration_changed:<name>` | 停止并比较实际发行包，不改写迁移历史 |
+| 迁移成功但凭据无法解密 | 保持流量停止，更改凭据前先确认数据库与密钥配对 |
+| 历史数据可读但新任务失败 | 升级验收未完成，保留该任务云标识，调查后再推广 |
+
+## 回退
+
+不承诺数据库迁移可逆。回退通常是把旧版本和对应旧备份恢复到全新目标，再按恢复流程验证，而不是在新 schema 上直接运行旧代码。
+
+旧备份不包含升级后的新增数据。回退前盘点新写入、外部工具副作用和新云资源，避免丢失业务结果或产生孤儿资源。保留升级后数据库快照用于调查；不要覆盖唯一可恢复副本。
+
+实现依据：[迁移器](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/storage/migrate.ts)、[本地启动](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/tooling/local.ts)。下一步：[备份恢复](/zh-CN/operate/backup-restore)、[更新记录](/zh-CN/changelog)、[已验证组合](/zh-CN/integrations/verified-combinations)。

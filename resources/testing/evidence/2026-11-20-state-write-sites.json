@@ -1,0 +1,418 @@
+{
+  "scope": "AST inventory of query calls in non-test apps/modules/integrations TypeScript: four lifecycle tables, state/review updates and inserts. Dynamic SQL listed separately; not a runtime test or automatic transition proof.",
+  "files_scanned": 105,
+  "writes": [
+    {
+      "path": "modules/execution/runs.ts",
+      "line": 59,
+      "table": "runs",
+      "sql": "INSERT INTO runs(tenant_id,id,session_id,idempotency_key,request_hash,input,origin,execution_identity) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *",
+      "parameters": "[tenant, randomUUID(), session, key, hash, input,origin,executionIdentity]",
+      "source_sha256": "f462cf48c64b845d29861f4a2fac3d144ee99c61775301cac56249cc09842ecf"
+    },
+    {
+      "path": "modules/execution/runs.ts",
+      "line": 137,
+      "table": "session_runtimes",
+      "sql": "UPDATE session_runtimes SET state='unreachable' WHERE tenant_id=$1 AND session_id=$2 AND state IN ('ready','unreachable')",
+      "parameters": "[lease.tenant_id, run.session_id]",
+      "source_sha256": "f462cf48c64b845d29861f4a2fac3d144ee99c61775301cac56249cc09842ecf"
+    },
+    {
+      "path": "modules/execution/runs.ts",
+      "line": 146,
+      "table": "session_runtimes",
+      "sql": "UPDATE session_runtimes SET state='ready' WHERE tenant_id=$1 AND session_id=$2 AND state='unreachable' RETURNING session_id",
+      "parameters": "[lease.tenant_id, run.session_id]",
+      "source_sha256": "f462cf48c64b845d29861f4a2fac3d144ee99c61775301cac56249cc09842ecf"
+    },
+    {
+      "path": "modules/execution/runs.ts",
+      "line": 158,
+      "table": "session_runtimes",
+      "sql": "UPDATE session_runtimes SET state='ready' WHERE tenant_id=$1 AND session_id=$2 RETURNING session_id",
+      "parameters": "[lease.tenant_id, session]",
+      "source_sha256": "f462cf48c64b845d29861f4a2fac3d144ee99c61775301cac56249cc09842ecf"
+    },
+    {
+      "path": "modules/execution/runs.ts",
+      "line": 174,
+      "table": "session_runtimes",
+      "sql": "UPDATE session_runtimes SET state='interrupted' WHERE tenant_id=$1 AND session_id=$2",
+      "parameters": "[lease.tenant_id, run.session_id]",
+      "source_sha256": "f462cf48c64b845d29861f4a2fac3d144ee99c61775301cac56249cc09842ecf"
+    },
+    {
+      "path": "modules/execution/runs.ts",
+      "line": 176,
+      "table": "runs",
+      "sql": "UPDATE runs SET state=$3,output=$4,error=$5,lease_until=CASE WHEN $6 THEN NULL ELSE lease_until END,updated_at=now() WHERE tenant_id=$1 AND id=$2",
+      "parameters": "[lease.tenant_id, lease.id, state, state === 'completed' ? JSON.stringify(data) : null, state === 'failed' ? JSON.stringify(data) : null, terminal.has(state)]",
+      "source_sha256": "f462cf48c64b845d29861f4a2fac3d144ee99c61775301cac56249cc09842ecf"
+    },
+    {
+      "path": "modules/execution/runs.ts",
+      "line": 187,
+      "table": "runs",
+      "sql": "UPDATE runs SET state='waiting_approval',lease_owner=NULL,lease_until=NULL,updated_at=now() WHERE tenant_id=$1 AND id=$2",
+      "parameters": "[lease.tenant_id, lease.id]",
+      "source_sha256": "f462cf48c64b845d29861f4a2fac3d144ee99c61775301cac56249cc09842ecf"
+    },
+    {
+      "path": "modules/execution/runs.ts",
+      "line": 204,
+      "table": "runs",
+      "sql": "UPDATE runs SET state='running',updated_at=now() WHERE tenant_id=$1 AND id=$2",
+      "parameters": "[tenant, run.id]",
+      "source_sha256": "f462cf48c64b845d29861f4a2fac3d144ee99c61775301cac56249cc09842ecf"
+    },
+    {
+      "path": "modules/execution/runs.ts",
+      "line": 217,
+      "table": "runs",
+      "sql": "UPDATE runs SET state=$3,cancel_requested=true,updated_at=now() WHERE tenant_id=$1 AND id=$2 RETURNING *",
+      "parameters": "[tenant, id, state]",
+      "source_sha256": "f462cf48c64b845d29861f4a2fac3d144ee99c61775301cac56249cc09842ecf"
+    },
+    {
+      "path": "modules/execution/sessions.ts",
+      "line": 177,
+      "table": "sessions",
+      "sql": "INSERT INTO sessions(tenant_id,id,agent_id,sandbox_connection_id,model_connection_id,definition,env_secret_id,env_names,agent_revision) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id,agent_id,agent_revision,definition,env_names,state,sandbox,created_at,updated_at",
+      "parameters": "[tenant, id, parsed.agent_id??null, sandbox.id, model.id, pinned, envSecret, JSON.stringify(Object.keys(env).sort()),agent.revision]",
+      "source_sha256": "7c573299bb53511c84e2e9ac2d0fde6ff61fcef02bf53bbef6087699264f0a0d"
+    },
+    {
+      "path": "modules/execution/worker.ts",
+      "line": 92,
+      "table": "session_runtimes",
+      "sql": "INSERT INTO session_runtimes(tenant_id,session_id,secret_id) VALUES($1,$2,$3) RETURNING *",
+      "parameters": "[run.tenant_id, run.session_id, secret]",
+      "source_sha256": "8707399ad82166bc30ccde80931f7abbb81fa899eb22412e68666cacbf8d31a2"
+    },
+    {
+      "path": "modules/execution/worker.ts",
+      "line": 99,
+      "table": "session_runtimes",
+      "sql": "UPDATE session_runtimes SET state='restoring' WHERE tenant_id=$1 AND session_id=$2 RETURNING *",
+      "parameters": "[run.tenant_id,run.session_id]",
+      "source_sha256": "8707399ad82166bc30ccde80931f7abbb81fa899eb22412e68666cacbf8d31a2"
+    },
+    {
+      "path": "modules/execution/worker.ts",
+      "line": 111,
+      "table": "session_runtimes",
+      "sql": "UPDATE session_runtimes SET state=CASE WHEN state LIKE 'restoring%' THEN 'restoring_preparing' ELSE 'preparing' END WHERE tenant_id=$1 AND session_id=$2 AND state IN ('reserved','preparing','restoring','restoring_preparing') RETURNING session_id",
+      "parameters": "[run.tenant_id, run.session_id]",
+      "source_sha256": "8707399ad82166bc30ccde80931f7abbb81fa899eb22412e68666cacbf8d31a2"
+    },
+    {
+      "path": "modules/execution/worker.ts",
+      "line": 116,
+      "table": "session_runtimes",
+      "sql": "UPDATE session_runtimes SET state=CASE WHEN state='restoring_preparing' THEN 'restoring_starting' ELSE 'starting' END WHERE tenant_id=$1 AND session_id=$2 AND state IN ('preparing','restoring_preparing')",
+      "parameters": "[run.tenant_id, run.session_id]",
+      "source_sha256": "8707399ad82166bc30ccde80931f7abbb81fa899eb22412e68666cacbf8d31a2"
+    },
+    {
+      "path": "modules/sandboxes/checkpoints.ts",
+      "line": 13,
+      "table": "resource_operations",
+      "sql": "INSERT INTO resource_operations(tenant_id,id,session_id,kind,detail) VALUES($1,$2,$3,'checkpoint',$4)",
+      "parameters": "[tenant,op.id,session,{source_id:row.sandbox.id}]",
+      "source_sha256": "d984108d9e17a3700dbdc75322ee99624a5dba0d5979a67b3bc09c73466f55f2"
+    },
+    {
+      "path": "modules/sandboxes/checkpoints.ts",
+      "line": 16,
+      "table": "resource_operations",
+      "sql": "UPDATE resource_operations SET provider_resource_id=$3,state='completed',updated_at=now() WHERE tenant_id=$1 AND id=$2",
+      "parameters": "[tenant,op.id,op.provider_resource_id]",
+      "source_sha256": "d984108d9e17a3700dbdc75322ee99624a5dba0d5979a67b3bc09c73466f55f2"
+    },
+    {
+      "path": "modules/sandboxes/checkpoints.ts",
+      "line": 18,
+      "table": "resource_operations",
+      "sql": "UPDATE resource_operations SET state='unknown',review_state='needs_review',detail=detail || '{\"reason\":\"snapshot_unconfirmed\"}'::jsonb WHERE tenant_id=$1 AND id=$2",
+      "parameters": "[tenant,op.id]",
+      "source_sha256": "d984108d9e17a3700dbdc75322ee99624a5dba0d5979a67b3bc09c73466f55f2"
+    },
+    {
+      "path": "modules/sandboxes/checkpoints.ts",
+      "line": 34,
+      "table": "resource_operations",
+      "sql": "INSERT INTO resource_operations(tenant_id,id,session_id,kind,detail) VALUES($1,$2,$3,'restore',$4)",
+      "parameters": "[tenant,op.id,session,{checkpoint}]",
+      "source_sha256": "d984108d9e17a3700dbdc75322ee99624a5dba0d5979a67b3bc09c73466f55f2"
+    },
+    {
+      "path": "modules/sandboxes/checkpoints.ts",
+      "line": 42,
+      "table": "resource_operations",
+      "sql": "UPDATE resource_operations SET state='unknown',detail=detail || '{\"reason\":\"restore_unconfirmed\"}'::jsonb WHERE tenant_id=$1 AND id=$2",
+      "parameters": "[tenant,op.id]",
+      "source_sha256": "d984108d9e17a3700dbdc75322ee99624a5dba0d5979a67b3bc09c73466f55f2"
+    },
+    {
+      "path": "modules/sandboxes/checkpoints.ts",
+      "line": 43,
+      "table": "resource_operations",
+      "sql": "UPDATE resource_operations SET state='completed',provider_resource_id=$3,updated_at=now() WHERE tenant_id=$1 AND id=$2",
+      "parameters": "[tenant,op.id,resource.id]",
+      "source_sha256": "d984108d9e17a3700dbdc75322ee99624a5dba0d5979a67b3bc09c73466f55f2"
+    },
+    {
+      "path": "modules/sandboxes/image-preparation.ts",
+      "line": 17,
+      "table": "resource_operations",
+      "sql": "INSERT INTO resource_operations(tenant_id,id,session_id,kind,state,detail) VALUES($1,$2,$3,'image_prepare','pending',$4)",
+      "parameters": "[tenant,operation.id,session,{reference:image.reference}]",
+      "source_sha256": "c75e70ccb406d3f3520f0c0658a0e686307b317dfe8e2d25fee44e9abdb55d5b"
+    },
+    {
+      "path": "modules/sandboxes/image-preparation.ts",
+      "line": 22,
+      "table": "resource_operations",
+      "sql": "UPDATE resource_operations SET state='unknown',detail=detail || $3::jsonb,updated_at=now() WHERE tenant_id=$1 AND id=$2",
+      "parameters": "[tenant,operation.id,{reason:'image_preparation_unconfirmed',failure:failureDiagnostic(error)}]",
+      "source_sha256": "c75e70ccb406d3f3520f0c0658a0e686307b317dfe8e2d25fee44e9abdb55d5b"
+    },
+    {
+      "path": "modules/sandboxes/image-preparation.ts",
+      "line": 37,
+      "table": "resource_operations",
+      "sql": "UPDATE resource_operations SET state=$3,detail=(detail-'reason') || $4::jsonb,attempt_count=attempt_count+1,last_checked_at=now(),updated_at=now() WHERE tenant_id=$1 AND id=$2",
+      "parameters": "[tenant,operation.id,status==='ready'?'completed':status==='failed'?'rejected':'pending',status==='failed'?{reason:'image_build_failed'}:{}]",
+      "source_sha256": "c75e70ccb406d3f3520f0c0658a0e686307b317dfe8e2d25fee44e9abdb55d5b"
+    },
+    {
+      "path": "modules/sandboxes/image-preparation.ts",
+      "line": 52,
+      "table": "resource_operations",
+      "sql": "UPDATE resource_operations SET state='deleted',updated_at=now() WHERE tenant_id=$1 AND id=$2",
+      "parameters": "[tenant,operation.id]",
+      "source_sha256": "c75e70ccb406d3f3520f0c0658a0e686307b317dfe8e2d25fee44e9abdb55d5b"
+    },
+    {
+      "path": "modules/sandboxes/lifecycle.ts",
+      "line": 84,
+      "table": "resource_operations",
+      "sql": "INSERT INTO resource_operations(tenant_id,id,session_id,kind,state,detail) VALUES($1,$2,$3,'create','pending',$4)",
+      "parameters": "[tenant, operation, session, detail]",
+      "source_sha256": "20062744d03e6e4c9d0c722d9bf5d9dc52c9baa8e779a1a5979b79e96172e2f9"
+    },
+    {
+      "path": "modules/sandboxes/lifecycle.ts",
+      "line": 91,
+      "table": "resource_operations",
+      "sql": "UPDATE resource_operations SET state='rejected',detail=detail || $3::jsonb,updated_at=now() WHERE tenant_id=$1 AND id=$2",
+      "parameters": "[tenant, operation, { reason: error.code }]",
+      "source_sha256": "20062744d03e6e4c9d0c722d9bf5d9dc52c9baa8e779a1a5979b79e96172e2f9"
+    },
+    {
+      "path": "modules/sandboxes/lifecycle.ts",
+      "line": 106,
+      "table": "resource_operations",
+      "sql": "UPDATE resource_operations SET state='completed',provider_resource_id=$3,review_state='automatic',next_check_at=NULL,last_checked_at=now(),updated_at=now() WHERE tenant_id=$1 AND id=$2",
+      "parameters": "[session.tenant_id, operation, resource.id]",
+      "source_sha256": "20062744d03e6e4c9d0c722d9bf5d9dc52c9baa8e779a1a5979b79e96172e2f9"
+    },
+    {
+      "path": "modules/sandboxes/lifecycle.ts",
+      "line": 113,
+      "table": "resource_operations",
+      "sql": "UPDATE resource_operations SET state='unknown',detail=detail || $3::jsonb,attempt_count=attempt_count+1,last_checked_at=now(),next_check_at=CASE WHEN review_state='acknowledged' OR attempt_count>=2 THEN NULL ELSE now()+make_interval(secs=>LEAST(900,30*power(2,LEAST(attempt_count,5)))::int) END,review_state=CASE WHEN review_state='acknowledged' THEN 'acknowledged' WHEN attempt_count>=2 THEN 'needs_review' ELSE 'automatic' END,updated_at=now() WHERE tenant_id=$1 AND id=$2",
+      "parameters": "[tenant, operation, { reason }]",
+      "source_sha256": "20062744d03e6e4c9d0c722d9bf5d9dc52c9baa8e779a1a5979b79e96172e2f9"
+    },
+    {
+      "path": "modules/sandboxes/lifecycle.ts",
+      "line": 161,
+      "table": "sessions",
+      "sql": "UPDATE sessions SET state=$3,pause_scope=$4,updated_at=now() WHERE tenant_id=$1 AND id=$2",
+      "parameters": "[tenant,session,pending,scope]",
+      "source_sha256": "20062744d03e6e4c9d0c722d9bf5d9dc52c9baa8e779a1a5979b79e96172e2f9"
+    },
+    {
+      "path": "modules/sandboxes/lifecycle.ts",
+      "line": 184,
+      "table": "session_runtimes",
+      "sql": "UPDATE session_runtimes SET state='restoring' WHERE tenant_id=$1 AND session_id=$2 AND state<>'interrupted'",
+      "parameters": "[tenant,session]",
+      "source_sha256": "20062744d03e6e4c9d0c722d9bf5d9dc52c9baa8e779a1a5979b79e96172e2f9"
+    },
+    {
+      "path": "modules/sandboxes/lifecycle.ts",
+      "line": 185,
+      "table": "sessions",
+      "sql": "UPDATE sessions SET state=$3,pause_scope=$4,sandbox=$5,updated_at=now() WHERE tenant_id=$1 AND id=$2",
+      "parameters": "[tenant,session,target,resume?null:scope,row.sandbox]",
+      "source_sha256": "20062744d03e6e4c9d0c722d9bf5d9dc52c9baa8e779a1a5979b79e96172e2f9"
+    },
+    {
+      "path": "modules/sandboxes/lifecycle.ts",
+      "line": 226,
+      "table": "runs",
+      "sql": "UPDATE runs SET state='cancelling',cancel_requested=true,generation=generation+1,lease_owner=NULL,lease_until=NULL,updated_at=now() WHERE tenant_id=$1 AND id=$2",
+      "parameters": "[tenant, run.id]",
+      "source_sha256": "20062744d03e6e4c9d0c722d9bf5d9dc52c9baa8e779a1a5979b79e96172e2f9"
+    },
+    {
+      "path": "modules/sandboxes/lifecycle.ts",
+      "line": 230,
+      "table": "sessions",
+      "sql": "UPDATE sessions SET state='closing',updated_at=now() WHERE tenant_id=$1 AND id=$2",
+      "parameters": "[tenant, session]",
+      "source_sha256": "20062744d03e6e4c9d0c722d9bf5d9dc52c9baa8e779a1a5979b79e96172e2f9"
+    },
+    {
+      "path": "modules/sandboxes/lifecycle.ts",
+      "line": 254,
+      "table": "resource_operations",
+      "sql": "UPDATE resource_operations SET state='completed',review_state='automatic',next_check_at=NULL,last_checked_at=now(),detail=detail || $3::jsonb,updated_at=now() WHERE tenant_id=$1 AND id=$2",
+      "parameters": "[tenant, create.id, { reconciled_ids: found.map(r => r.id) }]",
+      "source_sha256": "20062744d03e6e4c9d0c722d9bf5d9dc52c9baa8e779a1a5979b79e96172e2f9"
+    },
+    {
+      "path": "modules/sandboxes/lifecycle.ts",
+      "line": 262,
+      "table": "resource_operations",
+      "sql": "INSERT INTO resource_operations(tenant_id,id,session_id,kind,provider_resource_id) VALUES($1,$2,$3,'delete',$4)",
+      "parameters": "[tenant, operation.id, session, id]",
+      "source_sha256": "20062744d03e6e4c9d0c722d9bf5d9dc52c9baa8e779a1a5979b79e96172e2f9"
+    },
+    {
+      "path": "modules/sandboxes/lifecycle.ts",
+      "line": 275,
+      "table": "resource_operations",
+      "sql": "UPDATE resource_operations SET state='completed',review_state='automatic',next_check_at=NULL,last_checked_at=now(),updated_at=now() WHERE tenant_id=$1 AND id=$2",
+      "parameters": "[tenant, operation.id]",
+      "source_sha256": "20062744d03e6e4c9d0c722d9bf5d9dc52c9baa8e779a1a5979b79e96172e2f9"
+    },
+    {
+      "path": "modules/sandboxes/lifecycle.ts",
+      "line": 288,
+      "table": "resource_operations",
+      "sql": "UPDATE resource_operations SET state='deleted',updated_at=now() WHERE tenant_id=$1 AND id=$2",
+      "parameters": "[tenant,checkpoint.id]",
+      "source_sha256": "20062744d03e6e4c9d0c722d9bf5d9dc52c9baa8e779a1a5979b79e96172e2f9"
+    },
+    {
+      "path": "modules/sandboxes/lifecycle.ts",
+      "line": 295,
+      "table": "runs",
+      "sql": "UPDATE runs SET state='cancelled',lease_owner=NULL,lease_until=NULL,updated_at=now() WHERE tenant_id=$1 AND session_id=$2 AND state='cancelling' RETURNING id",
+      "parameters": "[tenant, session]",
+      "source_sha256": "20062744d03e6e4c9d0c722d9bf5d9dc52c9baa8e779a1a5979b79e96172e2f9"
+    },
+    {
+      "path": "modules/sandboxes/lifecycle.ts",
+      "line": 298,
+      "table": "sessions",
+      "sql": "UPDATE sessions SET state='closed',sandbox=CASE WHEN sandbox IS NULL THEN NULL ELSE sandbox || '{\"state\":\"destroyed\"}'::jsonb END,updated_at=now() WHERE tenant_id=$1 AND id=$2",
+      "parameters": "[tenant, session]",
+      "source_sha256": "20062744d03e6e4c9d0c722d9bf5d9dc52c9baa8e779a1a5979b79e96172e2f9"
+    },
+    {
+      "path": "modules/sandboxes/operations.ts",
+      "line": 30,
+      "table": "resource_operations",
+      "sql": "UPDATE resource_operations SET review_state=$3,next_check_at=CASE WHEN $3='automatic' THEN now() ELSE NULL END,updated_at=now() WHERE tenant_id=$1 AND id=$2",
+      "parameters": "[tenant,id,parsed.action==='acknowledge'?'acknowledged':'automatic']",
+      "source_sha256": "a28720e3fad4a6e713f848ef1a5900948c0337e4bc8ff2f42a91aec5cb49a4a3"
+    },
+    {
+      "path": "modules/tools/broker.ts",
+      "line": 87,
+      "table": "runs",
+      "sql": "UPDATE runs SET state='running',updated_at=now() WHERE tenant_id=$1 AND id=$2",
+      "parameters": "[lease.tenant_id, lease.id]",
+      "source_sha256": "6197af2cba2ca94cb7241ef671e284c4f6c4f90954947d392746555e0096bf75"
+    },
+    {
+      "path": "modules/tools/broker.ts",
+      "line": 127,
+      "table": "runs",
+      "sql": "UPDATE runs SET state=$3,updated_at=now() WHERE tenant_id=$1 AND id=$2 AND state<>'cancelling'",
+      "parameters": "[lease.tenant_id, lease.id, state]",
+      "source_sha256": "6197af2cba2ca94cb7241ef671e284c4f6c4f90954947d392746555e0096bf75"
+    },
+    {
+      "path": "modules/tools/broker.ts",
+      "line": 133,
+      "table": "runs",
+      "sql": "UPDATE runs SET state='running',updated_at=now() WHERE tenant_id=$1 AND id=$2 AND state IN ('waiting_authorization','waiting_approval')",
+      "parameters": "[lease.tenant_id, lease.id]",
+      "source_sha256": "6197af2cba2ca94cb7241ef671e284c4f6c4f90954947d392746555e0096bf75"
+    },
+    {
+      "path": "modules/tools/reconciliation.ts",
+      "line": 34,
+      "table": "runs",
+      "sql": "UPDATE runs SET state='running',updated_at=now() WHERE tenant_id=$1 AND id=$2 AND state='waiting_authorization'",
+      "parameters": "[tenant, run]",
+      "source_sha256": "a95103cec9d22d38bca12e2ac699eec0eec305790c6e8ec537d9fdcb1fad9a8a"
+    },
+    {
+      "path": "modules/tools/reconciliation.ts",
+      "line": 64,
+      "table": "runs",
+      "sql": "UPDATE runs SET state='running',updated_at=now() WHERE tenant_id=$1 AND id=$2",
+      "parameters": "[tenant, run]",
+      "source_sha256": "a95103cec9d22d38bca12e2ac699eec0eec305790c6e8ec537d9fdcb1fad9a8a"
+    }
+  ],
+  "dynamicQueries": [
+    {
+      "path": "modules/artifacts/artifacts.ts",
+      "line": 34,
+      "expression": "`SELECT ${fields} FROM artifacts WHERE tenant_id=$1 AND run_id=$2 ORDER BY name`"
+    },
+    {
+      "path": "modules/artifacts/artifacts.ts",
+      "line": 39,
+      "expression": "`SELECT ${fields} FROM artifacts WHERE tenant_id=$1 AND run_id=$2 ORDER BY name`"
+    },
+    {
+      "path": "modules/artifacts/artifacts.ts",
+      "line": 42,
+      "expression": "`SELECT ${fields},content FROM artifacts WHERE tenant_id=$1 AND id=$2`"
+    },
+    {
+      "path": "modules/connections/connections.ts",
+      "line": 59,
+      "expression": "`SELECT ${fields} FROM connections WHERE tenant_id=$1 AND deleted_at IS NULL ORDER BY created_at`"
+    },
+    {
+      "path": "modules/connections/connections.ts",
+      "line": 62,
+      "expression": "`SELECT ${fields} FROM connections WHERE tenant_id=$1 AND id=$2 AND deleted_at IS NULL`"
+    },
+    {
+      "path": "modules/connections/usage.ts",
+      "line": 12,
+      "expression": "queries[section]"
+    },
+    {
+      "path": "modules/credentials/managed-secrets.ts",
+      "line": 14,
+      "expression": "`SELECT ${fields} FROM managed_secrets WHERE tenant_id=$1 AND deleted_at IS NULL ORDER BY created_at`"
+    },
+    {
+      "path": "modules/credentials/managed-secrets.ts",
+      "line": 16,
+      "expression": "`SELECT ${fields} FROM managed_secrets WHERE tenant_id=$1 AND id=$2 AND deleted_at IS NULL`"
+    },
+    {
+      "path": "modules/execution/queries.ts",
+      "line": 11,
+      "expression": "`SELECT ${fields} FROM ${table} s ${join} WHERE s.tenant_id=$1 AND ($2='' OR s.state=$2) AND ($3='' OR strpos(lower(s.id),lower($3))>0 ${kind==='runs'?\"OR strpos(lower(s.session_id),lower($3))>0 OR strpos(lower(s.input),lower($3))>0 OR strpos(lower(ss.definition->>'name'),lower($3))>0\":\"OR strpos(lower(s.agent_id),lower($3))>0 OR strpos(lower(s.definition->>'name'),lower($3))>0\"}) ORDER BY s.created_at DESC,s.id DESC LIMIT $4 OFFSET $5`"
+    },
+    {
+      "path": "modules/storage/migrate.ts",
+      "line": 22,
+      "expression": "sql"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+resources/
+tooling/
+migration-manifest.json
+AGENTS.md
+README.md
+blog/
+PUBLISHING.md

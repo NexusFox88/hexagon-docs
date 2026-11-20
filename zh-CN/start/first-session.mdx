@@ -1,0 +1,73 @@
+---
+title: "创建你的第一个 Agent Session"
+---
+
+本教程使用内置 Pi 1.5.2，让 Agent 在云 Sandbox 中生成一个文本文件。你将获得 Session 和 Run 标识、最终回答、可下载产物，并验证关闭 Session 后产物仍可读取。
+
+## 前提与验证范围
+
+先完成[安装](/zh-CN/start/install)，在 Console 验证并启用一个 Sandbox 连接和一个兼容的模型连接。使用[执行矩阵](/zh-CN/integrations/verified-combinations)中已有证据的精确组合；例如 E2B / Pi 的记录需要同时核对模型端点和协议。不要仅按供应商名称推断通过。
+
+两套程序已于 2026-11-20 分别在 **Vercel + 内置 Pi 1.5.2 + 已配置 Messages 端点的 deepseek-ai/DeepSeek-V4-Flash** 组合完成独立实云运行。[执行记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-first-session-docs-cloud.json)覆盖任务完成、产物大小/hash/内容、Session 关闭、删除操作完成，以及关闭后下载字节一致。该结果不认证其他端点、账户或组合，也不覆盖 Tools、审批、多轮和预览。执行会使用云资源和模型额度；不需要额外 Tool 或预先注册 Agent 模板。
+
+## 运行完整程序
+
+在仓库根目录设置已经验证的连接 ID。这两个值是标识，不是供应商密钥：
+
+```sh
+export HEXAGON_EXAMPLE_SANDBOX_ID='YOUR_SANDBOX_CONNECTION_ID'
+export HEXAGON_EXAMPLE_MODEL_ID='YOUR_MODEL_CONNECTION_ID'
+```
+
+选择一种语言执行。两套程序是独立旅程，运行两套将分别创建资源。
+
+Python：[完整源文件](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/first-session.py)。安装本地 SDK 后运行：
+
+```sh
+.local/docs-example-venv/bin/python examples/documentation/first-session.py
+```
+
+TypeScript：[完整源文件](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/first-session.ts)。在已安装仓库依赖的环境运行：
+
+```sh
+npm --prefix sdk/typescript run build
+./node_modules/.bin/tsx examples/documentation/first-session.ts
+```
+
+程序直接创建 Session，固定 Pi 版本和所选连接。提交的任务要求 Harness 将 `hello.txt` 放入它收到的 Run 产物目录。程序轮询 Run，核对导出文件内容，再关闭 Session 并重复下载产物以检查保留行为。
+
+## 完成后应该看到什么
+
+程序输出 Session 和 Run ID、最终回答，以及 `Completed; artifacts and journal:`。Python 记录位于 `.local/docs-first-python/`，TypeScript 位于 `.local/docs-first-typescript/`。
+
+目录中包含私有 `journal.json` 和以本地固定名称保存的产物。使用固定名称避免把远端路径直接用于本地文件写入。至少一个产物的去除首尾空白后的内容应为 `Hello from Hexagon`。
+
+日志最终阶段 `closed_and_retention_checked` 表示该程序观察到 Run 完成、产物内容符合预期、关闭接口返回 `closed`，且关闭后仍能下载产物。这个结果仅证明本次具体组合，不证明所有 Provider 都支持同样的行为。
+
+成功 Run 的 `output` 是包含 `role: "assistant"`、`text` 和产物元数据的对象。阅读 `output.text`，再与下载文件核对：回答应说明创建了 `hello.txt`，内容为 `Hello from Hexagon` 加换行，具体措辞可以不同。回答中的工作区路径不是下载 URL，应通过 Artifact ID 下载。最终回答、终态和实际导出字节需要分别检查。[回答审阅记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-first-session-answer-review.json)将两次已有回答与留存字节、实际 read/命令事件逐项核对，不承诺模型措辞固定。
+
+## 如果程序中途退出
+
+十分钟是示例的观察期限，不是服务器的取消命令。超时、终端关闭或网络断开后，Run 可能仍在运行。打开 Console，按私有记录中的标识检查原任务。
+
+程序拒绝覆盖已有 journal，防止再次执行意外创建第二个 Session。不要直接删除 journal 来重试：
+
+| 已保存的信息 | 下一步 |
+| --- | --- |
+| 没有 Session ID | 创建结果可能未知；检查 Console 中的 Session 和资源操作，先确认是否创建成功 |
+| 有 Session ID，没有 Run ID | 若提交响应丢失，用记录中的同一 Session、input 和 key 调用 `submit`，取回原 Run |
+| 有 Run ID | 调用 `run` 读取当前结果；无需重新提交任务 |
+| 阶段是 `closing` | 查询同一 Session 并在 Console 检查云清理；重复 close 对原资源进行对账 |
+| Run 失败或产物不匹配 | 读取事件和错误，保留记录；任务完成调查后显式关闭 Session |
+
+需要取消时调用 Python `client.cancel(run_id)` 或 TypeScript `await client.cancel(runId)`，随后查询终态。取消不会自动撤销已经发生的外部操作，也不能代替 Session 关闭。
+
+需要清理时调用 Python `client.close(session_id)` 或 TypeScript `await client.close(sessionId)`，核对返回状态并查看 Console 中的资源操作。未知结果需要[对账](/zh-CN/operate/reconciliation)，不能把抛出异常解释成资源不存在。
+
+本示例采用单进程使用方式；不要让多个进程修改同一个 journal。确认旧 Session 清理完成后，归档整个结果目录，再进行独立的新实验。
+
+下一步：[理解刚才发生的事](/zh-CN/start/what-happened)。
+
+继续完成更完整的任务：[完成一个真实项目任务](/zh-CN/start/project-task)。
+
+将此生命周期接入应用时，继续阅读[后端集成](/zh-CN/build/backend-integration)。契约依据：[SDK 指南](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/README.md)、[Session 初始化](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/session-initialization.md)与[验收旅程](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/acceptance.md)。

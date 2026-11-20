@@ -1,0 +1,65 @@
+---
+title: "Upgrade code and migrate data"
+---
+
+An upgrade involves control-plane code, database schema, SDKs, and execution protocols. Identify the target source, retain the old distribution, and create a matching recoverable backup before replacing the environment.
+
+## Before upgrading
+
+Record source revision/distribution version, lockfile, SDK versions, migration inventory, and deployment configuration. A local build is not automatically a named public release.
+
+Settle Runs, close Sessions, and confirm cleanup. [Reconcile](/en/operate/reconciliation) unknown outcomes first. Create an [offline matching backup](/en/operate/backup-restore) and retain the corresponding old code.
+
+Do not assume a new worker can resume arbitrary historical invocations. Credential-boundary, Runtime-protocol, or Harness changes can require fresh Sessions; read their migration instructions.
+
+## Apply the update
+
+Prepare new code independently while retaining the old distribution. Install its locked dependencies. Managed local startup performs migrations:
+
+```sh
+npm ci
+npm run local -- start
+npm run local -- status
+```
+
+Compiled distributions follow their production installation instructions. Foreground deployments migrate with `npm run db:migrate` before starting; the [hosted deployment prerequisites](/en/operate/self-host) for identity and keys still apply. Do not improvise a mixed-version rollout over the same deployment.
+
+Migrations run under a database transaction/advisory lock. Changed applied SQL checksums are rejected. Unknown newer migrations produce `database_schema_newer_than_code`. Do not delete migration records or edit historical SQL to bypass protection.
+
+## Verify afterward
+
+Confirm identity/database/key alignment and working management/credential ingress. Read historical initialization, Runs, events, and artifacts. Complete a fresh task using the intended combination. Check affected contracts in both SDKs and run each full cloud journey when the change requires it. Review previews, authorization/approval, and cleanup according to impact.
+
+Type checking alone does not prove migration or cloud recovery. Record actual commands, versions, successes, and failures.
+
+## Preserve an exact upgrade pair
+
+Record both source and destination distribution fingerprints, their `release.json` metadata when available, lockfile hashes, applied migration names/checksums, SDK package versions and the backup manifest. A content fingerprint is not a Git revision or a signed release. Keep the old artifact itself; a directory name alone cannot reproduce it.
+
+The [November 18 local distribution drill](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-18-local-beta-delivery.md) documents a restored database started with a newer compiled distribution, retained history/decryption and subsequent independent cloud tasks. It does not define a universal supported release-to-release upgrade matrix. Until the running source/destination build pair is tied to its verification results, use this as a scoped process example and record your own pair.
+
+The retained build manifests identify the following **unpublished build fingerprints** in that drill:
+
+| Build | Built at (UTC, November 18) | Recorded role |
+| --- | --- | --- |
+| `beta-candidate-2` · `3f0b9043cc2edba0…` | 12:37:11 | Original production-dependency installation and initial restore context |
+| `beta-recovery` · `88913006ad76316c…` | 12:58:09 | Later saved local recovery context |
+| `beta-delivery` · `6f3262ed25e2451e…` | 13:05:44 | Final distribution; subsequent startup and retained-history review in the historical record |
+
+The restored-workspace Python and TypeScript records both report artifact verification and confirmed cleanup. Their cloud work preceded the final build; the TypeScript journey started at 13:04:39 UTC. Therefore those tasks must not be reported as execution of `beta-delivery`. The matrix does not attest the serving process's exact build fingerprint. This is a verified installation/restore/upgrade **process example**, with 27 restored tables matching their original counts and hashes, not an independently certified final-build release pair. For a new upgrade, record the actual running source/destination fingerprint alongside the new task results before claiming that exact pair passed.
+
+| Condition | Continue? |
+| --- | --- |
+| New code recognizes every applied migration and stored checksums match | Proceed to isolated task verification; schema compatibility alone is not product acceptance |
+| `database_schema_newer_than_code` | Stop; use matching code or restore the matching old backup into a fresh target |
+| `database_migration_changed:<name>` | Stop and compare the actual distributions; do not rewrite migration history |
+| Migration succeeds but credentials fail to decrypt | Keep traffic stopped; verify the paired key/database before changing secrets |
+| Historical data reads but a fresh task fails | Upgrade acceptance is incomplete; preserve that task's cloud IDs and investigate before rollout |
+
+## Roll back
+
+Database migrations are not promised to be reversible. Restore the old code with its matching old backup into a fresh target, then verify recovery. Do not simply run old code against the newer schema.
+
+An older backup omits later writes. Inventory new business results, external side effects, and cloud resources before rollback. Preserve the post-upgrade database for investigation and never overwrite the only recoverable copy.
+
+Sources: [migrator](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/storage/migrate.ts), [launcher](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/tooling/local.ts). Next: [backup/restore](/en/operate/backup-restore), [changelog](/en/changelog), [verified combinations](/en/integrations/verified-combinations).

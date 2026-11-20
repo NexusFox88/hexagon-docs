@@ -1,0 +1,126 @@
+---
+title: "Add a Harness adapter"
+---
+
+A Harness adapter connects an agent implementation to Hexagon's existing Runtime, model access and Tool broker. It translates launch configuration, results and continuation state. Runtime owns the processes; the control plane owns Session/Run, durable events, credentials, approvals and cloud resource cleanup. Do not start a second control-plane service or put Harness execution in the API process.
+
+Read [the integration contract](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/harness-integration-contract.md) and [architecture](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/architecture.md). The following workflow extends a real implementation; registration alone does not establish compatibility.
+
+## Choose distribution and protocol separately
+
+Prefer an [OCI image](/en/integrations/harnesses/oci) for a new integration. It pins the interpreter and dependencies and resolves to a linux/amd64 manifest digest. A Dockerfile recipe is not a published image, and a published image is not an executed combination. Private registry support also depends on the Sandbox provider.
+
+The [source-package format](/en/integrations/harnesses/source-package) remains a compatibility path for Python/Node source using `hexagon-json-v1`. It does not orchestrate dependency installation. Both paths store tenant-owned registrations and pin versions; the control plane does not import uploaded source. Reusing an existing id/version with changed content conflicts. Select a new version and create a new Session when changing the pinned definition.
+
+Check [protocols.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/protocols.ts) for model protocols, Tools and continuation semantics. For example, the current Codex adapter declares Responses, Hermes declares Chat Completions, and Aider does not declare remote Tools. An image label cannot add executable protocol support. Extending a protocol requires implementation and rejection tests, not just another catalog value.
+
+## Trace the three adapter methods
+
+[HarnessAdapter](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/harness.ts) is the authoritative interface:
+
+| Method | Responsibility | Review question |
+| --- | --- | --- |
+| `install(connector, sandbox)` | Place required adapter/bridge files in the guest | Are dependencies pinned and installed in the Sandbox rather than executed in the control plane? |
+| `invocation(...)` | Return command argv, environment, optional stdin and Tool definitions | Are input, model access, native Session and initialization mapped without shell interpolation or credential leakage? |
+| `result(stdout)` | Interpret the real final response, native identifier and failure flag | Do missing, malformed, duplicate or upstream-error results fail honestly? |
+
+Use [OCI runtime-adapter.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/runtime-adapter.ts) for the existing dispatch and [managed-cli.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/managed-cli.ts) for managed CLI result handling. OCI supplies dependencies; the adapter installs bridge/configuration support rather than silently replacing the pinned CLI. Keep argv as separate strings and test actual upstream flags at the pinned version. Do not rely on a daemon entrypoint when the contract expects one supervised invocation.
+
+Model access comes from the worker's scoped configuration. Preserve its proxy URL and delegated authentication arrangement; do not replace it with a vendor endpoint or account key. Where required by the CLI, retain the proxy's `/v1` prefix. Raw upstream model/provider keys stay in the control plane. Never log environment credentials, place them in artifacts, or enable unrelated account integrations implicitly.
+
+## Build from the minimal Python Harness
+
+The existing [Python Agent](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/harnesses/python-agent/main.py) is a real model-driven loop with shell execution, Tool mailbox access, bounded steps and local conversation history. Its [OCI Dockerfile](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/harnesses/oci/custom-python/Dockerfile) pins the base image and selects `hexagon-json-v1`. Read both before adapting them. Shell execution is part of the guest's power, not a new isolation boundary.
+
+An OCI build from the repository root can be prepared with:
+
+```sh
+docker build -f examples/harnesses/oci/custom-python/Dockerfile -t hexagon-custom-python:dev .
+```
+
+This command requires Docker and may download dependencies. It creates a local image only; cloud providers cannot generally consume that local tag. Image publication is a separate action. Use an accessible immutable image reference when following the bilingual registration examples in the [OCI guide](/en/integrations/harnesses/oci); do not invent a digest for this local build.
+
+For `hexagon-json-v1`, the program receives one JSON object through stdin followed by EOF. It contains `run_id`, `input`, scoped `model` endpoint/name, optional `native_session`, the Run's `artifact_directory`, and declared `tools`; current adapters can also pass initialization. Consume the supplied configuration, preserve history under the Session workspace and write exports only to the supplied artifact directory.
+
+The successful final record is one JSON line:
+
+```json
+{"type":"hexagon.result","text":"The actual assistant response","native_session":"opaque-session-id","failed":false}
+```
+
+Emit exactly one final result. Keep `text` nonempty and the optional native identifier bounded to 512 characters. For source packages the parser uses a strict schema, so do not add diagnostic fields to this record. The example's exceptional output currently includes diagnostic fields; that is rejected by the source parser and must never be treated as successful execution. Review and test failure reporting when deriving your implementation. Ordinary logs are not an assistant result. Common worker handling additionally requires a successful process outcome and artifact export; a valid-looking JSON line alone does not complete the Run.
+
+## A portable failure record
+
+When deriving a `hexagon-json-v1` implementation, emit a bounded failure record containing only contract fields, then exit nonzero:
+
+```python
+import json
+import sys
+
+print(json.dumps({
+    "type": "hexagon.result",
+    "text": "Custom Harness execution failed.",
+    "failed": True,
+}), flush=True)
+sys.exit(1)
+```
+
+This is a failure-handler fragment, not a complete Harness. Do not serialize an exception, upstream body or credential into the final record. It deliberately omits native_session when no valid continuation identifier is known. Both the explicit failure flag and process exit preserve failure; no fallback success should be synthesized. Test the fragment through each intended parser and separately test the worker’s exit handling. The linked Python Agent currently has extra diagnostic fields in its exception branch; use this stricter shape when targeting both distribution paths.
+
+## Use the Tool bridge and continuation contract
+
+Bound Tools use the existing mailbox/bridge, not direct upstream credentials. A custom loop calls `http://127.0.0.1:8765/tools/<run_id>/call` with the Run-scoped `HEXAGON_TOOL_TOKEN`, a stable call ID, declared name and arguments. Continue polling the same call ID and arguments through authorization/approval waits, then inspect the result including `isError`. Creating a new call ID during a wait can create a different invocation. Native MCP-capable CLIs use [tool_bridge.py](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/runtime/tool_bridge.py) through the adapter's configuration.
+
+Return the actual native continuation identifier when supported, and pass it back on the next Run. Do not fabricate one from the Run ID if the upstream CLI expects its own Session identifier. The generic Python example owns its own history, so its identifier has a different implementation contract. Verify a follow-up that depends on previous context, including after supported filesystem resume. Initialization support also needs deliberate first-turn/follow-up behavior; declaring a capability does not implement it.
+
+Cancellation remains Runtime's responsibility. The adapter must not detach an independent agent daemon that escapes process supervision. Inspect [Runtime](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/runtime/server.py) and test descendants, cancellation during Tool waits, and late output. Client event disconnection does not cancel a Run. Preserve uncertainty after process loss rather than starting another invocation blindly. Native action visibility differs by CLI; expose actual events and never manufacture hidden reasoning.
+
+## Registration and verification changes
+
+For a new OCI protocol, review protocol declarations, image schema/registration, runtime adapter, result parser, catalog/templates and evidence records together. Existing protocols can often reuse the registry without a new built-in branch. Relevant sources include [images.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/images.ts), [catalog.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/catalog.ts), [templates.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/templates.ts) and [verification.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/verification.ts). Source registration is in [harness-packages.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/harness-packages.ts). Tenant ownership must be checked for definitions, registry secrets and Session bindings.
+
+Start with deterministic parser/configuration tests:
+
+```sh
+npx vitest run modules/harnesses/runtime-adapter.test.ts modules/harnesses/managed-cli.test.ts modules/harnesses/managed-cli-config.test.ts
+```
+
+Add tests for your adapter rather than assuming these existing suites cover it. Test malformed/missing/duplicate final output, nonzero exit, upstream error, unsupported model binding, initialization and native-state mapping. Actual upstream binaries with fixture model responses add evidence about CLI flags and bridge behavior; they still do not prove real model or cloud compatibility.
+
+Finally, each SDK must independently register the image, create a cloud Session, complete two turns with retained context, call assigned Tools, export/download an artifact, cancel an active turn, and close with provider-confirmed cleanup. Include authorization/approval waits where declared, durable events and cross-language continuation. For a conversation-only contract explicitly exclude unsupported Tools/artifacts without crediting them as passed. Record exact digest, command, provider, model protocol/name, SDK, scenario and date using [the testing guide](/en/contribute/testing). Preserve failures and unresolved resource IDs. Only matching evidence can update the verified-combination record.
+
+Next: [OCI registration](/en/integrations/harnesses/oci), [source-package compatibility](/en/integrations/harnesses/source-package), [testing and evidence](/en/contribute/testing).
+
+## Separate the success checks
+
+Do not test `result(stdout)` with only one successful JSON object. Adapter parsing, process exit and platform terminal state are separate decisions. Cover these inputs independently in the new implementation's tests:
+
+| Input or scenario | Required observation |
+| --- | --- |
+| One real nonempty final result and clean exit | Parse the reply; worker still checks execution state and export before completion |
+| Missing or duplicate final result | Fail explicitly rather than treating the last log line as the reply |
+| Missing fields, wrong types or empty text | Fail without inventing a successful fallback response |
+| `failed: true` or native CLI error final | Preserve failure despite readable stdout |
+| Success-shaped result with nonzero process exit | Worker must not record completed |
+| Process exits while waiting_authorization / waiting_approval | Do not bypass the wait and report success |
+| Runtime interruption or late output during cancellation | Respect platform interruption/cancellation; late success text cannot revive or complete old work |
+| Second turn receives native_session | Use the real identifier from the first turn; verify prior facts and files separately |
+
+The strict source-package result schema and the generic OCI parser are different code paths. Source packages reject additional fields; the current generic OCI `hexagon-json-v1` branch does not use the same strict schema. For portability, emit only agreed final-result fields and test both registration paths. Acceptance of diagnostic fields through one distribution path is not a universal protocol guarantee.
+
+Inspect observable causes of final failure as well. The worker uses persisted model transport records to distinguish some failures as `model_transport_failed`, `model_authentication_failed`, `model_rate_limited` or `model_request_failed`; otherwise failure may be `harness_execution_failed`. Do not rewrite every nonzero exit as a user-key problem or expose raw upstream responses through public errors.
+
+## Design acceptance for the minimal Harness
+
+Pin an explicitly supported Provider, image digest, model protocol and SDK version, then record these observations in order. These are execution requirements, not newly passed results claimed by this page.
+
+1. In the first turn, obtain a verifiable model response, save a known file and export an artifact. Check exit, final reply and downloaded digest.
+2. Continue the same Session with a new Run ID and submission idempotency key. Ask for a prior conversation fact and the saved file without placing the answer in the second prompt.
+3. For a Harness declaring Tools, exercise the existing bridge and test both normal output and `isError`, preserving call ID and arguments.
+4. During authorization or approval waits, confirm the original Run remains waiting. After a decision, continue the original call and check external operation count; a second Run is not continuation evidence.
+5. Cancel an active turn and confirm Runtime-supervised process state, Run terminal state and already-dispatched external outcomes. Cancellation cannot retract prior effects.
+6. Close the Session, confirm cloud and associated-resource cleanup, then download exported artifacts again. Run the required journey independently through the other SDK and separately record cross-language continuation.
+
+Conversation-only adapters retain narrower declarations and explicitly identify unsupported steps; they do not pass the complete Tool/artifact journey. Record protocol compatibility, real-model execution and fault recovery separately; see [capabilities and evidence](/en/concepts/capabilities-and-evidence).
+

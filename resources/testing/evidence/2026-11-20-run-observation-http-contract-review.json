@@ -1,0 +1,271 @@
+{
+  "date": "2026-11-20",
+  "scope": "Current-source loopback TCP HTTP/SSE and real PostgreSQL in isolated migrated schema. Persisted fixtures, no worker/model/cloud execution. Real stream disconnect/reconnect tested; cancellation state/event/approval transactions tested without Runtime processes.",
+  "source_sha256": {
+    "apps/control-plane/server.ts": "90b27ace779174006be88890beb73039a273614f4f9ab378e04e819db990c4ca",
+    "modules/execution/queries.ts": "51f66f55090458aa05fd56c72fa7d5b087c15a7d7032259622ec240d0e6ff4ac",
+    "modules/execution/runs.ts": "f462cf48c64b845d29861f4a2fac3d144ee99c61775301cac56249cc09842ecf"
+  },
+  "checks": [
+    {
+      "name": "public projection",
+      "method": "GET",
+      "path": "/runs/:id",
+      "status": 200
+    },
+    {
+      "name": "global summaries",
+      "method": "GET",
+      "path": "/runs",
+      "status": 200
+    },
+    {
+      "name": "search across input",
+      "method": "GET",
+      "path": "/runs?search=unicode",
+      "status": 200
+    },
+    {
+      "name": "search definition name",
+      "method": "GET",
+      "path": "/runs?search=observation",
+      "status": 200
+    },
+    {
+      "name": "exact state filter",
+      "method": "GET",
+      "path": "/runs?state=failed",
+      "status": 200
+    },
+    {
+      "name": "Session full Run list",
+      "method": "GET",
+      "path": "/sessions/:id/runs",
+      "status": 200
+    },
+    {
+      "name": "invalid before",
+      "method": "GET",
+      "path": "/sessions/:id/runs?before=not-a-date",
+      "status": 400
+    },
+    {
+      "name": "foreign object hidden",
+      "method": "GET",
+      "path": "/runs/:id",
+      "status": 404
+    },
+    {
+      "name": "foreign object hidden",
+      "method": "GET",
+      "path": "/sessions/:id/runs",
+      "status": 404
+    },
+    {
+      "name": "foreign object hidden",
+      "method": "GET",
+      "path": "/runs/:id/events",
+      "status": 404
+    },
+    {
+      "name": "foreign object hidden",
+      "method": "GET",
+      "path": "/runs/:id/stream",
+      "status": 404
+    },
+    {
+      "name": "foreign global empty",
+      "method": "GET",
+      "path": "/runs",
+      "status": 200
+    },
+    {
+      "name": "event page bound",
+      "method": "GET",
+      "path": "/runs/:id/events",
+      "status": 200
+    },
+    {
+      "name": "exclusive cursor remainder",
+      "method": "GET",
+      "path": "/runs/:id/events?after=500",
+      "status": 200
+    },
+    {
+      "name": "event end",
+      "method": "GET",
+      "path": "/runs/:id/events?after=501",
+      "status": 200
+    },
+    {
+      "name": "negative cursor rejected",
+      "method": "GET",
+      "path": "/runs/:id/events?after=-1",
+      "status": 400
+    },
+    {
+      "name": "overflow cursor current limitation",
+      "method": "GET",
+      "path": "/runs/:id/events?after=99999999999999999999999999999999",
+      "status": 500
+    },
+    {
+      "name": "SSE drains all pages then end",
+      "method": "GET",
+      "path": "/runs/:id/stream",
+      "status": 200
+    },
+    {
+      "name": "Last-Event-ID fallback",
+      "method": "GET",
+      "path": "/runs/:id/stream",
+      "status": 200
+    },
+    {
+      "name": "explicit after overrides header",
+      "method": "GET",
+      "path": "/runs/:id/stream?after=501",
+      "status": 200
+    },
+    {
+      "name": "invalid header cursor",
+      "method": "GET",
+      "path": "/runs/:id/stream",
+      "status": 400
+    },
+    {
+      "name": "application allowed",
+      "method": "GET",
+      "path": "/runs",
+      "status": 200
+    },
+    {
+      "name": "application allowed",
+      "method": "GET",
+      "path": "/sessions/:id/runs",
+      "status": 200
+    },
+    {
+      "name": "application allowed",
+      "method": "GET",
+      "path": "/runs/:id",
+      "status": 200
+    },
+    {
+      "name": "application allowed",
+      "method": "GET",
+      "path": "/runs/:id/events",
+      "status": 200
+    },
+    {
+      "name": "application allowed",
+      "method": "GET",
+      "path": "/runs/:id/stream",
+      "status": 200
+    },
+    {
+      "name": "TCP disconnect did not cancel persisted Run",
+      "passed": true
+    },
+    {
+      "name": "TCP reconnect only new persisted event",
+      "method": "GET",
+      "path": "/runs/:id/stream?after=501",
+      "status": 200
+    },
+    {
+      "name": "Session page capped at 100",
+      "method": "GET",
+      "path": "/sessions/:id/runs?before=2021-01-01T00:00:00Z",
+      "status": 200
+    },
+    {
+      "name": "timestamp tie limitation",
+      "method": "GET",
+      "path": "/sessions/:id/runs?before=2020-01-01T00:00:00Z",
+      "status": 200
+    },
+    {
+      "name": "global offset continuation",
+      "method": "GET",
+      "path": "/runs?limit=100",
+      "status": 200
+    },
+    {
+      "name": "global offset end",
+      "method": "GET",
+      "path": "/runs?limit=100&offset=100",
+      "status": 200
+    },
+    {
+      "name": "cancel queued",
+      "method": "POST",
+      "path": "/runs/:id/cancel",
+      "status": 200
+    },
+    {
+      "name": "cancel running",
+      "method": "POST",
+      "path": "/runs/:id/cancel",
+      "status": 200
+    },
+    {
+      "name": "cancel waiting_approval",
+      "method": "POST",
+      "path": "/runs/:id/cancel",
+      "status": 200
+    },
+    {
+      "name": "cancel cancelling",
+      "method": "POST",
+      "path": "/runs/:id/cancel",
+      "status": 200
+    },
+    {
+      "name": "cancel completed",
+      "method": "POST",
+      "path": "/runs/:id/cancel",
+      "status": 200
+    },
+    {
+      "name": "cancel failed",
+      "method": "POST",
+      "path": "/runs/:id/cancel",
+      "status": 200
+    },
+    {
+      "name": "cancel cancelled",
+      "method": "POST",
+      "path": "/runs/:id/cancel",
+      "status": 200
+    },
+    {
+      "name": "foreign cancellation denied",
+      "method": "POST",
+      "path": "/runs/:id/cancel",
+      "status": 404
+    }
+  ],
+  "passed": true,
+  "cleanup": "Server closed and temporary schema dropped.",
+  "limitations": [
+    "No browser rendering, production proxy/TLS or real Harness cancellation.",
+    "Terminal race branches are fixture transitions, not an exhaustive concurrent interleaving proof.",
+    "Cursor overflow reproduces current 500 behavior; no product behavior changed."
+  ],
+  "command": "./node_modules/.bin/tsx .local/docs-content-checks/run-observation-http-contracts.ts",
+  "exit_code": 0,
+  "script_sha256": "2727538df4b781933ecac0377bc0bbc32a5f5c24eccfe18fd8746f4eec85d37c",
+  "reviewed_routes": [
+    "GET /v1/runs",
+    "GET /v1/sessions/:id/runs",
+    "GET /v1/runs/:id",
+    "GET /v1/runs/:id/events",
+    "GET /v1/runs/:id/stream",
+    "POST /v1/runs/:id/cancel"
+  ],
+  "reviewed_pages": {
+    "docs/product/en/reference/runs.md": "212d2d29346bfbda444e844bed24ef9ecbb78ae24d25a89fb54734807f10624c",
+    "docs/product/zh-CN/reference/runs.md": "824c8877b603b4312b494bcd5884bd12ae959ebfb255be64ff1a8c3a52a3bcae"
+  }
+}

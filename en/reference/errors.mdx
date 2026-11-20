@@ -1,0 +1,107 @@
+---
+title: "Error codes and handling"
+---
+
+First identify whether the failure belongs to an HTTP request, background Run, Tool call or local command. An accepted request may later fail or wait; HTTP success does not establish task success. The table is an actionable index of common errors, not a promise that every internal error string is a stable public code.
+
+## HTTP and SDK error format
+
+```json
+{"error":{"code":"invalid_request","fields":["harness","resources.timeout_seconds"]}}
+```
+
+This is an illustrative shape, not an execution log. The [HTTP handler](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts) maps Zod validation failures to 400 `invalid_request` with field paths; ExecutionError preserves its status and `error.code`. Fastify client errors become `invalid_http_request` with the corresponding 4xx status, including oversized bodies. Unclassified failures become 500 `internal_error` without exposing database queries or upstream exceptions.
+
+Missing/invalid identity returns 401 `unauthorized`. Correct URL, Token and role rather than retrying permission failures. Tenant-scoped missing resources may return 404 without revealing that another tenant owns them.
+
+Both SDKs expose `HexagonError.status` and `.code`; ordinary HTTP errors without a structured code use `http_error`. They do not preserve the example's `fields` array as an exception property. Network, timeout, JSON parsing and local discovery errors are not necessarily HexagonError. TypeScript stream-open failure uses `event_stream_failed`; Python truncated streams can raise ConnectionError. Do not assume every exception means the server rejected the operation. See [Python](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/python/hexagon/__init__.py) and [TypeScript](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/typescript/index.ts).
+
+## Handle by phase
+
+The HTTP column records the status at the corresponding ExecutionError branch. Background worker paths can record the same error on a Run/event rather than return it directly to the current caller. Source links identify actual branches, not fresh passing tests.
+
+| Code | HTTP | Phase | Next action and resource implications | Source |
+| --- | --- | --- | --- | --- |
+| `invalid_submission` | 400 | Submission | Correct empty input/key; do not retry unchanged. | [runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| `idempotency_conflict` | 409 | Submission | Original request exists. Compare exact input/origin; reuse original intent, not a fresh key. | [runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| `session_busy` | 409 | Submission | An active Run exists; observe it and queue follow-up work in your application. | [runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| `session_closed` | 409 | Submission | Inspect current Session state; create a deliberate new context only when appropriate. | [runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| `sandbox_expired` | 409 | Submission | Inspect original resource cleanup before new work. | [runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| `connection_not_ready` | 409 | Submission | Inspect validation, enablement and pinned version before retrying; a new connection revision does not rewrite existing Sessions, and old resources may still exist. | [runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| `context_file_missing` | 409 | Submission | Upload the referenced file to the same Session while its initial-upload window is open; after execution starts, inspect the pinned context instead of assuming upload can repair it. | [runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| `context_file_changed` | 409 | Submission | Compare pinned SHA-256 and uploaded bytes; do not ignore the mismatch. | [runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| `context_file_encoding` | 400 | Submission | Supply valid UTF-8 text without NUL. | [runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| `context_file_too_large` | 413 | Submission | Reduce referenced background text; see limits. | [runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| `input_too_large` | 413 | Submission | Reduce input plus compiled background bytes. | [runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| `initialization_too_large` | 413 | Initialization | Reduce serialized/compiled initialization. | [initialization.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/initialization.ts) |
+| `upload_too_large` | 413 | Upload | Reduce decoded total or split valid batches; per-file limits remain. | [inputs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/inputs.ts) |
+| `connection_changed_during_validation` | 409 | Connection validation | Read current configuration and validate that revision again. | [connections.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/connections/connections.ts) |
+| `connection_in_use` | 409 | Connection deletion | Inspect dependent Sessions/definitions; settle dependencies without losing cleanup access. | [connections.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/connections/connections.ts) |
+| `harness_version_conflict` | 409 | Registration | Inspect both OCI and source-package registrations: they share id/version. Reuse an identical OCI definition or deliberately choose a new version; do not overwrite the old identity. | [images.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/harnesses/images.ts) |
+| `preview_session_unavailable` | 409 | Preview | Check Session/resource state; do not interpret unavailable preview as failed Run. | [previews.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/previews.ts) |
+| `preview_unauthorized` | 401 | Preview access | Check grant expiry/revocation and authorized access; never log the grant URL. | [previews.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/previews.ts) |
+| `tool_call_conflict` | 409 | Tool call / resolution | Compare call identity/arguments and exact request hash; never replace evidence to force acceptance. | [broker.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/broker.ts) |
+| `tool_call_in_flight` | 409 | Tool resolution | Wait for the broker lock to settle, then re-query; do not concurrently resolve. | [reconciliation.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/reconciliation.ts) |
+| `tool_outcome_not_unknown` | 409 | Tool resolution | Read current call state; resolution is only for unknown outcomes. | [reconciliation.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/reconciliation.ts) |
+| `tool_resolution_conflict` | 409 | Tool resolution | An incompatible resolution was recorded; inspect it rather than overwriting. | [reconciliation.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/reconciliation.ts) |
+| `tool_authorization_not_pending` | 409 | Authorization refusal | Re-query the original call; its authorization wait has changed. | [reconciliation.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/reconciliation.ts) |
+| `tool_run_not_active` | 409 | Tool decision | Do not revive terminal/cancelling work; inspect recorded effects. | [broker.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/broker.ts) |
+| `tool_account_changed` | 409 | Tool dispatch | Reconcile account identity and pinned binding; do not silently switch accounts. | [broker.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/broker.ts) |
+| `mcp_schema_changed` | 409 | Tool dispatch | Revalidate discovery and choose a new compatible binding/Session as needed. | [broker.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/broker.ts) |
+| `tool_operation_unavailable` | 400 | Tool dispatch | Check selected and pinned operation catalogs; do not broaden permissions automatically. | [broker.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/broker.ts) |
+| `lease_lost` | 409 | Worker update | Stale execution authority: let current owner recover; never force a duplicate invocation. | [artifacts.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/artifacts/artifacts.ts) |
+| `invalid_artifact_manifest` | 400 | Artifact capture | Inspect duplicates and aggregate size; failed capture does not undo the task. | [artifacts.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/artifacts/artifacts.ts) |
+| `artifact_integrity_failed` | 400 | Artifact capture | Check size, canonical Base64 and SHA-256; do not return corrupted output. | [artifacts.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/artifacts/artifacts.ts) |
+| `artifact_conflict` | 409 | Artifact capture | Same Run/name already has different bytes; retain and investigate both claims. | [artifacts.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/artifacts/artifacts.ts) |
+| `duplicate_input_path` | 400 | Upload | Remove duplicate paths within the request; no upload transaction has begun. | [inputs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/inputs.ts) |
+| `reserved_initialization_path` | 400 | Upload | Do not replace SOUL.md when initialization owns it; choose another project file path. | [inputs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/inputs.ts) |
+| `workspace_already_started` | 409 | Upload | Initial inputs are closed after a Run or allocation; continue through Agent work, not another upload. | [inputs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/inputs.ts) |
+| `ambiguous_variables` | 400 | Definition | Supply variables or nonempty env, not both; existing Sessions are not rewritten. | [sessions.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts) |
+| `connection_kind_mismatch` | 400 | Binding | Use sandbox/model/tool/http IDs in their matching fields; do not copy credential values into ID fields. | [sessions.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts) |
+| `missing_tool_binding` | 400 | Session creation | Bind every declared Tool by name; optional readiness does not mean the binding can be omitted. | [sessions.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts) |
+| `agent_archived` | 409 | Agent use/update | Inspect the archived template; use an active template or explicit new definition for new Sessions. | [sessions.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts) |
+| `agent_revision_changed` | 409 | Agent update | Reload the current revision and reconcile the full replacement before retrying. | [sessions.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts) |
+| `stale_approval` | 409 | Approval decision | Refresh the exact approval and Run; cancellation or another decision may have settled it. | [runs.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts) |
+| `session_connection_changed` | 409 | Credential access | Pinned connection version differs; inspect current binding, settle old work and create a deliberate replacement Session if needed. | [access.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/access/access.ts) |
+
+## Errors that arrive inside successful responses
+
+A successful HTTP response can report a failed operation. Connection validation catches remote verification failures and returns the connection with `status: invalid`, a scoped `validation.code`, and `enabled: false`; an SDK exception is not required. Re-check `status` before enabling. `connection_changed_during_validation` instead means the original version could not be updated because the configuration changed or disappeared while verification was running. Its remote verification request may already have happened.
+
+Similarly, Tool reconciliation returning `state: completed` means the result has been durably delivered. If the caller verified `outcome: failed`, the delivered Tool result contains an error; it does not mean the external write succeeded. Repeating an identical recorded resolution returns it, while incompatible replacement evidence produces `tool_resolution_conflict`. Inspect the resolution content, not just the outer state.
+
+## Preflight reasons are not retry instructions
+
+[Combination preflight](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/compatibility.ts) returns `compatibility.reasons`, including `incompatible_model`, `harness_tools_unsupported`, `sandbox_oci_image_unsupported`, `sandbox_private_image_unsupported`, `harness_initialization_unsupported`, `missing_capability`, `network_policy_unsupported` and `credential_proxy_not_allowed_by_network_policy`. These describe incompatibility; they do not all imply the same HTTP response or a failed remote allocation. Correct the combination or explicitly revise requirements. Never silently replace an allowlist with unrestricted access.
+
+## Establish the original outcome before retrying
+
+- Query/event transport failure: bounded backoff, same Run and committed cursor; correct authentication first when applicable.
+- Lost Run submission response: recover with the same Session, input, origin and key; do not generate another key.
+- Lost Session/cloud creation response: preserve intent, identifiers and time; inspect original objects/operations. Do not assume Run submission idempotency applies.
+- Unknown Tool write: inspect call, request hash and pinned policy, then resolve only after checking upstream records; do not re-dispatch.
+- Unconfirmed close/delete: retain resource/deletion receipts and reconcile the original operation. Stopping the service or an empty list does not universally prove cleanup.
+
+Resources may already exist and writes may already have happened. Neither `internal_error` nor client timeout guarantees no effects. Follow [recovery](/en/build/recovery) and [reconciliation](/en/operate/reconciliation).
+
+## Three recovery decisions
+
+**Submission timed out after the server accepted it.** Keep the original Session ID, full input, origin and idempotency key in your durable request record. Resubmit that exact intent. The server returns the existing Run when its hash matches; changing the text or origin under the same key produces `idempotency_conflict`. A new key represents another submission and can duplicate work. See the [durable backend example](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/backend-intents.py).
+
+**A user clicks Approve after cancellation.** A stale decision may return `stale_approval`; read the original approval and Run. Do not create a new approval to bypass the response. Repeating the already-recorded identical decision can return that record, which still does not prove the external operation ran. Inspect the Tool result and any cancellation-race outcome separately.
+
+**The model produced output but export failed.** The worker can settle the Run as failed with `artifact_export_rejected`, even after the Harness process ran. Query persisted artifacts and the original Run/events. Repeating the whole task could repeat file changes or external effects; diagnose the export failure before deciding whether a follow-up is appropriate. This worker code is recorded on the Run, not an HTTP status returned by the earlier successful submit.
+
+## Record an error without changing its meaning
+
+A useful application error record contains the operation kind, request correlation ID, exception class, available HTTP status/code and whether a Run ID is already known. Keep full inputs, keys and resource references in private durable state as needed for recovery; omit them from public logs. The SDK's exception message alone is not enough to select a retry policy.
+
+Use a separate outcome such as “submission outcome unknown” when a write loses its response. Do not label it “rejected” merely because the client threw an exception. For read-only event observation, reconnecting the same Run is appropriate; for resource creation or external writes, first inspect the original operation. A generic HTTP 409/500 handler cannot safely choose the same action for all these cases.
+
+## Unclassified errors and local commands
+
+Record time, request method and sanitized path, HTTP status/code, business correlation ID and private Session/Run/operation references. Query durable Run, Tool call and resource-operation state, then export [diagnostics](/en/operate/observability). Exclude Authorization headers, credential-bearing preview URLs, original secrets and complete user inputs.
+
+The local launcher, dependency probes, provider SDKs and some Runtime failures still emit text or ordinary exceptions rather than a unified HTTP code. Follow [CLI](/en/reference/cli) and the relevant integration guide; do not invent API codes for them. When implementation/evidence is inconclusive, retain the unknown state and distinguish observed facts from unverified conclusions.
+
+All 41 common-code table rows were matched to an actual code/status branch in their linked source files; see the [branch review](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-errors-reference-review.json). This checks the documented index, not every internal string or runtime path. No new remote fault injection is claimed. Next: [troubleshooting](/en/operate/troubleshooting), [limits](/en/reference/limits), [recovery](/en/build/recovery).

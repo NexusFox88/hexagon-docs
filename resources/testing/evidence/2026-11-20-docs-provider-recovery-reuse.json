@@ -1,0 +1,63 @@
+{
+  "scope": "Rechecked retained real-provider observations; no new cloud calls. Separate historical journeys are combined only for their measured properties, not represented as one new paired exercise.",
+  "Agent37": {
+    "tmp_counterexample": {
+      "before_exit_code": 0,
+      "pause_observed": "paused",
+      "resume_observed": "running",
+      "missing_path": "/tmp/hexagon-cache-probe",
+      "after_exit_code": 2,
+      "historical_probe_passed": false,
+      "cleanup": true
+    },
+    "managed_workspace": "Both retained OpenCode SDK idle/wake rows report file_verified, native_reused, context_retained, auto_woke and closed cleanup.",
+    "limit": "Lost PID file makes the old kill probe inconclusive for process survival; do not infer process death from memory_process=false."
+  },
+  "Freestyle": {
+    "harness": {
+      "id": "opencode",
+      "version": "1.2.27"
+    },
+    "uploaded_files": [
+      "acceptance.mjs",
+      "app.mjs",
+      "filter.mjs",
+      "index.html",
+      "README.md",
+      "serve.py",
+      "style.css"
+    ],
+    "input_receipt_verified": true,
+    "fixed_test_unchanged": true,
+    "independent_test_exit_codes": {
+      "typescript": 0,
+      "python": 0
+    },
+    "artifacts": [
+      "filter.mjs",
+      "test-report.txt"
+    ],
+    "product_cleanup": "confirmed",
+    "resource_cleanup": "confirmed",
+    "idle_wake": "Separate OpenCode dual-SDK records verify file/native conversation preservation and closed cleanup.",
+    "limit": "This establishes the recorded execution path, not arbitrary guest-user permissions or universal memory survival."
+  },
+  "sources": [
+    {
+      "path": ".local/serverless-probe-agent37.json",
+      "sha256": "26f29e8df5acf0e77d71ef5a575a66d836fbae95bfff1364f4e70c0df6b505eb"
+    },
+    {
+      "path": ".local/evidence/api-smoke-14b5f6bb-6a91-45d7-9b0b-352ecc33fdcc.json",
+      "sha256": "19113de2fa22e27d4525bb28faaf9ccdd409921ea674c681c7b68c13dd439f9b"
+    },
+    {
+      "path": ".local/serverless-harness-acceptance/agent37-opencode.json",
+      "sha256": "81eda0399140b726ff350838274236975408deb9657f32ee39b83f878dd9696a"
+    },
+    {
+      "path": ".local/serverless-harness-acceptance/freestyle-opencode.json",
+      "sha256": "3806e33ea8b3a334f9a7841dfdd0f6997f097021aa5bcbcd8f93b79d51e8c0a9"
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+---
+title: "Observe execution and diagnose failures"
+---
+
+Correlate business requests with Sessions, Runs, Runtime bindings, and cloud operations. Control-plane health, Runtime reachability, task completion, and confirmed deletion are separate observations.
+
+## Start with identifiers
+
+Persist business request ID, Session/Run IDs, idempotency key, and event cursor. In Console, inspect input, initialization, events, Tools, and resources. Run origin can carry request_id, message_id, and channel for correlation, not authentication or business authorization.
+
+| Object | Inspect | Do not infer |
+| --- | --- | --- |
+| Control-plane health | Database, worker, credential ingress | Every cloud account works |
+| Session | Pinned definition, lifecycle, resource binding | Process is continuously alive |
+| Run | Stage, waits, terminal status, output/error | Completion means compute deletion |
+| Runtime binding | Reachability and interruption/recovery | Unreachable means stopped |
+| Sandbox | Last observed cloud state | Sleeping means absent |
+| Resource operation | Create/delete intent, unknown state, review | Acknowledgement means cleanup |
+| Tool call | Arguments, approval, dispatch policy, resolution | Timeout means no write occurred |
+
+## Trace a silent task
+
+Query the original Run before submitting again. For authorization/approval waits, inspect the actual invocation. For provisioning, inspect creation operations and stage. For unreachable Runtime, observe recovery of the existing invocation rather than starting another process. If the Run completed, inspect client cursor handling and final result retrieval.
+
+SDK entry points include `run`, `events`/`stream`, `tool_calls`/`toolCalls`, and `session_initialization`/`sessionInitialization`. Event pages are bounded; drain subsequent pages. Empty data does not prove termination.
+
+## Worked investigation: execution failed after cloud restore
+
+A [read-only recheck of an existing real failure](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-docs-failure-correlation.json) traced a Modal/OpenClaw OCI Run through its persisted events and the same Session's resource operations. The sequence was `run.provisioning` → `workspace.inputs_verified` → `run.running` → `harness.starting` → `harness.running` → `harness.exited` → `run.failed`. The terminal diagnostic was `harness_execution_failed`, exit code `1`, Runtime state `exited`.
+
+The matching cloud `create` and `restore` operations were both `completed`. Two `delete` operations were `completed`, and the checkpoint was `deleted`. This locates the failure after provisioning, at Harness execution; it is not evidence that allocation failed or that resources remain allocated. The diagnostic alone does not identify the Harness's underlying cause. Preserve that Run and inspect its private execution history before attempting another task. This review created no Run or cloud resource.
+
+To reproduce the investigation with your own failure, query the saved Run, retain its `session_id`, drain resource-operation pages and select only that Session's rows. Do not choose the tenant's most recent operation. Read each relevant operation's detail/reviews and compare the event stages with its state. Keep actual IDs in your private incident record. The following table covers other possible observations:
+
+| Observation | Interpretation | Next action |
+| --- | --- | --- |
+| Run has a provisioning error; create operation is unknown | Task observation does not establish whether allocation happened | Preserve original operation/resource handles and use reconciliation |
+| Provider resource handle exists but Runtime is unreachable | Allocation and usable execution are different stages | Inspect that resource and Runtime recovery; do not allocate a replacement |
+| Run failed and Session is closing | Work ended, cleanup may still be pending | Follow original delete/preparation-resource operations |
+| Run completed but UI stopped updating | Execution may be healthy; observer may be behind | Query result and replay persisted events from the saved cursor |
+
+Resource details expose `kind`, `state`, `provider_resource_id`, `provider_operation_id`, `provider_build_id`, `attempt_count`, `review_state`, `last_checked_at`, `next_check_at`, `reason` and filtered `failure`. Some are absent when no receipt was obtained. Missing a provider handle is not proof that the request had no effect. Keep actual IDs in a private incident record; public reports should retain the causal sequence without account secrets or task content.
+
+For a shareable health summary, `npm run local -- diagnostics /absolute/new-report.json` creates a new private-permission file and refuses overwriting. Its allowlisted health projection deliberately omits resource IDs and private endpoints, so it cannot replace your private correlation record. Inspect the report before sharing.
+
+## Interpret diagnostics
+
+Local startup logs reside in private service.log. Sanitized diagnostics retain category, numeric HTTP status, and allowlisted transport codes such as ECONNRESET and ETIMEDOUT. Arbitrary upstream messages, URLs, bodies, and codes are deliberately excluded to avoid leaking credentials/data.
+
+Fields locate a layer rather than proving a root cause. A 401 can originate in different services; a reset does not establish absence of remote effects. Correlate stage, time, identifiers, and object states.
+
+## Monitoring
+
+Build checks around actual queries: prolonged waits, unreachable Runtime, unknown create/delete, unfinished closing, unhealthy credential ingress, and export failures. Set thresholds for your workload rather than assuming a universal SLA.
+
+This guide does not assume existing Prometheus endpoints or OpenTelemetry exporters. Integrate available APIs and sanitized logs after checking stability and permissions.
+
+Verify that one business request can be traced to its Run, execution stage, and related operation, without leaking secrets. Preserve original task identity and recovery evidence after repair. Sources: [diagnostic filtering](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/diagnostics/failure.ts), [recovery architecture](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/architecture.md). Next: [troubleshooting](/en/operate/troubleshooting), [reconciliation](/en/operate/reconciliation), [events and states](/en/reference/events-and-states).

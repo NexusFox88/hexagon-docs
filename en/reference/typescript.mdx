@@ -1,0 +1,491 @@
+---
+title: "TypeScript SDK reference"
+---
+
+`@hexagon/agent-sdk` is an ESM package, currently version `0.1.0`, with Node.js >=20 in its package manifest. The control-plane repository separately requires Node.js >=22.19.0. Do not infer browser or edge-runtime support from the Node package requirement. Local identity discovery imports Node filesystem/path/OS modules and belongs in a trusted backend.
+
+Build from this checkout, then install it into your own Node application:
+
+```sh
+# Hexagon repository root
+npm --prefix sdk/typescript run build
+# In your separate application's directory, substitute the actual checkout path:
+npm install /absolute/path/to/Hexagon/sdk/typescript
+```
+
+The absolute path is a placeholder. This does not claim public npm publication. See [package.json](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/typescript/package.json); record the artifact and source revision as well as version.
+
+## Install a packaged snapshot
+
+To test the files that an independent application receives, build and pack a local tarball. Run these commands from the Hexagon repository root; replace the destination and application paths with directories you own:
+
+```sh
+npm --prefix sdk/typescript run build
+mkdir -p /absolute/path/to/sdk-artifacts
+npm pack ./sdk/typescript --ignore-scripts --pack-destination /absolute/path/to/sdk-artifacts
+cd /absolute/path/to/your-node-application
+npm install /absolute/path/to/sdk-artifacts/hexagon-agent-sdk-0.1.0.tgz
+node --input-type=module -e 'import { Hexagon } from "@hexagon/agent-sdk"; console.log(typeof Hexagon.local)'
+```
+
+The last command should print `function`. Use the filename printed by `npm pack` if the version changes. `--ignore-scripts` skips the package's prepack build, so the explicit build must succeed first. Packing writes a local archive; it does not publish to npm. Keep the archive with the source revision for reproducibility. The package exports ESM and TypeScript declarations from `dist`; a CommonJS `require` entry is not declared.
+
+The local tarball path has been checked by installing into a temporary application outside the checkout. A loopback simulated HTTP service verified authenticated Run retrieval, a decimal event cursor above JavaScript's safe integer range, and `HexagonError` status/code conversion. This proves package consumption and those client behaviors, not actual server authorization or cloud execution. See the [installation evidence](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-typescript-installed-package.json).
+
+## Initialize a client
+
+```typescript
+import { Hexagon, HexagonError } from '@hexagon/agent-sdk';
+
+const client = await Hexagon.local();
+// Alternatively, from a trusted server process:
+// const client = new Hexagon(apiOrigin, applicationToken);
+```
+
+The explicit base URL excludes `/v1`, which the SDK appends. Construction makes no validation request. `local({dataDirectory, baseUrl})` returns a Promise and verifies private workspace files/loopback identity; optional baseUrl checks the discovered endpoint, rather than switching to hosted authentication. See [local.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/typescript/local.ts).
+
+Never embed control-plane Tokens in frontend bundles. Authenticate business users in your backend and forward authorized results. The SDK does not have a client-wide dispose method; `close(session)` requests Session closure. Breaking out of stream iteration releases its reader but does not cancel execution.
+
+## Public methods and actual return types
+
+This inventory is generated with the installed TypeScript compiler from the source declarations and inferred return types. Initializers show real defaults; `Promise<any>` is preserved rather than replaced with an invented response model. JSON responses are not runtime-validated by these types. Generic request returns `undefined` for HTTP 204 even when a caller supplies an incompatible generic type.
+
+
+
+| Declaration | Inferred return | Call context |
+| --- | --- | --- |
+| &lt;code>static async local(options:import('./local.js').LocalOptions=&#123;&#125;)&lt;/code> | &lt;code>Promise&lt;Hexagon&gt;&lt;/code> | [Contract/errors](/en/operate/local-workspace) · [Example](/en/reference/typescript#initialize-a-client) |
+| &lt;code>constructor(base: string, private token: string)&lt;/code> | &lt;code>Hexagon&lt;/code> | [Contract/errors](/en/operate/local-workspace) · [Example](/en/reference/typescript#initialize-a-client) |
+| &lt;code>async request&lt;T = any&gt;(method: string, path: string, body?: unknown, headers: Record&lt;string, string&gt; = &#123;&#125;, signal?: AbortSignal): Promise&lt;T&gt;&lt;/code> | &lt;code>Promise&lt;T&gt;&lt;/code> | [Contract/errors](/en/reference/http) · [Example](/en/reference/monitoring) |
+| &lt;code>createPreview(session: string, port: number, ttlSeconds = 600)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/artifacts-previews) · [Example](/en/build/private-preview) |
+| &lt;code>revokePreview(id: string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/artifacts-previews) · [Example](/en/build/private-preview) |
+| &lt;code>registerHarness(input: HarnessImageInput)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/harness-registration) · [Example](/en/integrations/harnesses/oci) |
+| &lt;code>registerHarnessPackage(input: unknown)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/harness-registration) · [Example](/en/integrations/harnesses/source-package) |
+| &lt;code>applications()&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/oauth) · [Example](/en/reference/typescript#catalogs-and-oauth-consent-calls) |
+| &lt;code>configureApplicationOAuth(provider:string,input:&#123;client_id:string;client_secret:string;redirect_uri:string&#125;)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/oauth) · [Example](/en/reference/typescript#catalogs-and-oauth-consent-calls) |
+| &lt;code>authorizeConnection(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/oauth) · [Example](/en/reference/typescript#catalogs-and-oauth-consent-calls) |
+| &lt;code>authorizationFlow(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/oauth) · [Example](/en/reference/typescript#catalogs-and-oauth-consent-calls) |
+| &lt;code>cancelAuthorization(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/oauth) · [Example](/en/reference/typescript#catalogs-and-oauth-consent-calls) |
+| &lt;code>overview()&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/monitoring) · [Example](/en/reference/monitoring) |
+| &lt;code>listSessions(query:&#123;limit?:number;offset?:number;search?:string;state?:string&#125;=&#123;&#125;)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/monitoring) · [Example](/en/reference/monitoring) |
+| &lt;code>listRuns(query:&#123;limit?:number;offset?:number;search?:string;state?:string&#125;=&#123;&#125;)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/runs) · [Example](/en/reference/typescript#read-bounded-pages-of-run-summaries) |
+| &lt;code>pending(limit=25,offset=0)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/monitoring) · [Example](/en/reference/monitoring) |
+| &lt;code>approvals(run:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/approvals-tools) · [Example](/en/build/approvals) |
+| &lt;code>connectionDependencies(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/connections) · [Example](/en/reference/typescript#connection-lifecycle-calls) |
+| &lt;code>listTokens()&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/tokens) · [Example](/en/reference/typescript#managed-secret-and-application-token-calls) |
+| &lt;code>createToken(label:string,expiresInDays=30)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/tokens) · [Example](/en/reference/typescript#managed-secret-and-application-token-calls) |
+| &lt;code>rotateToken(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/tokens) · [Example](/en/reference/typescript#managed-secret-and-application-token-calls) |
+| &lt;code>revokeToken(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/tokens) · [Example](/en/reference/typescript#managed-secret-and-application-token-calls) |
+| &lt;code>deployment()&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/deployment) · [Example](/en/reference/deployment) |
+| &lt;code>updateDeployment(config:unknown,expectedRevision:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/deployment) · [Example](/en/reference/deployment) |
+| &lt;code>retryIngress()&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/deployment) · [Example](/en/reference/deployment) |
+| &lt;code>resourceOperations(limit=50,offset=0)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/resource-operations) · [Example](/en/operate/reconciliation) |
+| &lt;code>resourceOperation(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/resource-operations) · [Example](/en/operate/reconciliation) |
+| &lt;code>reviewResourceOperation(id:string,action:'acknowledge'&#124;'reopen'&#124;'reconcile',note='')&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/resource-operations) · [Example](/en/operate/reconciliation) |
+| &lt;code>catalog()&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/harness-registration) · [Example](/en/reference/typescript#catalogs-and-oauth-consent-calls) |
+| &lt;code>createSecret(input: &#123;name:string;value:string&#125;)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/secrets) · [Example](/en/reference/typescript#managed-secret-and-application-token-calls) |
+| &lt;code>sessionEnvironment(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/session-access) · [Example](/en/reference/session-access) |
+| &lt;code>sessionAuthorization(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/session-access) · [Example](/en/reference/session-access) |
+| &lt;code>revokeSessionConnection(id:string,connection:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/session-access) · [Example](/en/reference/session-access) |
+| &lt;code>listSecrets()&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/secrets) · [Example](/en/reference/typescript#managed-secret-and-application-token-calls) |
+| &lt;code>secret(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/secrets) · [Example](/en/reference/typescript#managed-secret-and-application-token-calls) |
+| &lt;code>updateSecret(id:string,input:&#123;name?:string;value?:string;enabled?:boolean&#125;)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/secrets) · [Example](/en/reference/typescript#managed-secret-and-application-token-calls) |
+| &lt;code>deleteSecret(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/secrets) · [Example](/en/reference/typescript#managed-secret-and-application-token-calls) |
+| &lt;code>preflightSession(input:SessionInput)&lt;/code> | &lt;code>Promise&lt;SessionPreflight&gt;&lt;/code> | [Contract/errors](/en/reference/sessions) · [Example](/en/build/sandbox-policy) |
+| &lt;code>createAccess(session:string,connectionId:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/session-access) · [Example](/en/reference/session-access) |
+| &lt;code>listAccess(session:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/session-access) · [Example](/en/reference/session-access) |
+| &lt;code>revokeAccess(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/session-access) · [Example](/en/reference/session-access) |
+| &lt;code>listConnections()&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/connections) · [Example](/en/reference/typescript#connection-lifecycle-calls) |
+| &lt;code>connection(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/connections) · [Example](/en/reference/typescript#connection-lifecycle-calls) |
+| &lt;code>createConnection(input: unknown)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/connections) · [Example](/en/reference/typescript#connection-lifecycle-calls) |
+| &lt;code>discoverMcpTools(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/connections) · [Example](/en/reference/typescript#connection-lifecycle-calls) |
+| &lt;code>connectionAuthorization(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/oauth) · [Example](/en/reference/typescript#catalogs-and-oauth-consent-calls) |
+| &lt;code>disconnectConnection(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/connections) · [Example](/en/reference/typescript#connection-lifecycle-calls) |
+| &lt;code>validateConnection(id: string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/connections) · [Example](/en/reference/typescript#connection-lifecycle-calls) |
+| &lt;code>updateConnection(id: string, input: unknown)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/connections) · [Example](/en/reference/typescript#connection-lifecycle-calls) |
+| &lt;code>deleteConnection(id: string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/connections) · [Example](/en/reference/typescript#connection-lifecycle-calls) |
+| &lt;code>listAgents()&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/agents) · [Example](/en/build/agent-templates) |
+| &lt;code>agent(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/agents) · [Example](/en/build/agent-templates) |
+| &lt;code>reviseAgent(id:string,definition:AgentInput,expectedRevision:number)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/agents) · [Example](/en/build/agent-templates) |
+| &lt;code>archiveAgent(id:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/agents) · [Example](/en/build/agent-templates) |
+| &lt;code>copyAgent(id:string,name:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/agents) · [Example](/en/build/agent-templates) |
+| &lt;code>preflightAgent(definition:AgentInput,bindings:Omit&lt;SessionInput,'agent_id'&gt;)&lt;/code> | &lt;code>Promise&lt;SessionPreflight&gt;&lt;/code> | [Contract/errors](/en/reference/agents) · [Example](/en/build/agent-templates) |
+| &lt;code>createAgent(input: AgentInput)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/agents) · [Example](/en/build/agent-templates) |
+| &lt;code>createSession(input: SessionInput)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/sessions) · [Example](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/first-session.ts) |
+| &lt;code>sessionInitialization(id:string)&lt;/code> | &lt;code>Promise&lt;SessionInitialization&gt;&lt;/code> | [Contract/errors](/en/reference/sessions) · [Example](/en/build/agent-templates) |
+| &lt;code>session(id: string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/sessions) · [Example](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/inspect-run.ts) |
+| &lt;code>upload(session: string, files: &#123; path: string; content_base64: string &#125;[])&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/sessions) · [Example](/en/build/project-context) |
+| &lt;code>submit(session: string, input: string, idempotencyKey: string, origin?:RunOrigin)&lt;/code> | &lt;code>Promise&lt;Run&gt;&lt;/code> | [Contract/errors](/en/reference/runs) · [Example](/en/build/backend-integration) |
+| &lt;code>run(id: string)&lt;/code> | &lt;code>Promise&lt;Run&gt;&lt;/code> | [Contract/errors](/en/reference/runs) · [Example](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/inspect-run.ts) |
+| &lt;code>toolCalls(run: string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/approvals-tools) · [Example](/en/build/tool-authorization) |
+| &lt;code>denyToolAuthorization(run: string, call: string, requestHash: string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/approvals-tools) · [Example](/en/build/tool-authorization) |
+| &lt;code>resolveToolCall(run: string, call: string, resolution: &#123; request_hash: string; outcome: 'completed' &#124; 'failed'; text: string; evidence: string &#125;)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/approvals-tools) · [Example](/en/reference/approvals-tools) |
+| &lt;code>cancel(id: string)&lt;/code> | &lt;code>Promise&lt;Run&gt;&lt;/code> | [Contract/errors](/en/reference/runs) · [Example](/en/build/recovery) |
+| &lt;code>pause(session:string,scope:'session'&#124;'sandbox'='session')&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/sessions) · [Example](/en/build/idle-and-wake) |
+| &lt;code>resume(session:string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/sessions) · [Example](/en/build/idle-and-wake) |
+| &lt;code>sessionActivity(period:'24h'&#124;'7d'='24h')&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/monitoring) · [Example](/en/reference/monitoring) |
+| &lt;code>close(session: string)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/sessions) · [Example](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/first-session.ts) |
+| &lt;code>decide(approval: string, approved: boolean)&lt;/code> | &lt;code>Promise&lt;any&gt;&lt;/code> | [Contract/errors](/en/reference/approvals-tools) · [Example](/en/build/approvals) |
+| &lt;code>events(run: string, after = '0')&lt;/code> | &lt;code>Promise&lt;&#123; events: RunEvent[]; &#125;&gt;&lt;/code> | [Contract/errors](/en/reference/runs) · [Example](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/inspect-run.ts) |
+| &lt;code>artifacts(run: string)&lt;/code> | &lt;code>Promise&lt;&#123; artifacts: Artifact[]; &#125;&gt;&lt;/code> | [Contract/errors](/en/reference/artifacts-previews) · [Example](/en/build/artifacts) |
+| &lt;code>async downloadArtifact(id: string): Promise&lt;Uint8Array&gt;&lt;/code> | &lt;code>Promise&lt;Uint8Array&lt;ArrayBufferLike&gt;&gt;&lt;/code> | [Contract/errors](/en/reference/artifacts-previews) · [Example](/en/build/artifacts) |
+| &lt;code>async *stream(run: string, after = '0', signal?: AbortSignal): AsyncGenerator&lt;RunEvent&gt;&lt;/code> | &lt;code>AsyncGenerator&lt;RunEvent, any, any&gt;&lt;/code> | [Contract/errors](/en/reference/runs) · [Example](/en/build/stream-events) |
+
+
+
+Regenerate using `node tooling/generate-typescript-doc-index.mjs`. Server schemas still validate `unknown`, input objects and query values. Optional query fields should be omitted rather than explicitly set to undefined: list methods stringify supplied entries. Pagination is explicit; events and artifacts retain their collection envelopes.
+
+## Exported types
+
+| Type | Meaning and limitation |
+| --- | --- |
+| SessionInput / AgentInput | Configuration inputs; TypeScript's optional fields do not enforce every server cross-field constraint, including exactly one of harness/agent_id |
+| AgentBehavior / AgentEnvironment | Initialization and guest environment; environment is readable by guest code and is not managed credential storage |
+| HarnessImageInput | OCI registration fields and protocol union; server resolves/pins image digest and validates compatibility |
+| SessionPreflight | Readiness, combination, lifecycle and credential boundaries; structural support is separate from real execution evidence |
+| SessionInitialization | Historical pinned snapshot with environment names/redaction metadata, not secret-bearing replay data |
+| Run / RunOrigin | Run state/output/error and optional correlation metadata; state is typed as string, not a complete enumerated state machine |
+| RunEvent | Optional string id, type and unknown payload; narrow payload after checking type |
+| Artifact | Metadata; bytes are returned separately by downloadArtifact |
+| HexagonError | Error with numeric status and string code |
+
+Definitions live in [index.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/typescript/index.ts). LocalOptions is declared in local.ts; the package exports map exposes the root entry, not a promised public local subpath import.
+
+### Where declarations are narrower or wider than the HTTP contract
+
+| Declaration | Runtime contract to preserve |
+| --- | --- |
+| `preflightAgent(definition, bindings)` | The current `Omit<SessionInput, 'agent_id'>` annotation also permits Session-only fields. Send only `sandbox_connection_id`, `model_connection_id`, `tools` and `connections` in `bindings`; the server rejects additional fields. Put behavior in `definition` |
+| `Run` | The HTTP projection also includes `input`, `created_at` and `updated_at`, which this interface does not declare. The client returns the JSON unchanged; use the [Run contract](/en/reference/runs) and an application-owned validated shape if accessing additional fields |
+| `RunEvent` | JSON event-list entries include `created_at`; SSE entries do not. The shared interface omits this timestamp and leaves `data` unknown; validate a payload before using its fields |
+| Methods inferred as `Promise<any>` | This is not a promise of arbitrary fields. Their linked HTTP contract defines the response; `request<T>` does not validate it |
+
+Server validation still applies when TypeScript accepts an object. Conversely, an omitted response field in a declaration does not mean the server discarded it. Keep runtime validation separate from type assertions; neither changes permissions or retry semantics.
+
+## Common calls with context
+
+The following excerpt requires an initialized client, ready connection IDs, saved submission intent and application-owned persistence functions. It does not include the complete recovery/cleanup path; use the [full first-Session program](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/first-session.ts) for that.
+
+```typescript
+const session = await client.createSession({
+  harness: {id: 'pi', version: '1.5.2'},
+  sandbox_connection_id: sandboxId,
+  model_connection_id: modelId,
+});
+await saveSessionId(session.id);
+await client.upload(session.id, [{
+  path: 'README.txt',
+  content_base64: Buffer.from('Project context\n').toString('base64'),
+}]);
+const run = await client.submit(session.id, savedInput, savedKey,
+  {request_id: businessRequestId});
+await saveRunId(run.id);
+for await (const event of client.stream(run.id, savedCursor ?? '0')) {
+  if (event.id) await storeEventAndCursorAtomically(run.id, event);
+}
+const result = await client.run(run.id);
+```
+
+Unlike Python upload, TypeScript upload accepts an array containing already encoded Base64 strings. Keep Session/Run IDs and exact input/origin/key in your application journal. A lost submission response can be recovered with the same intent; Session creation has no equivalent Run-submission idempotency guarantee. Use [backend integration](/en/build/backend-integration) and [project context](/en/build/project-context).
+
+## Streams, cancellation and errors
+
+`stream(run, after='0', signal?)` is an AsyncGenerator. Iterate with `for await`, checkpoint only durable event IDs, and reconnect to the original Run after the last committed cursor. IDs stay strings. `stream.end` has no durable ID; query the Run afterward. Unexpected EOF/truncated data throws an ordinary Error; reconnect is not automatic.
+
+An AbortSignal passed to stream stops local observation. It does not cancel the Run. `cancel(run)` requests execution cancellation; `close(session)` separately handles resource cleanup. Not every convenience method accepts a signal. Generic `request` accepts one as its fifth argument; it provides no universal request timeout by default. Supply a signal where supported and handle unknown operation outcomes correctly.
+
+Ordinary JSON request errors become HexagonError with server code or `http_error`; stream-open errors use `event_stream_failed`, and artifact download fallback is `artifact_download_failed`. Fetch/abort/JSON errors may remain native exceptions. Generic request rejects redirects, while the stream/download paths use fetch's default redirect behavior. Use the actual trusted API origin and do not rely on redirects. See [errors](/en/reference/errors).
+
+## Management workflows and gaps
+
+Use [connections](/en/build/connection-lifecycle) for CRUD and validation; [applications](/en/integrations/apps) and [MCP](/en/integrations/mcp) for operation selection; [Agent templates](/en/build/agent-templates) for revisions; [approvals](/en/build/approvals) and [reconciliation](/en/operate/reconciliation) for decisions. Secret, Token, OAuth and deployment methods require the appropriate management role. Their presence in the class does not authorize the caller. Keep grants and returned credentials out of logs.
+
+Generic `request<T>(method, path, ...)` can reach implemented JSON endpoints without a convenience method, such as a Session-scoped Run list. It cannot invent endpoints, perform browser OAuth interaction or proxy arbitrary binary responses. The generic type parameter is a compile-time assertion, not a schema check. There is no built-in durable journal, universal pagination loop or safe automatic retry for side effects.
+
+The source-derived inventory, linked example callsites and return/error contract mapping have been reviewed for every public method. Linked examples share setup and normative HTTP contracts; their presence is not proof that every operation has been executed. Installed-package tests and cloud journeys retain their recorded scope and date. See [testing](/en/contribute/testing) for the distinction between source, type, deterministic and cloud evidence.
+
+## Managed Secret and application Token calls
+
+These independent helpers require an initialized **owner** client. Defining them makes no request; call only the operation you intend. Supply same-tenant resource IDs from your private management record and values from your credential storage. The snippets propagate errors and do not retry writes. TypeScript snippets use the `Hexagon` import shown above.
+
+### Store and inspect provider credentials
+
+```typescript
+async function inspectSecrets(client: Hexagon, secretId: string) {
+  const metadata = (await client.listSecrets()).secrets;
+  const detail = await client.secret(secretId);
+  return { metadata, detail };
+}
+
+async function createManagedSecret(client: Hexagon, name: string, value: string) {
+  const created = await client.createSecret({ name, value });
+  return { id: created.id, version: created.version };
+}
+
+async function replaceManagedSecretValue(client: Hexagon, secretId: string, newValue: string) {
+  const changed = await client.updateSecret(secretId, { value: newValue });
+  return { id: changed.id, version: changed.version };
+}
+
+async function deleteUnusedManagedSecret(client: Hexagon, secretId: string) {
+  // Server rechecks dependencies; a preceding GET cannot reserve deletion.
+  await client.deleteSecret(secretId); // HTTP 204 -> undefined
+}
+```
+
+`inspect_secrets` / `inspectSecrets` returns metadata and dependency information, never the stored value. Its Session dependency array is bounded and is not a full historical audit. Creation returns an ID/version to persist; a name is not a deduplication key.
+
+Value replacement invalidates referencing connections: they become disabled and draft and require validation before explicit enablement. The returned Secret version is an observation, not an optimistic-lock condition. Do not call this helper again automatically after a timeout: inspect the original Secret and connection state first. Deletion can fail with `secret_in_use`; disabled connections still count as references. Successful deletion returns no JSON. None of these operations revokes a credential at the external provider. See the [full Secret contract](/en/reference/secrets).
+
+### Issue, rotate and revoke backend credentials
+
+```typescript
+async function applicationTokenMetadata(client: Hexagon) {
+  const { tokens } = await client.listTokens();
+  return tokens.filter((row: { role: string }) => row.role === 'application');
+}
+
+async function issueApplicationToken(client: Hexagon, label: string) {
+  return await client.createToken(label, 30);
+}
+
+async function rotateApplicationToken(client: Hexagon, oldTokenId: string) {
+  return await client.rotateToken(oldTokenId);
+}
+
+async function revokeApplicationToken(client: Hexagon, tokenId: string) {
+  const receipt = await client.revokeToken(tokenId);
+  return { id: receipt.id, revoked_at: receipt.revoked_at };
+}
+```
+
+The create and rotate helpers return **plaintext-bearing objects** with `id`, `token`, `label`, `role`, `expires_at` and `created_at`. Immediately transfer `token` to your backend's secret store and preserve its ID in private management records. Do not print these objects, return them to a browser, or include them in exception diagnostics. If saving to your secret store fails, preserve the receipt privately and reconcile that issued credential; rerunning the helper creates another operation and cannot recover the first plaintext.
+
+Metadata listing includes expired and revoked application rows; the role filter does not make them active. Rotation returns a **new ID**, invalidates the old token immediately and preserves its original expiry. There is no overlap window, and replaying the old rotation cannot retrieve the replacement. Revocation returns JSON with `revoked_at`, unlike Secret deletion's empty response. It tolerates repeated revocation of the same application row and does not cancel already accepted Runs.
+
+Before invoking a write, record the intended operation and target privately. A lost create/rotate response requires investigation using metadata; names and labels alone cannot identify a unique result. Use the [Token contract](/en/reference/tokens) for response-loss recovery and the [identity operations guide](/en/operate/access-control) for deployment and credential verification. These examples describe SDK calls; syntax/type checking does not verify live credential creation, external provider revocation or a complete rotation rollout.
+
+## Connection lifecycle calls
+
+Use these independent helpers with an initialized owner client; defining them does not create or mutate connections. The Vercel creation example requires an actual project/team pair and a Token from private credential storage. Record the creation intent before calling, and persist the returned connection ID before a later validation step. [Vercel configuration](/en/integrations/sandboxes/vercel) defines the provider-specific requirements; substitute another provider's full definition only after reading its guide.
+
+```typescript
+async function inspectConnection(client: Hexagon, connectionId: string) {
+  return {
+    catalog: (await client.listConnections()).connections,
+    connection: await client.connection(connectionId),
+    dependencies: await client.connectionDependencies(connectionId),
+  };
+}
+
+async function createVercelConnection(
+  client: Hexagon, projectId: string, teamId: string, token: string,
+) {
+  const created = await client.createConnection({
+    kind: 'sandbox', provider: 'vercel', name: 'Vercel workspace',
+    credential: token,
+    config: { project_id: projectId, team_id: teamId, vcpus: 2 },
+  });
+  return created.id;
+}
+
+async function validateAndEnableConnection(client: Hexagon, connectionId: string) {
+  const checked = await client.validateConnection(connectionId);
+  if (checked.status !== 'ready') {
+    return { enabled: false, stage: 'validation', code: checked.validation?.code };
+  }
+  const enabled = await client.updateConnection(connectionId, { enabled: true });
+  return { enabled: enabled.enabled, stage: 'enable',
+    status: enabled.status, version: enabled.version };
+}
+
+async function disableConnection(client: Hexagon, connectionId: string) {
+  const changed = await client.updateConnection(connectionId, { enabled: false });
+  return { id: changed.id, enabled: changed.enabled };
+}
+
+async function deleteUnusedConnection(client: Hexagon, connectionId: string) {
+  await client.deleteConnection(connectionId); // HTTP 204 -> undefined
+}
+
+async function discoverRemoteMcp(client: Hexagon, connectionId: string) {
+  const discovered = await client.discoverMcpTools(connectionId);
+  return { id: discovered.id, version: discovered.version,
+    status: discovered.status, enabled: discovered.enabled };
+}
+
+async function disconnectToolCredentials(client: Hexagon, connectionId: string) {
+  const disconnected = await client.disconnectConnection(connectionId);
+  return { id: disconnected.id, enabled: disconnected.enabled,
+    provider_revoked: disconnected.provider_revoked };
+}
+```
+
+Choose the helper for the current stage; do not run the entire block as a create/discover/disconnect/delete sequence:
+
+| Stage | Result to inspect and next action |
+| --- | --- |
+| Inspect | Returns connection metadata plus a dependency sample. Reads are separate observations, not a transaction or deletion reservation. Dependency arrays are capped at 100 each; an empty list is not a client-side deletion authorization. |
+| Create | Returns one connection ID; it is not yet validated or enabled. Repeating creation can create another row, even with the same name. |
+| Validate and enable | HTTP success with `status: invalid` returns `enabled: false` from the helper and does not attempt enablement. Only ready verification proceeds to a separate enable PATCH. Inspect the final returned state. |
+| Disable | Prevents eligible new work but does not cancel every in-flight call, change pinned Session definitions or delete cloud resources. |
+| Delete | Invoke after settling work and confirming dependent Sessions closed. The server independently checks dependencies; `connection_in_use` is an error, not a reason to delete records manually. Success has no JSON body. |
+| Discover MCP | Only for a `tool` / `mcp-remote` connection. Discovery revises selected tools and leaves the connection draft and disabled. Inspect the new config privately, then validate and explicitly enable it. |
+| Disconnect Tool | Only for Tool connections. Clears local credential linkage and pending OAuth flows. `provider_revoked: false` means the external account was not revoked; this does not delete a shared Secret. |
+
+Validation can contact providers, refresh OAuth credentials and incur model usage. A concurrent configuration change can yield `connection_changed_during_validation`; reread the connection and review the intended config before another attempt. The validation/enable pair is not one atomic request, and there is no client-side compare-and-set guard. Coordinate management changes in your application.
+
+Updating `config` replaces the whole config object. Credential/config changes reset readiness, so do not combine them with `enabled: true`. Even repeated disablement, disconnect or an empty PATCH can advance versions. The snippets propagate HTTP/network errors without retrying; after a lost response, inspect the original ID and state. The inspect helper may return private account metadata and is not a logging payload.
+
+See [connection response contracts](/en/reference/connections) for exact fields/errors, [connection changes](/en/build/connection-lifecycle) for existing Session handling, and [OAuth](/en/reference/oauth) for consent. These examples have local syntax/type verification, not fresh provider-validation or cloud-execution evidence.
+
+## Catalogs and OAuth consent calls
+
+These helpers require an initialized owner client. Catalog reads let you inspect advertised integrations and application operation requirements; they do not validate your account or prove an execution combination. Select an OAuth-capable application, create its Tool connection with the intended operations, and use the provider's registered client ID/secret and matching callback URL. The callback path must be `/oauth/callback`; see [OAuth configuration constraints](/en/reference/oauth).
+
+```typescript
+async function readIntegrationCatalogs(client: Hexagon) {
+  return { execution: await client.catalog(), applications: await client.applications() };
+}
+
+async function configureOAuthClient(
+  client: Hexagon, provider: string, clientId: string,
+  clientSecret: string, redirectUri: string,
+) {
+  return await client.configureApplicationOAuth(provider, {
+    client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri,
+  });
+}
+
+async function beginConsent(client: Hexagon, connectionId: string) {
+  const flow = await client.authorizeConnection(connectionId);
+  return { id: flow.id, authorization_url: flow.authorization_url,
+    expires_in: flow.expires_in };
+}
+
+async function inspectConsent(client: Hexagon, connectionId: string, flowId: string) {
+  const flow = await client.authorizationFlow(flowId);
+  if (flow.connection_id !== connectionId) {
+    throw new Error('Authorization flow belongs to a different connection');
+  }
+  const authorization = flow.status === 'completed'
+    ? await client.connectionAuthorization(connectionId) : undefined;
+  return { flow, authorization };
+}
+
+async function cancelPendingConsent(client: Hexagon, flowId: string) {
+  return await client.cancelAuthorization(flowId);
+}
+```
+
+Call these helpers as separate stages of your backend's consent flow:
+
+1. Configure the OAuth client when setting up or deliberately changing the integration. Do not repeat configuration for every status poll: changing it can invalidate in-flight flows. The returned `{configured, provider, client_id, redirect_uri}` confirms configuration only, not user consent.
+2. Begin consent once, persist the returned flow ID and its connection/business-user association privately, then present `authorization_url` only to the intended user. This URL contains flow state; do not log it or send the owner token to the browser. The user completes consent on the provider's page. The SDK does not automate that interaction.
+3. Query the saved flow ID with `inspect_consent` / `inspectConsent`. Each call makes one flow read, plus one authorization-state read only after completion. Schedule bounded polling in your application; these helpers do not sleep, loop or start another flow. A browser redirect alone is not success.
+4. If the user abandons consent, call the cancel helper for that saved flow. It returns a flow object, not an empty response. Cancellation only changes a pending flow; if the callback completed first, the response can remain completed.
+
+| Flow result | Application action |
+| --- | --- |
+| `pending` | Continue observing the same flow within its deadline; do not repeatedly start consent. |
+| `completed` | Inspect the returned authorization state and current connection readiness. Completion is historical: later revocation or configuration changes may already require reauthorization. |
+| `failed` | Read `error_code`, explain the failed attempt and repair its cause before a deliberate new consent attempt. |
+| `cancelled` / `expired` | Stop polling this attempt. Start another only when the user intends to authorize again. |
+| Unknown state or mismatched connection | Do not declare success. Preserve the original IDs and investigate; the helper rejects a connection mismatch before querying authorization. |
+
+Connection authorization uses its own `state` values (`oauth`, `manual`, `disconnected`, `reauthorization_required`, `refreshing`, `refresh_unknown`), not flow `status`. `oauth` and `refresh_available` describe stored lifecycle facts; the read does not refresh a token or check live provider revocation. Unknown refresh outcomes require investigation or deliberate reauthorization, not replaying a possibly rotated refresh token.
+
+Starting consent again cancels pending flows for that connection. A lost start response is therefore not safely recovered by blindly calling the start helper again; preserve the uncertainty and deliberately replace the attempt only when appropriate. Cancelling a flow does not revoke existing provider credentials, cancel a Run or decide a Tool approval. `app_oauth_setup_required`, `app_oauth_unsupported`, `app_oauth_flow_not_found` and authentication errors propagate through the SDK; network failures remain distinct. See [OAuth responses and errors](/en/reference/oauth) and [application integration](/en/integrations/apps).
+
+These functions are contextual SDK examples with caller-supplied credentials and IDs. Local code checks do not establish browser consent, token exchange or provider account verification.
+
+Agent list/read, preflight, revision, copy, archive and pinned-initialization examples are in [prepare and apply a template revision](/en/build/agent-templates). The examples preserve the observed revision and explain environment preservation and lost-response recovery.
+
+For six contextual Session environment/authorization and access-grant methods, see [SDK access examples](/en/reference/session-access). The examples separate plaintext reads, token issuance, one-grant revocation and Session binding revocation.
+
+Operational SDK examples cover [overview, Session/pending pages, activity and health](/en/reference/monitoring), and [deployment revision updates plus ingress retry/stop](/en/reference/deployment). These keep observation, saved configuration and running-process actions separate.
+
+Explicit [pause/resume examples](/en/build/idle-and-wake) and [verified Tool resolution](/en/reference/approvals-tools) cover lifecycle intent, partial response loss and exact-body reconciliation replay.
+
+## Response contracts by resource
+
+The generated signatures show how to invoke the client. Use the corresponding HTTP contract for exact response projections, status codes, required role, state preconditions and effects. Most management methods return the decoded JSON directly; a successful promise/call can still carry invalid connection validation or reconciliation_error. Do not infer success from the absence of an SDK exception.
+
+| Resource | Contract |
+| --- | --- |
+| Runs, events and cancellation | [Runs, events and cancellation](/en/reference/runs) |
+| Session creation, files and lifecycle | [Session creation, files and lifecycle](/en/reference/sessions) |
+| Session environment, authorization and grants | [Session environment, authorization and grants](/en/reference/session-access) |
+| Artifact bytes and private previews | [Artifact bytes and private previews](/en/reference/artifacts-previews) |
+| Approvals and Tool recovery | [Approvals and Tool recovery](/en/reference/approvals-tools) |
+| Connections, validation and usage | [Connections, validation and usage](/en/reference/connections) |
+| Applications and OAuth | [Applications and OAuth](/en/reference/oauth) |
+| Managed Secrets | [Managed Secrets](/en/reference/secrets) |
+| Application tokens | [Application tokens](/en/reference/tokens) |
+| Agent templates and revisions | [Agent templates and revisions](/en/reference/agents) |
+| Catalog and Harness registration | [Catalog and Harness registration](/en/reference/harness-registration) |
+| Resource operation reconciliation | [Resource operation reconciliation](/en/reference/resource-operations) |
+| Monitoring and collection queries | [Monitoring and collection queries](/en/reference/monitoring) |
+| Local deployment configuration | [Local deployment configuration](/en/reference/deployment) |
+
+Binary artifact download and streaming are special return paths described above. HTTP DELETE is not uniformly empty: Token revoke returns JSON, while preview/access/Secret/connection deletion uses 204. OAuth flow cancellation returns a flow object. Preserve these differences when building a generic application wrapper.
+
+## Inspect an existing Run without submitting work
+
+Build the SDK, then run the [complete diagnostic example](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/inspect-run.ts) from the repository root:
+
+```sh
+npm --prefix sdk/typescript run build
+./node_modules/.bin/tsx examples/documentation/inspect-run.ts --session YOUR_SESSION_ID --run YOUR_RUN_ID --after 0 --max-pages 20
+```
+
+It checks Run/Session association, reads bounded event pages, queries current Run state and lists artifact IDs/sizes/digests. It omits task/event/output content and artifact names; resource IDs still require private handling. It never submits, approves, cancels or closes work. Decimal-string cursors use BigInt comparisons rather than lossy JavaScript numbers.
+
+`last_observed_cursor` is diagnostic, not an application-consumer checkpoint: this program counts events instead of persistently storing their payloads. `reached_empty_event_page` describes one query, not Run completion. Separate state/event/artifact reads are not an atomic snapshot. Continue diagnostics from that cursor when bounded, but do not use it to skip unprocessed application events. Type checking and fake-client checks do not certify real API or cloud behavior. See [Run contracts](/en/reference/runs) and [recovery](/en/build/recovery).
+
+[Example setup, stages and recovery](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/README.md).
+
+## Porting between the two SDKs
+
+| Concern | Python | TypeScript |
+| --- | --- | --- |
+| Client creation | `Hexagon.local()` returns the client synchronously | `await Hexagon.local()` |
+| HTTP calls | Blocking calls; do not invoke directly in an async server event loop | Promises; await each dependent operation |
+| Upload input | `{relative_path: bytes}`; SDK encodes Base64 | Array of `{path, content_base64}`; caller encodes bytes |
+| Streaming | Synchronous generator; use `for`; close a retained generator after partial consumption | AsyncGenerator; use `for await`; optional AbortSignal ends observation |
+| Download | `bytes` | `Uint8Array` |
+| HTTP 204 | `None` | `undefined` |
+| Event cursor | Numeric string; `int` can compare without precision loss | Numeric string; use `BigInt`, not `Number` |
+| Optional query fields | Omit unused keyword arguments; `None` can be serialized as text | Omit unused properties; explicit `undefined` can become text |
+| Pagination | Caller follows response envelope | Caller follows response envelope |
+
+Neither SDK automatically retries writes or persists recovery state. Switching language does not change tenant permissions, resource ownership or the identity of an existing Session. Keep the same input, origin and key when recovering one submission across clients.
+
+## Read bounded pages of Run summaries
+
+This helper requires an initialized trusted-backend client. It calls the tenant-wide summary endpoint, not the per-Session Run list. A non-null returned `next_offset` means the page budget stopped collection before the observed end. Errors propagate to the caller; the function makes no write request.
+
+```typescript
+async function readRunSummaryPages(client: Hexagon, maxPages = 10) {
+  if (!Number.isInteger(maxPages) || maxPages < 1) {
+    throw new Error('maxPages must be a positive integer');
+  }
+  const rows: unknown[] = [];
+  let offset = 0;
+  for (let pageIndex = 0; pageIndex < maxPages; pageIndex++) {
+    const page = await client.listRuns({ limit: 100, offset });
+    rows.push(...page.runs);
+    const nextOffset = page.next_offset;
+    if (nextOffset === null) return { runs: rows, next_offset: null };
+    if (!Number.isInteger(nextOffset) || nextOffset <= offset) {
+      throw new Error('invalid pagination progress');
+    }
+    offset = nextOffset;
+  }
+  return { runs: rows, next_offset: offset };
+}
+```
+
+`runs` here contains summaries, so fetch `client.run(id)` (with `await` in TypeScript) when full input/output is needed. Concurrent inserts can shift offsets; this helper does not provide a stable export or certify that every Run was seen. A returned next offset is a continuation hint, not a durable event cursor. For event replay, use the original Run ID and event `after` contract instead. See [collection semantics](/en/reference/runs) and the [bounded diagnostic example](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/README.md).
+
+Continue with the [complete first Session](/en/start/first-session), [backend integration](/en/build/backend-integration), or [event/state reference](/en/reference/events-and-states).

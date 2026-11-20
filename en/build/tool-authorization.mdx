@@ -1,0 +1,90 @@
+---
+title: "Handle Tool authorization and reauthorization"
+---
+
+Authorization establishes usable account credentials. Approval permits one specific operation. They can occur sequentially; successful authorization is not blanket approval for writes.
+
+First [configure and bind a Tool](/en/build/tools). Declare a Tool optional only when deferred authorization is acceptable. Missing required authorization can prevent Session initialization.
+
+## Resume the original Run
+
+Inspect Run state and Tool calls. Present `waiting_authorization` as an actionable state, not indefinite thinking. Locate the connection in Console, authorize the account or replace credentials, verify, and enable it. The worker continues the original Run; do not submit a replacement merely to resume.
+
+OAuth requires a deployment-owned application registration and correct callback. The credential-proxy tunnel is not a management or OAuth callback tunnel. Externally supplied access tokens may need manual renewal. Consult the connector contract for exact scope.
+
+## Distinguish account repair from operation consent
+
+| Signal | Diagnose before acting | Correct action |
+| --- | --- | --- |
+| Connection disabled or not ready | Check its current validation and account | Repair or verify the connection, then explicitly enable it |
+| Remote credential rejected | Check the connector's renewal flow and intended account | Renew that account's credential; do not silently switch accounts |
+| Authorization restored, then approval required | Read the new pending approval and actual arguments | Ask for a separate operation decision |
+| Call outcome unknown | Check whether a request was already dispatched | Reconcile the external result; credential repair does not authorize replay |
+| Access revoked for this Session | Check the Session access decision | Do not assume global connection reauthorization reverses per-Session revocation |
+
+`optional_tools` permits deferred authorization during initialization; it does not make every dependency check optional or make execution ignore authorization. The first invocation may still wait. Authorization refusal is a call-level response. Account credential revocation, per-Session access revocation and Run cancellation are separate actions with different scope.
+
+After account repair, continue observing the original Run and call. If policy requires approval, the next screen should explain the specific operation rather than announce the entire task succeeded. When the connection version changes, refresh approval data; a previously displayed consent card can become obsolete.
+
+## Inspect and refuse one request
+
+```python
+calls = client.tool_calls(run_id)['calls']
+# Display the invocation and let an authorized operator select it.
+selected = next(call for call in calls if call['id'] == selected_call_id)
+client.deny_tool_authorization(run_id, selected['id'], selected['request_hash'])
+```
+
+```typescript
+const { calls } = await client.toolCalls(runId);
+const selected = calls.find((call: { id: string }) => call.id === selectedCallId);
+if (!selected) throw new Error('Selected invocation not found');
+await client.denyToolAuthorization(runId, selected.id, selected.request_hash);
+```
+
+Refusal requires an authorized management identity; an ordinary application Token cannot use that mutation route. Execute through Console or an appropriately authorized backend, never by handing owner credentials to the browser.
+
+Refusal affects that pending invocation only. The Harness receives `tool_authorization_denied` and can continue explaining the limitation. It does not revoke account credentials, cancel the Run, or prohibit a later distinct request.
+
+Identical repeated refusal returns the stored result without restarting execution. Hash mismatch, nonpending calls, dispatch in progress, or cancellation races can reject the action. Query current state rather than changing the hash to bypass a guard.
+
+## Expiry and unknown outcomes
+
+Replacing invalid credentials does not authorize repeating already-dispatched operations. If a write was sent and its outcome is unknown, use [Tool reconciliation](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/tool-reconciliation.md). Refusal cannot undo an earlier external request.
+
+Cancelling an OAuth consent flow is separate from cancelling the Run. Preserve recoverable waiting state when users leave consent, allowing explicit refusal or later completion without duplicate tasks.
+
+Verify successful authorization resumes the same Run. Verify refusal makes no new external call, leaves credentials unchanged, and lets the task explain the restriction. Account-specific evidence is listed in [application connectors](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md). Next: [Approvals](/en/build/approvals).
+
+## Repair a manually supplied credential through the SDK
+
+For a connector that accepts a manually supplied credential, use a management client on the backend. Obtain the new credential through private server configuration for the same intended account. The following snippets update the existing connection; they do not create a replacement Run or automatically approve its operation.
+
+```python
+client.update_connection(connection_id, credential=replacement_credential)
+checked = client.validate_connection(connection_id)
+if checked['status'] != 'ready':
+    raise RuntimeError('Inspect validation before enabling the connection')
+client.update_connection(connection_id, enabled=True)
+current = client.run(original_run_id)
+calls = client.tool_calls(original_run_id)['calls']
+```
+
+```typescript
+await client.updateConnection(connectionId, {credential: replacementCredential});
+const checked = await client.validateConnection(connectionId);
+if (checked.status !== 'ready') throw new Error('Inspect validation before enabling');
+await client.updateConnection(connectionId, {enabled: true});
+const current = await client.run(originalRunId);
+const {calls} = await client.toolCalls(originalRunId);
+```
+
+Continue observing rather than expecting an immediate terminal result. Managed OAuth connectors use their authorization-flow procedure instead of these manual-credential snippets; see [application accounts](/en/integrations/apps). Preserve the original Run and call IDs throughout. If validation reports a different account or the call is already `unknown`, stop and investigate the binding or external outcome before proceeding.
+
+## Recorded success and refusal cases
+
+The [November 16 cloud journey](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-16-current-dual-sdk-journey.md) records runtime report authorization followed by approval and exactly one fixture report write, through both SDKs on Instabox/Pi/SiliconFlow. The report service was controlled test infrastructure, not a real SaaS account. The [authorization-refusal record](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-tool-authorization-denial.md) separately records Console refusal during an E2B/OpenCode/MiniMax task: the original Run completed explaining the refusal, the report connection stayed draft, no approval was created and report writes remained zero.
+
+These are dated acceptance records. [The refusal regression](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/authorization-denial.test.ts) also exercises both real SDK transports, duplicate refusal, hash/tenant/cancellation guards and unchanged credentials against local services. Reading that test is not a new execution; none of these records certifies every account's expiry or refresh flow.
+
+Sources: [connection management](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/connections/connections.ts), [Tool broker](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/tools/broker.ts), [application authorization](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/application-connectors.md). Next: [approvals](/en/build/approvals), [credential rotation](/en/operate/credentials), [events and states](/en/reference/events-and-states).

@@ -1,0 +1,100 @@
+---
+title: "接入 Blaxel"
+---
+
+Blaxel 为 Hexagon 提供文件、命令和私有预览，以及 Provider 管理的自动 standby。适用于不要求 Hexagon 域名 allowlist 或 OCI Harness 的任务；这两项当前不在该连接器的能力声明中。
+
+## 配置连接
+
+准备目标 workspace 与有相应访问权限的 API key。每个连接独立保存 workspace 和凭据，不依赖进程全局工作区设置。API key 保留在控制平面，不放进 Sandbox 环境。
+
+| 字段 | 默认值 | 约束 |
+| --- | --- | --- |
+| workspace | 必填 | 字母、数字、下划线或连字符 |
+| image | blaxel/base-image:latest | 非空的 Provider 基础镜像引用 |
+| memory_mb | 2048 | 整数，至少 2048 |
+| region | 不指定 | 可选非空字符串，实际可用性需确认 |
+
+image 是 Provider 的基础镜像配置，不等于 Hexagon 已支持此 Provider 的 OCI Harness 注册执行路径。默认镜像使用浮动标签；需要可重复环境时记录实际部署镜像与验证时间。
+
+以下示例从私有环境配置读取凭据，使用本地管理客户端。hosted 初始化见[自托管](/zh-CN/operate/self-host)。示例每次创建新连接，保存返回 ID 后复用。
+
+```python
+import os
+from hexagon import Hexagon
+
+client = Hexagon.local()
+connection = client.create_connection(
+    kind="sandbox", provider="blaxel", name="Blaxel workspace",
+    credential=os.environ["BLAXEL_API_KEY"],
+    config={"workspace": os.environ["BLAXEL_WORKSPACE"],
+            "image": "blaxel/base-image:latest", "memory_mb": 2048},
+)
+checked = client.validate_connection(connection["id"])
+if checked["status"] != "ready":
+    raise RuntimeError("Inspect Blaxel connection diagnostics")
+client.update_connection(connection["id"], enabled=True)
+```
+
+```typescript
+import { Hexagon } from '@hexagon/agent-sdk';
+
+const client = await Hexagon.local();
+const credential = process.env.BLAXEL_API_KEY;
+const workspace = process.env.BLAXEL_WORKSPACE;
+if (!credential || !workspace) throw new Error('Set Blaxel key and workspace');
+const connection = await client.createConnection({
+  kind: 'sandbox', provider: 'blaxel', name: 'Blaxel workspace', credential,
+  config: { workspace, image: 'blaxel/base-image:latest', memory_mb: 2048 },
+});
+const checked = await client.validateConnection(connection.id);
+if (checked.status !== 'ready') throw new Error('Inspect Blaxel connection diagnostics');
+await client.updateConnection(connection.id, { enabled: true });
+```
+
+验证只调用 workspace 的 Sandbox 列表；ready 不证明配额充足或实际执行成功。创建、验证、启用是三个步骤。修改 workspace、镜像或凭据后重新验证并启用；已存在的 Session 保持固定配置。
+
+## 运行任务与预览
+
+将 connection.id 用作[首个 Session 教程](/zh-CN/start/first-session)的 sandbox_connection_id，搭配兼容 Harness 和模型。分别使用 Python / TypeScript 走完创建、任务、文件产物与关闭。默认镜像是 Alpine/musl，内置 OpenCode 的安装适配处理本地二进制选择；不要把该适配理解为任意第三方可执行文件都兼容。
+
+需要预览时，在工作区启动应用，通过[私有预览](/zh-CN/build/private-preview)授权入口访问。连接器为端口建立 public=false 的预览资源，并在控制平面使用 X-Blaxel-Preview-Token。浏览器使用 Hexagon 授权，不能获得 Provider API key 或预览 Token。
+
+Blaxel 入口使用 IPv6。连接器会为仅监听 IPv4 的用户应用准备桥接；原生 IPv6 应用无需这层桥接。预览失败时先检查应用是否实际监听、端口是否正确，再检查桥接和私有端点；不能通过公开端口绕过鉴权。
+
+## 自动 standby 与恢复
+
+当前声明是 automatic_standby，不是平台显式 pause_resume。Provider 决定进入 standby 的时机，Hexagon 不能通过 DEPLOYED 状态或本地空闲计时器确定实际计算和计费状态。下一轮继续向同一 Session submit，平台检查并准备 Runtime；不将任意后台命令当作可安全重放的服务。
+
+暂停后的文件、对话与进程连续性要按具体 Harness 单独验证。不要由一次请求成功、等待了若干秒或单轮运行成功推断整个休眠旅程通过。计费状态不可观测时明确保留未知；也不承诺空闲后零费用。
+
+## 网络与清理
+
+网络 allowlist 当前不支持，要求该策略会在分配前拒绝；不要为使示例通过而悄悄改成开放策略。若任务必须限制域名，选择声明支持的 Provider。
+
+Session 关闭包含两类资源检查：计算 Sandbox，以及它的关联预览端点。连接器列举、删除并重新检查预览，再确认 Sandbox 删除或供应商终态；计算资源已终止不自动证明端点也已删除。即使计算资源因其他原因消失，关联资源仍需对账。
+
+Provider 响应超时、鉴权失败或网络错误不等于资源不存在。创建用持久 operation ID 派生精确名字；响应丢失后按原名字调查，不以新建 Session 代替对账。控制平面需要持续运行才能及时执行它负责的期限与清理工作。
+
+## 故障定位和完成条件
+
+| 症状 | 下一步 |
+| --- | --- |
+| 401 / 403 | 核对 key 所属账户、workspace 和权限，不打印凭据 |
+| 429 | 区分账户额度、并发限制和速率限制；查看脱敏诊断与 retry-after，不循环创建 |
+| 创建一直等待 | 查询原 operation 对应资源的部署状态，保留不确定结果 |
+| 命令结束状态未知 | 检查原进程与 Run；不直接重复有副作用命令 |
+| 预览不可达 | 应用端口、IPv4/IPv6 监听、桥接、私有端点与授权 |
+| 清理未完成 | 计算与 preview 列表分别核查，保留资源标识 |
+
+完成一次真实任务需核对回答、文件字节、预览授权、后续对话和关闭后的计算及端点清理。需要 standby 的应用增加独立恢复检查。历史 [Blaxel 证据](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-blaxel.md)与[执行矩阵](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/execution-matrix.md)提供有日期和范围的记录，本页写作没有重新运行云任务。
+
+依据：[连接器](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/sandboxes/blaxel.ts)、[生命周期策略](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/serverless-sessions.md)。下一步：[空闲与唤醒](/zh-CN/build/idle-and-wake)、[清理对账](/zh-CN/operate/reconciliation)、[Sandbox 总览](/zh-CN/integrations/sandboxes)。
+
+## 分别处理预览端点与计算资源恢复
+
+两个调用方可能在预览端点尚未创建完成时请求同一个端口。连接器使用确定性的端口名称，并可在冲突响应后找回已创建端点。不要通过新建另一个 Sandbox 或将端点改成公开来处理该竞态；保留原 Session、端口与资源身份，检查对应端点及其私有访问状态。
+
+[并发预览调查](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-blaxel.md)保留早期失败，以及后续独立调用方、重叠双 SDK 旅程通过的结果。最后审计检查八个精确资源及其预览集合，但不证明任意并发负载，也没有把所有早期 502 都归因于复现的 409 竞态。清理中 Provider 读取失败仍是未知，不能作为端点不存在的证据。
+
+连接器背景见[Blaxel 集成说明](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/blaxel.md)，任务与生命周期证据见[已验证组合](/zh-CN/integrations/verified-combinations)。下一步：[私有预览](/zh-CN/build/private-preview)、[资源对账](/zh-CN/operate/reconciliation)、[已验证组合](/zh-CN/integrations/verified-combinations)。

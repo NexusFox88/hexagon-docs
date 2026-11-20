@@ -1,0 +1,121 @@
+---
+title: "Continue work across turns"
+---
+
+Reuse a Session for ongoing project work. Each accepted new submission intent creates a Run with its own input, events, and result. Retrying the same intent with the same key returns its existing Run.
+
+Start with an open Session and no active Run. The first Session tutorial explicitly closes its resources, so its closed Session cannot be reused.
+
+## Submit a follow-up
+
+For a concrete two-turn exercise, use these fixed requirements. Save each input and its own key before sending, and persist the returned Run ID immediately:
+
+| Turn | Task | Evidence to retain |
+| --- | --- | --- |
+| First | Create workspace `notes.txt` containing exactly `Project: ORBIT` followed by a newline. Read it back and export a copy into this Run's artifact directory. | First Run ID, completed state, downloaded artifact bytes |
+| Second | Read workspace `notes.txt`, preserve the first line, append `Next steps` followed by a newline, and export the updated file into this Run's artifact directory. | A different Run ID on the same Session, completed state, a second downloaded artifact |
+
+The expected downloaded bytes are `b'Project: ORBIT\n'` and `b'Project: ORBIT\nNext steps\n'`. Keep the downloads under separate local names. The Agent must actually read the workspace file; merely repeating the requested text in its answer is insufficient. If either task reports a conflict or the file already exists with different content, inspect it before proceeding. Use a dedicated Session for this exercise.
+
+Assume the first Run created `notes.txt` in the workspace and completed. Read the IDs and the new submission key from your application's durable records.
+
+```python
+first = client.run(first_run_id)
+if first['state'] != 'completed':
+    raise RuntimeError('Inspect the first Run before continuing')
+second = client.submit(
+    session_id,
+    'Read workspace notes.txt. Preserve its first line and append exactly Next steps followed by a newline. Export the updated file into your Run artifact directory.',
+    saved_second_turn_key,
+)
+print(second['id'])
+```
+
+```typescript
+const first = await client.run(firstRunId);
+if (first.state !== 'completed') throw new Error('Inspect the first Run before continuing');
+const second = await client.submit(sessionId,
+  'Read workspace notes.txt. Preserve its first line and append exactly Next steps followed by a newline. Export the updated file into your Run artifact directory.',
+  savedSecondTurnKey);
+console.log(second.id);
+```
+
+Use a new key for the second turn and reuse that key for retries of that same turn. Sending different content with the first turn's key causes an idempotency conflict.
+
+## Decide whether this is a retry or a new turn
+
+| Situation | Submission identity | Expected behavior |
+| --- | --- | --- |
+| First response was lost | Keep Session, input, origin and key unchanged | Recover the existing Run if accepted; otherwise submit that same intent. |
+| User asks for a further change | Same Session, new saved input and new saved key | Create a distinct Run once the Session can accept it. |
+| User edits a task after its Run was accepted | Treat the edit as a separate intent; settle existing work first | The original Run is not replaced by changing its input or reusing its key. |
+| Session was closed after the original Run | Original key can still identify its retained Run | Recovering the old Run does not reopen the Session or start new work. |
+
+For example, `request-001/key-A` creates R1. A timeout followed by the identical `request-001/key-A` must recover R1, not R2. Once R1 completes, `request-002/key-B` creates R2 for the requested continuation. Persist both associations rather than overwriting “the current Run” and losing the first task's history.
+
+## Concurrency and waits
+
+A Session permits one active Run. Waiting for Tool authorization or approval still counts as active. A status check does not prevent another client from submitting concurrently, so handle `session_busy` even after observing completion.
+
+Your application may serialize messages or ask the user to settle the current task. Hexagon does not automatically queue all busy-session submissions. Separate Sessions suit independent workspaces; splitting Sessions loses the shared context that an ongoing task may need.
+
+Record the follow-up as a pending application intent, then attempt submission. On `session_busy`, keep that same intent pending; do not create a second Session or change its key merely to bypass the conflict. Resume submission after observing the active Run settle, using the saved input, origin and key. If you lose the submission response, the request may already have been accepted: resend the identical intent to recover its Run ID. An already accepted request is looked up before the active-Run conflict check.
+
+Multiple browser tabs or workers need a shared application queue or database coordination. A `completed` check followed by a submit is not an atomic reservation. Only mark the pending message as accepted after saving its Run ID. An application's queue also needs its own cancellation and ordering rules; cancelling a pending application message does not require calling the Run cancellation API when no Run exists.
+
+## Continue from another SDK
+
+Transfer the Session ID and prior Run ID through your backend's durable records. Give the receiving process its own authorized client configuration; do not put a control-plane token in the handoff record. The receiving side checks the association before submitting:
+
+```python
+# Python may receive IDs produced by a TypeScript backend.
+first = client.run(first_run_id)
+if first['session_id'] != session_id or first['state'] != 'completed':
+    raise RuntimeError('Handoff does not match a completed Run in this Session')
+```
+
+```typescript
+// TypeScript may receive IDs produced by a Python backend.
+const first = await client.run(firstRunId);
+if (first.session_id !== sessionId || first.state !== 'completed') {
+  throw new Error('Handoff does not match a completed Run in this Session');
+}
+```
+
+Then use the follow-up submission above with a newly persisted second-turn key. These are alternative receiving-side fragments, not additional declarations to paste into the same scope. Recheck application-user ownership as in [backend integration](/en/build/backend-integration); tenant-level API access alone does not establish that an application user owns the conversation. Do not send a Harness-native session identifier to the SDK: the worker maintains that binding internally.
+
+## Continuity
+
+After planned idle suspension, the next submit coordinates waking the Session. Files and Harness conversation continuity depend on the combination and recovery strategy. Arbitrary process memory, sockets, and background services are not portable guarantees. See [Serverless Sessions](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/serverless-sessions.md).
+
+Each Run exports a separate artifact snapshot. Later modifications do not rewrite earlier exported output. Use workspace paths to read existing files; an Artifact ID is not a filesystem path.
+
+Another SDK language can continue the Session when connected to the same control plane with appropriate authorization. The Session ID identifies the context, not an in-memory SDK client object.
+
+| Need or observed state | Keep this Session? |
+| --- | --- |
+| Continue the same project with its pinned configuration | Yes, after active work settles and the workspace is usable. |
+| Change the client language or restart the backend | Yes; recover IDs and pending intents from durable storage. |
+| Replace Harness/model/Sandbox selection or pinned instructions/context | Create a new Session. Reusing initialization creates new work with current connection settings; it is not a live migration. |
+| Session is closed | Create a new Session for new work. Retained history and artifacts remain separate from an executable workspace. |
+| Run failed or was cancelled | Inspect partial file changes and external side effects before deciding. Terminal state does not roll them back. |
+| Runtime is interrupted / workspace requires recovery | Investigate the original invocation and resource state. Repeatedly submitting follow-ups does not repair a quarantined Runtime. |
+
+For Harnesses with native continuation, the worker saves the returned native session identifier before marking a successful Run completed. A failed or interrupted Run does not establish a new successful conversation checkpoint. File continuity, conversation continuity and an unchanged process are three different properties.
+
+## Verify and recover
+
+Confirm two distinct Run IDs belong to the same Session. Check that the second task reads the first file, retains its original content, and adds the requested section. Verify conversation continuity separately if your application depends on it; file retention alone does not prove conversation recovery.
+
+Investigate partial changes after a failed first turn before resubmitting work. Runtime interruption and unknown remote outcomes do not imply safe replay. Explicitly close after the final turn and confirm resource cleanup.
+
+For an existing staged implementation of two modifications, use the [project task tutorial](/en/start/project-task): `start` → `observe` → review → `followup` → `observe` → review → `close`. Preview and browser checks remain part of that tutorial's full journey. Its local journal is designed for one language's program; do not swap Python and TypeScript journal files to simulate a cross-language handoff.
+
+
+## Read the evidence at the right scope
+
+The [November 20 project tutorial record](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-project-docs-cloud.json) verifies two distinct Runs in each SDK's own Session, unchanged fixed tests, first-turn filtering and second-turn Reset, retained exports and cleanup for Vercel/Pi/configured Messages. It is concrete multi-turn project evidence, not execution of the illustrative `notes.txt` exercise or a cross-language handoff.
+
+The [November 16 journey record](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-16-current-dual-sdk-journey.md) separately records bidirectional Python/TypeScript continuation on Instabox/Pi/SiliconFlow. It is dated evidence for that combination and revision, not a fresh verification of every current stack. The [HTTP/SDK interoperability test](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/sdk-interoperability.test.ts) shows the handoff contract with real clients and PostgreSQL but does not itself run a cloud Harness. Keep these scopes separate when deciding what to rerun for your deployment.
+
+Sources: [architecture](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/architecture.md), [SDK contracts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/README.md), [submission and active-Run checks](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/runs.ts), [lifecycle contract](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/serverless-sessions.md). Next: [Idle and wake](/en/build/idle-and-wake), [recovery](/en/build/recovery), [Session and Run concepts](/en/concepts/sessions-runs-agents).

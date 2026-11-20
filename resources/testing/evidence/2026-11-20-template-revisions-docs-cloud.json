@@ -1,0 +1,193 @@
+{
+  "date": "2026-11-20",
+  "scope": "Independent dual-SDK A/B/C template rollout on Vercel/Pi 1.5.2 and configured Messages endpoint. Real marker commands, distinct cloud resources, exact proof artifacts, revision snapshots, archival rejection and closure verified. No general provider isolation/security certification.",
+  "program_sha256": {
+    "examples/documentation/template-revisions.py": "48b88548ebd0059e955735a26221044b9f759e8c73362b90895114491c21eb0b",
+    "examples/documentation/template-revisions.ts": "13abb949bc5dd25a81e3c9f9f489bd5b6aa1ac2cf1a3a74446922207b718bbe8"
+  },
+  "journeys": [
+    {
+      "sdk": "python",
+      "exit_code": 0,
+      "agent_archived": true,
+      "both_revisions_rejected_after_archive": true,
+      "distinct_cloud_resources": 3,
+      "sessions": [
+        {
+          "label": "A",
+          "revision": 1,
+          "timeout_seconds": 180,
+          "history_unchanged_after_archive_and_close": true,
+          "run_state": "completed",
+          "session_state": "closed",
+          "proof_sha256": "06f961b802bc46ee168555f066d28f4f0e9afdf3f88174c1ee6f9de004fc30a0",
+          "retained_proof_matches": true,
+          "marker_execution": [
+            {
+              "command_sha256": "2b47fdea3c9e37e09aac439eb1a03fa3e4e059189f81a18ab230ca8b6ab31a0a",
+              "exit_code": 0,
+              "asserted_absent_then_wrote_marker": true
+            }
+          ],
+          "resource_operations": [
+            {
+              "kind": "delete",
+              "state": "completed"
+            },
+            {
+              "kind": "create",
+              "state": "completed"
+            }
+          ]
+        },
+        {
+          "label": "B",
+          "revision": 1,
+          "timeout_seconds": 180,
+          "history_unchanged_after_archive_and_close": true,
+          "run_state": "completed",
+          "session_state": "closed",
+          "proof_sha256": "c0cde77fa8fef97d476c10aad3d2d54fcc2f336140d073651c2dcccf1e379fd6",
+          "retained_proof_matches": true,
+          "marker_execution": [
+            {
+              "command_sha256": "f20adeb87feb47f549737dc2fe22cead5ec588027bba90a9cf747f06ed9fff4a",
+              "exit_code": 0,
+              "asserted_absent_then_wrote_marker": true
+            }
+          ],
+          "resource_operations": [
+            {
+              "kind": "delete",
+              "state": "completed"
+            },
+            {
+              "kind": "create",
+              "state": "completed"
+            }
+          ]
+        },
+        {
+          "label": "C",
+          "revision": 2,
+          "timeout_seconds": 300,
+          "history_unchanged_after_archive_and_close": true,
+          "run_state": "completed",
+          "session_state": "closed",
+          "proof_sha256": "12f37a8a84034d3e623d726fe10e5031f4df997ac13f4d5571b5a90c41fb84fe",
+          "retained_proof_matches": true,
+          "marker_execution": [
+            {
+              "command_sha256": "f597dac9661c2b2dba48a9101381452666698003fbe2dac8f052f57c6ffd8fa4",
+              "exit_code": 0,
+              "asserted_absent_then_wrote_marker": true
+            }
+          ],
+          "resource_operations": [
+            {
+              "kind": "delete",
+              "state": "completed"
+            },
+            {
+              "kind": "create",
+              "state": "completed"
+            }
+          ]
+        }
+      ],
+      "passed": true
+    },
+    {
+      "sdk": "typescript",
+      "exit_code": 0,
+      "agent_archived": true,
+      "both_revisions_rejected_after_archive": true,
+      "distinct_cloud_resources": 3,
+      "sessions": [
+        {
+          "label": "A",
+          "revision": 1,
+          "timeout_seconds": 180,
+          "history_unchanged_after_archive_and_close": true,
+          "run_state": "completed",
+          "session_state": "closed",
+          "proof_sha256": "06f961b802bc46ee168555f066d28f4f0e9afdf3f88174c1ee6f9de004fc30a0",
+          "retained_proof_matches": true,
+          "marker_execution": [
+            {
+              "command_sha256": "44fbcc769756840d0c81bee27d9465906f4328450428c9328843b9c8ca4168db",
+              "exit_code": 0,
+              "asserted_absent_then_wrote_marker": true
+            }
+          ],
+          "resource_operations": [
+            {
+              "kind": "delete",
+              "state": "completed"
+            },
+            {
+              "kind": "create",
+              "state": "completed"
+            }
+          ]
+        },
+        {
+          "label": "B",
+          "revision": 1,
+          "timeout_seconds": 180,
+          "history_unchanged_after_archive_and_close": true,
+          "run_state": "completed",
+          "session_state": "closed",
+          "proof_sha256": "c0cde77fa8fef97d476c10aad3d2d54fcc2f336140d073651c2dcccf1e379fd6",
+          "retained_proof_matches": true,
+          "marker_execution": [
+            {
+              "command_sha256": "d544fb9317b1fbf573799ec20be507bc12a5fe169419bb815738234ef39ce335",
+              "exit_code": 0,
+              "asserted_absent_then_wrote_marker": true
+            }
+          ],
+          "resource_operations": [
+            {
+              "kind": "delete",
+              "state": "completed"
+            },
+            {
+              "kind": "create",
+              "state": "completed"
+            }
+          ]
+        },
+        {
+          "label": "C",
+          "revision": 2,
+          "timeout_seconds": 300,
+          "history_unchanged_after_archive_and_close": true,
+          "run_state": "completed",
+          "session_state": "closed",
+          "proof_sha256": "12f37a8a84034d3e623d726fe10e5031f4df997ac13f4d5571b5a90c41fb84fe",
+          "retained_proof_matches": true,
+          "marker_execution": [
+            {
+              "command_sha256": "3a069123f0f7e0979e6441ccf0a42ab4a5cd306eb9c7d7c84aeffaa107099106",
+              "exit_code": 0,
+              "asserted_absent_then_wrote_marker": true
+            }
+          ],
+          "resource_operations": [
+            {
+              "kind": "delete",
+              "state": "completed"
+            },
+            {
+              "kind": "create",
+              "state": "completed"
+            }
+          ]
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "private_evidence": ".local/docs-content-checks/template-revisions-private.json"
+}

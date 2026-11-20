@@ -1,0 +1,1152 @@
+{
+  "checked_at": "2026-11-19T04:01:50.759Z",
+  "model": "MiniMax-M3",
+  "rows": [
+    {
+      "sandbox": "instabox",
+      "harness": "opencode",
+      "language": "python",
+      "status": "passed",
+      "protocol": "openai-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "instabox",
+      "harness": "opencode",
+      "language": "typescript",
+      "status": "passed",
+      "protocol": "anthropic-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "instabox",
+      "harness": "oci-codex",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "instabox",
+      "harness": "oci-codex",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "instabox",
+      "harness": "oci-hermes",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "instabox",
+      "harness": "oci-hermes",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "instabox",
+      "harness": "oci-openclaw",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "instabox",
+      "harness": "oci-openclaw",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "instabox",
+      "harness": "oci-opencode",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "instabox",
+      "harness": "oci-opencode",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "boat",
+      "harness": "opencode",
+      "language": "python",
+      "status": "passed",
+      "protocol": "openai-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "boat",
+      "harness": "opencode",
+      "language": "typescript",
+      "status": "passed",
+      "protocol": "anthropic-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "boat",
+      "harness": "oci-codex",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "boat",
+      "harness": "oci-codex",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "boat",
+      "harness": "oci-hermes",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "boat",
+      "harness": "oci-hermes",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "boat",
+      "harness": "oci-openclaw",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "boat",
+      "harness": "oci-openclaw",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "boat",
+      "harness": "oci-opencode",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "boat",
+      "harness": "oci-opencode",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "fly-machines",
+      "harness": "opencode",
+      "language": "python",
+      "status": "passed",
+      "protocol": "openai-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "fly-machines",
+      "harness": "opencode",
+      "language": "typescript",
+      "status": "passed",
+      "protocol": "anthropic-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "fly-machines",
+      "harness": "oci-codex",
+      "language": "python",
+      "status": "passed",
+      "protocol": "openai-responses",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "fly-machines",
+      "harness": "oci-codex",
+      "language": "typescript",
+      "status": "passed",
+      "protocol": "openai-responses",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "fly-machines",
+      "harness": "oci-hermes",
+      "language": "python",
+      "status": "passed",
+      "protocol": "openai-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "fly-machines",
+      "harness": "oci-hermes",
+      "language": "typescript",
+      "status": "passed",
+      "protocol": "openai-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "fly-machines",
+      "harness": "oci-openclaw",
+      "language": "python",
+      "status": "passed",
+      "protocol": "openai-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "fly-machines",
+      "harness": "oci-openclaw",
+      "language": "typescript",
+      "status": "passed",
+      "protocol": "anthropic-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "fly-machines",
+      "harness": "oci-opencode",
+      "language": "python",
+      "status": "passed",
+      "protocol": "openai-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "fly-machines",
+      "harness": "oci-opencode",
+      "language": "typescript",
+      "status": "passed",
+      "protocol": "anthropic-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "freestyle",
+      "harness": "opencode",
+      "language": "python",
+      "status": "passed",
+      "protocol": "openai-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "freestyle",
+      "harness": "opencode",
+      "language": "typescript",
+      "status": "passed",
+      "protocol": "anthropic-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "freestyle",
+      "harness": "oci-codex",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "freestyle",
+      "harness": "oci-codex",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "freestyle",
+      "harness": "oci-hermes",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "freestyle",
+      "harness": "oci-hermes",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "freestyle",
+      "harness": "oci-openclaw",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "freestyle",
+      "harness": "oci-openclaw",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "freestyle",
+      "harness": "oci-opencode",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "freestyle",
+      "harness": "oci-opencode",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "agent37",
+      "harness": "opencode",
+      "language": "python",
+      "status": "passed",
+      "protocol": "openai-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "agent37",
+      "harness": "opencode",
+      "language": "typescript",
+      "status": "passed",
+      "protocol": "anthropic-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "agent37",
+      "harness": "oci-codex",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "agent37",
+      "harness": "oci-codex",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "agent37",
+      "harness": "oci-hermes",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "agent37",
+      "harness": "oci-hermes",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "agent37",
+      "harness": "oci-openclaw",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "agent37",
+      "harness": "oci-openclaw",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "agent37",
+      "harness": "oci-opencode",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "agent37",
+      "harness": "oci-opencode",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "e2b",
+      "harness": "opencode",
+      "language": "python",
+      "status": "passed",
+      "protocol": "openai-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "e2b",
+      "harness": "opencode",
+      "language": "typescript",
+      "status": "passed",
+      "protocol": "anthropic-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "e2b",
+      "harness": "oci-codex",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "e2b",
+      "harness": "oci-codex",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "e2b",
+      "harness": "oci-hermes",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "e2b",
+      "harness": "oci-hermes",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "e2b",
+      "harness": "oci-openclaw",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "e2b",
+      "harness": "oci-openclaw",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "e2b",
+      "harness": "oci-opencode",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "e2b",
+      "harness": "oci-opencode",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "modal",
+      "harness": "opencode",
+      "language": "python",
+      "status": "passed",
+      "protocol": "openai-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "modal",
+      "harness": "opencode",
+      "language": "typescript",
+      "status": "passed",
+      "protocol": "anthropic-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "modal",
+      "harness": "oci-codex",
+      "language": "python",
+      "status": "passed",
+      "protocol": "openai-responses",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "modal",
+      "harness": "oci-codex",
+      "language": "typescript",
+      "status": "passed",
+      "protocol": "openai-responses",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "modal",
+      "harness": "oci-hermes",
+      "language": "python",
+      "status": "passed",
+      "protocol": "openai-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "modal",
+      "harness": "oci-hermes",
+      "language": "typescript",
+      "status": "passed",
+      "protocol": "openai-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "modal",
+      "harness": "oci-openclaw",
+      "language": "python",
+      "status": "passed",
+      "protocol": "openai-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "modal",
+      "harness": "oci-openclaw",
+      "language": "typescript",
+      "status": "passed",
+      "protocol": "anthropic-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "modal",
+      "harness": "oci-opencode",
+      "language": "python",
+      "status": "passed",
+      "protocol": "openai-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "modal",
+      "harness": "oci-opencode",
+      "language": "typescript",
+      "status": "passed",
+      "protocol": "anthropic-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "blaxel",
+      "harness": "opencode",
+      "language": "python",
+      "status": "passed",
+      "protocol": "openai-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "blaxel",
+      "harness": "opencode",
+      "language": "typescript",
+      "status": "passed",
+      "protocol": "anthropic-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "blaxel",
+      "harness": "oci-codex",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "blaxel",
+      "harness": "oci-codex",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "blaxel",
+      "harness": "oci-hermes",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "blaxel",
+      "harness": "oci-hermes",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "blaxel",
+      "harness": "oci-openclaw",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "blaxel",
+      "harness": "oci-openclaw",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "blaxel",
+      "harness": "oci-opencode",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "blaxel",
+      "harness": "oci-opencode",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "vercel",
+      "harness": "opencode",
+      "language": "python",
+      "status": "passed",
+      "protocol": "openai-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "vercel",
+      "harness": "opencode",
+      "language": "typescript",
+      "status": "passed",
+      "protocol": "anthropic-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "vercel",
+      "harness": "oci-codex",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "vercel",
+      "harness": "oci-codex",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "vercel",
+      "harness": "oci-hermes",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "vercel",
+      "harness": "oci-hermes",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "vercel",
+      "harness": "oci-openclaw",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "vercel",
+      "harness": "oci-openclaw",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "vercel",
+      "harness": "oci-opencode",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "vercel",
+      "harness": "oci-opencode",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "upstash",
+      "harness": "opencode",
+      "language": "python",
+      "status": "passed",
+      "protocol": "openai-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "upstash",
+      "harness": "opencode",
+      "language": "typescript",
+      "status": "passed",
+      "protocol": "anthropic-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "upstash",
+      "harness": "oci-codex",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "upstash",
+      "harness": "oci-codex",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "upstash",
+      "harness": "oci-hermes",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "upstash",
+      "harness": "oci-hermes",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "upstash",
+      "harness": "oci-openclaw",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "upstash",
+      "harness": "oci-openclaw",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "upstash",
+      "harness": "oci-opencode",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "upstash",
+      "harness": "oci-opencode",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "sprites",
+      "harness": "opencode",
+      "language": "python",
+      "status": "passed",
+      "protocol": "openai-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "sprites",
+      "harness": "opencode",
+      "language": "typescript",
+      "status": "passed",
+      "protocol": "anthropic-compatible",
+      "checks": {
+        "idle": true,
+        "wake": true,
+        "file": true,
+        "native_session": true,
+        "conversation": true,
+        "closed": true
+      }
+    },
+    {
+      "sandbox": "sprites",
+      "harness": "oci-codex",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "sprites",
+      "harness": "oci-codex",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "sprites",
+      "harness": "oci-hermes",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "sprites",
+      "harness": "oci-hermes",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "sprites",
+      "harness": "oci-openclaw",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "sprites",
+      "harness": "oci-openclaw",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "sprites",
+      "harness": "oci-opencode",
+      "language": "python",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    },
+    {
+      "sandbox": "sprites",
+      "harness": "oci-opencode",
+      "language": "typescript",
+      "status": "unsupported_oci_provider",
+      "protocol": null,
+      "checks": null
+    }
+  ]
+}

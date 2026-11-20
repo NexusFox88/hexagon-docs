@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-20",
+  "scope": "Application example, real SQLite and fake SDK; no authentication server, HTTP handler, TypeScript application store or cloud acceptance",
+  "command": [
+    "python3",
+    "-B",
+    "examples/documentation/check-backend-intents.py"
+  ],
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "test_another_user_cannot_submit_or_read (__main__.DurableIntentChecks.test_another_user_cannot_submit_or_read) ... ok\ntest_bind_cannot_transfer_existing_ownership (__main__.DurableIntentChecks.test_bind_cannot_transfer_existing_ownership) ... ok\ntest_delivery_after_restart_verifies_bytes (__main__.DurableIntentChecks.test_delivery_after_restart_verifies_bytes) ... ok\ntest_delivery_rejects_active_run_and_corrupt_bytes (__main__.DurableIntentChecks.test_delivery_rejects_active_run_and_corrupt_bytes) ... ok\ntest_delivery_rejects_other_user_and_unrelated_artifact (__main__.DurableIntentChecks.test_delivery_rejects_other_user_and_unrelated_artifact) ... ok\ntest_known_run_is_queried_without_resubmission (__main__.DurableIntentChecks.test_known_run_is_queried_without_resubmission) ... ok\ntest_read_rejects_wrong_remote_session (__main__.DurableIntentChecks.test_read_rejects_wrong_remote_session) ... ok\ntest_repeated_prepare_keeps_key_and_rejects_changed_input (__main__.DurableIntentChecks.test_repeated_prepare_keeps_key_and_rejects_changed_input) ... ok\ntest_response_loss_and_restart_preserve_exact_intent (__main__.DurableIntentChecks.test_response_loss_and_restart_preserve_exact_intent) ... ok\ntest_status_without_run_does_not_submit (__main__.DurableIntentChecks.test_status_without_run_does_not_submit) ... ok\n\n----------------------------------------------------------------------\nRan 10 tests in 0.017s\n\nOK\n",
+  "passed": true,
+  "sha256": {
+    "examples/documentation/backend-intents.py": "67285fd12b4ba46b4b6b0b9b769e11c91920e08e2d2e4ebac1a64899879a45b4",
+    "examples/documentation/check-backend-intents.py": "ff7eb1c6f3764a971976c5bb831df9abdd9230e0897befe13b0303aa3e4df82a",
+    "docs/product/en/build/backend-integration.md": "a8bc084ae23494adf1a810fbe389d4fbc9a9a207f071b161dbb9585e5ffd0a8b",
+    "docs/product/zh-CN/build/backend-integration.md": "e00eb60c7b6700c50f792b10ca7e62237e51dbf0919e08f0ba4ca15b9f2e26d9"
+  }
+}

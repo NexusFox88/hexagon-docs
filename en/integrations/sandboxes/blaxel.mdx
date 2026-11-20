@@ -1,0 +1,100 @@
+---
+title: "Connect Blaxel"
+---
+
+Blaxel supplies files, commands, private preview, and provider-managed automatic standby. Use it for tasks that do not require Hexagon domain allowlists or OCI Harness execution; neither capability is currently declared by this connector.
+
+## Configure a connection
+
+Prepare the target workspace and an API key with appropriate access. Each connection stores its own workspace and credential instead of relying on process-global workspace settings. The API key stays in the control plane, not Sandbox environment.
+
+| Field | Default | Constraint |
+| --- | --- | --- |
+| workspace | Required | Letters, numbers, underscores, or hyphens |
+| image | blaxel/base-image:latest | Nonempty provider base-image reference |
+| memory_mb | 2048 | Integer, at least 2048 |
+| region | Unspecified | Optional nonempty string; check availability |
+
+The image field configures a provider base image; it does not establish support for Hexagon OCI Harness registration/execution. The default tag floats. Record actual deployed image and verification date when reproducibility matters.
+
+These examples read private environment configuration and use a local management client. See [self-hosting](/en/operate/self-host) for hosted initialization. Each execution creates a new connection; retain and reuse its ID.
+
+```python
+import os
+from hexagon import Hexagon
+
+client = Hexagon.local()
+connection = client.create_connection(
+    kind="sandbox", provider="blaxel", name="Blaxel workspace",
+    credential=os.environ["BLAXEL_API_KEY"],
+    config={"workspace": os.environ["BLAXEL_WORKSPACE"],
+            "image": "blaxel/base-image:latest", "memory_mb": 2048},
+)
+checked = client.validate_connection(connection["id"])
+if checked["status"] != "ready":
+    raise RuntimeError("Inspect Blaxel connection diagnostics")
+client.update_connection(connection["id"], enabled=True)
+```
+
+```typescript
+import { Hexagon } from '@hexagon/agent-sdk';
+
+const client = await Hexagon.local();
+const credential = process.env.BLAXEL_API_KEY;
+const workspace = process.env.BLAXEL_WORKSPACE;
+if (!credential || !workspace) throw new Error('Set Blaxel key and workspace');
+const connection = await client.createConnection({
+  kind: 'sandbox', provider: 'blaxel', name: 'Blaxel workspace', credential,
+  config: { workspace, image: 'blaxel/base-image:latest', memory_mb: 2048 },
+});
+const checked = await client.validateConnection(connection.id);
+if (checked.status !== 'ready') throw new Error('Inspect Blaxel connection diagnostics');
+await client.updateConnection(connection.id, { enabled: true });
+```
+
+Validation only lists Sandboxes in the workspace. Ready does not establish available quota or successful execution. Create, validate, and enable are separate steps. Revalidate and enable after workspace, image, or credential changes; existing Sessions retain pinned configuration.
+
+## Run a task and preview
+
+Use connection.id as sandbox_connection_id in the [first Session tutorial](/en/start/first-session), with a compatible Harness/model. Independently run creation, task, artifact, and close through Python and TypeScript. The default image is Alpine/musl; built-in OpenCode installation adapts native binary selection. This does not make arbitrary third-party executables compatible.
+
+Start the application in the workspace and use authorized [private preview](/en/build/private-preview). The connector creates a public=false preview resource for the port, using X-Blaxel-Preview-Token in the control plane. Browsers use Hexagon authorization, never provider API keys or preview Tokens.
+
+Blaxel ingress uses IPv6. The connector prepares a bridge for IPv4-only user applications; native IPv6 applications do not need that bridge. Diagnose the listening service and port before checking bridge/private endpoint state. Do not bypass authorization by making the port public.
+
+## Automatic standby and recovery
+
+The declared capability is automatic_standby, not platform-controlled pause_resume. The provider chooses standby timing. Neither DEPLOYED state nor a local idle timer establishes actual compute or billing state. Submit the next Run to the same Session; the platform checks and prepares Runtime. Arbitrary background commands are not treated as safely replayable services.
+
+Verify file, conversation, and process continuity separately for each Harness. A successful request, elapsed wait, or successful single turn does not prove the idle journey. Keep unobservable billing state unknown; do not promise zero idle charges.
+
+## Networking and cleanup
+
+Network allowlists are unsupported; a request requiring one is rejected before allocation. Do not silently weaken the policy to make an example pass. Choose a supporting provider when domain restrictions are required.
+
+Close checks both compute and associated preview endpoints. The connector lists, deletes, and rechecks previews, then confirms Sandbox absence or provider terminal state. Terminated compute alone does not prove endpoint removal. Associated resources still need reconciliation if compute disappears for another reason.
+
+Timeouts, authentication failures, and network errors do not mean resource absence. Creation derives an exact name from the persisted operation ID. Investigate that original name after a lost response rather than creating another Session as a substitute for reconciliation. The control plane must remain running to enforce the deadlines and cleanup it owns promptly.
+
+## Diagnose and complete
+
+| Symptom | Next action |
+| --- | --- |
+| 401 / 403 | Check key ownership, workspace, and permissions without printing credentials |
+| 429 | Distinguish quota, concurrency, and rate limits; inspect sanitized diagnostics/retry-after, not a create loop |
+| Allocation keeps waiting | Inspect deployment state for the original operation and retain uncertainty |
+| Process completion unknown | Check the original process/Run before repeating side effects |
+| Preview unavailable | Check port, IPv4/IPv6 listener, bridge, private endpoint, and authorization |
+| Cleanup incomplete | Check compute and preview lists separately; retain resource IDs |
+
+Complete a real task with response, file bytes, preview authorization, continuation, and confirmed compute/endpoint cleanup. Add independent recovery checks for standby-dependent applications. Historical [Blaxel evidence](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-blaxel.md) and the [execution matrix](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/execution-matrix.md) retain dates and scope. No cloud task was rerun while writing this page.
+
+Sources: [connector](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/sandboxes/blaxel.ts), [lifecycle strategies](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/serverless-sessions.md). Next: [idle and wake](/en/build/idle-and-wake), [reconciliation](/en/operate/reconciliation), [Sandbox overview](/en/integrations/sandboxes).
+
+## Treat preview allocation and compute as separate recovery work
+
+Two callers can request the same port while the preview endpoint is still being created. The connector uses the deterministic port name and can recover an already-created endpoint after a conflicting response. Do not create another Sandbox or make the endpoint public to recover this race. Retain the original Session, port and resource identity, then inspect that endpoint and its private access state.
+
+The [concurrent-preview investigation](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-15-blaxel.md) preserves earlier failures and later successful independent-caller and overlapping dual-SDK journeys. Its final audit checked eight exact resources and their preview collections. It does not prove arbitrary concurrency or attribute every earlier 502 to the reproduced 409 race. During cleanup, a provider read failure leaves uncertainty; it is not evidence of endpoint absence.
+
+Use [Blaxel integration notes](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/blaxel.md) for connector context and [verified combinations](/en/integrations/verified-combinations) for task versus lifecycle evidence. Next: [private previews](/en/build/private-preview), [resource reconciliation](/en/operate/reconciliation), [verified combinations](/en/integrations/verified-combinations).

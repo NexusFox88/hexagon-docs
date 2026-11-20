@@ -1,0 +1,137 @@
+---
+title: "Configuration and environment variables"
+---
+
+Configuration has separate layers: control-plane process settings, saved local deployment settings, Session behavior/guest environment, and provider-specific Connections. Their scopes differ. Putting a cloud account key in Session env does not replace a Connection.
+
+## Control-plane process
+
+Sources: [main.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/main.ts), [deployment mode](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/deployment/mode.ts), [local discovery](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/deployment/local-discovery.ts) and [tunnel](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/network/cloudflare-tunnel.ts). Changes require service restart, except internal readiness logic can update temporary ingress origins. Defaults below are entry-point defaults before local saved settings are applied.
+
+| Name | Default | Applicability / requirement | Sensitive | Type and purpose |
+| --- | --- | --- | --- | --- |
+| `HEXAGON_DEPLOYMENT_MODE` | local | local / hosted | No | local or hosted; other values fail startup. |
+| `DATABASE_URL` | postgres://hexagon@127.0.0.1:55432/hexagon | Both; required for hosted | Yes | PostgreSQL URL; hosted has no implicit database creation. |
+| `HEXAGON_DATA_DIR` | .local/control-plane | Primarily local | Private path | Resolved data directory for identity, key, settings and logs. |
+| `HOST / PORT` | 127.0.0.1 / 8787 | Both | No | Management listener host and numeric port; loopback local binding enables local bootstrap. |
+| `HEXAGON_ACCESS_HOST / HEXAGON_ACCESS_PORT` | 127.0.0.1 / 8789 | Both | No | Separate credential-access listener, not management ingress. |
+| `HEXAGON_ACCESS_URL` | Unset before local deployment settings | Both; required for hosted | Origin only | Public HTTPS origin for delegated credential access; local tunnel can populate it. |
+| `HEXAGON_ACCESS_TUNNEL` | Derived locally | Local only | No | cloudflare or empty; other nonempty values fail; hosted rejects nonempty. |
+| `PREVIEW_HOST / PREVIEW_PORT` | 127.0.0.1 / 8788 | Both | No | Preview listener; preview port also contributes to generated addresses. |
+| `PREVIEW_SCHEME / PREVIEW_DOMAIN` | http / localhost | Both | No | Advertised preview scheme/domain; configure DNS/TLS/routing separately. |
+| `HEXAGON_MASTER_KEY` | None | Required for hosted | Yes | Canonical Base64 encoding of 32 bytes, matching existing encrypted data. |
+| `HEXAGON_BOOTSTRAP_TOKEN` | None | Required for hosted | Yes | Must authenticate an existing owner; does not create hosted identity. |
+| `HEXAGON_LOCAL_DISCOVERY_FILE` | ~/.hexagon/local.json | local | Private path | Discovery descriptor location; per-data-directory connection.json is also written. |
+| `CLOUDFLARED_BINARY` | cloudflared | Local tunnel | No | Executable path; it must exist when using temporary ingress. |
+| `HEXAGON_TUNNEL_PROXY_FALLBACK` | Enabled unless disabled | Local tunnel | No | disabled prevents proxy-stripped retry for the specific tunnel transport failure. |
+
+Hosted startup requires an explicit database, matching key, existing owner Token and HTTPS credential origin without userinfo, query, fragment or a non-root path. Development tunnels are rejected. Failures include `invalid_deployment_mode`, `hosted_identity_and_storage_required`, `hosted_master_key_invalid`, `hosted_https_ingress_required` and `hosted_owner_identity_required`. There is no automatic hosted identity bootstrap; see [self-hosting](/en/operate/self-host).
+
+Listener ports are converted with `Number(...)` and passed to the server; invalid values do not all have one unified configuration error. Port conflicts, invalid hosts and listen failures use underlying errors. Changing HOST does not configure TLS, identity or reverse proxies.
+
+## Saved local deployment settings
+
+The selected data directory contains `deployment.json`, validated by [settings.ts](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/deployment/settings.ts). Local startup reads it; the direct hosted entry does not. The managed local launcher applies saved settings, so follow self-hosting instructions with explicit process configuration rather than mixing hosted startup with local bootstrap.
+
+| Field | Type / default | Required / sensitive | Behavior |
+| --- | --- | --- | --- |
+| `outbound_proxy` | Optional HTTP(S) origin, no default | Optional; URL username/password rejected | Outbound proxy; no path, query or fragment |
+| `no_proxy` | String array, default `[]` | Optional, normally nonsecret | Up to 128 entries, 253 characters each, restricted host syntax |
+| `ingress.mode` | Default `cloudflare` | Optional, nonsecret | `cloudflare`, `disabled` or `external` |
+| `ingress.url` | HTTPS origin | Required for external; no embedded credentials | Credential-access ingress, not Console or OAuth callback |
+
+Example configuration (the external hostname is a placeholder requiring real routing):
+
+```json
+{
+  "outbound_proxy": "http://127.0.0.1:7890",
+  "no_proxy": ["localhost", "127.0.0.1"],
+  "ingress": {"mode": "external", "url": "https://credentials.example.invalid"}
+}
+```
+
+```sh
+npm run local -- configure /absolute/path/deployment.json
+```
+
+configure replaces the full config rather than merging a patch; omitted fields take defaults. It returns a revision and `restart_required: true`, without restarting. Invalid saved files cause `deployment_configuration_invalid`; concurrent updates can produce `deployment_configuration_busy` or `deployment_configuration_changed`. Read the current settings rather than bypassing locks/revisions.
+
+## Standard proxy variables
+
+All variables below are optional process-environment strings. They apply at process startup; restart after changing an operator-supplied value. The local launcher and direct local entry first assemble saved settings, while direct hosted startup passes the environment to the outbound dispatcher without that assembly. Treat proxy URLs as sensitive if they contain authentication; do not copy them into public diagnostics. Host bypass lists are normally nonsecret but can expose internal names.
+
+| Variable | Default and precedence | Applicability and effect |
+| --- | --- | --- |
+| `HTTPS_PROXY` / `https_proxy` | Uppercase wins when present, even if empty. Local assembly then falls back to saved `outbound_proxy`; the direct dispatcher falls back to `HTTP_PROXY`, then `http_proxy`, then empty | Both modes; selects the HTTP(S) proxy used for HTTPS destinations. Local assembly writes both spellings when its selected proxy is nonempty |
+| `HTTP_PROXY` / `http_proxy` | Uppercase wins when present. Local assembly falls back to its selected HTTPS/saved proxy; the direct dispatcher defaults to empty | Both modes; proxy for HTTP destinations. Inherited HTTP-only settings remain usable even when local assembly selects no HTTPS proxy |
+| `NO_PROXY` / `no_proxy` | Uppercase wins when present. Local assembly merges this list with saved entries and `127.0.0.1,localhost`; the direct dispatcher defaults to `127.0.0.1,localhost,::1` only when neither spelling is present | Both modes; comma-separated bypass input to the installed Undici dispatcher. The saved JSON list has separate schema validation; do not assume it accepts every environment-list syntax |
+| `NODE_USE_ENV_PROXY` | Local assembly always sets `1`. Direct dispatcher selects an unproxied Agent only for the exact string `0`; all other values select its environment-proxy dispatcher | Both modes with different startup precedence. It is not a universal switch for dedicated protected-upstream proxies or subprocesses |
+| `ALL_PROXY` / `all_proxy` | No Hexagon default. The control-plane outbound dispatcher does not read either spelling | Passed to child environments. The local tunnel retry condition checks uppercase `ALL_PROXY` after HTTP(S) variables; lowercase alone does not trigger that fallback. A retry removes both spellings along with HTTP(S) proxy variables from the child environment |
+
+The last row describes Hexagon's wrapper, not a guarantee of how every provider SDK or external executable interprets environment variables. The tunnel wrapper attempts its proxy-stripped fallback only for its specific transport-failure classification and when fallback is not disabled. It does not retry every tunnel failure.
+
+Sources: [local environment assembly](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/deployment/settings.ts), [outbound dispatcher](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/deployment/outbound.ts), [Cloudflare wrapper](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/network/cloudflare-tunnel.ts). These settings configure control-plane transport, not Sandbox network policy or account authorization.
+
+## Proxy precedence
+
+Local `deploymentEnvironment` chooses `HTTPS_PROXY`, then `https_proxy`, then saved `outbound_proxy`. HTTP proxy uses `HTTP_PROXY`, then `http_proxy`, then that selected proxy. `NO_PROXY` takes precedence over `no_proxy` and merges with saved entries plus `127.0.0.1,localhost`. An explicitly present empty string can shadow saved values.
+
+`HEXAGON_ACCESS_URL` takes precedence over a saved external URL; a usable external address disables the temporary tunnel. Without one, explicit `HEXAGON_ACCESS_TUNNEL` takes precedence over ingress mode. Local environment assembly sets `NODE_USE_ENV_PROXY` to `1`; setting it to `0` is therefore not guaranteed to disable proxies through that path. The direct hosted [outbound setup](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/deployment/outbound.ts) does select direct transport when it receives `0`.
+
+With a local proxy and no explicit `HEXAGON_ACCESS_EGRESS_PROXY_URL`, assembly fills that value from the selected proxy. `HEXAGON_ACCESS_EGRESS_HOSTS` then defaults to `api.siliconflow.com,api.minimaxi.com,api.minimax.io,api.minimax.chat`. This concerns credential-access proxy routing, not account authorization or the Sandbox network allowlist. See [networking](/en/operate/networking) for advanced settings; application policy and process proxies are distinct.
+
+## Resolve conflicting settings
+
+These examples describe the local `deploymentEnvironment` function with only the stated inputs; inherited shell variables can change the result. They use reserved example addresses, not working ingress services. Inspect names and origins without printing credentials.
+
+| Saved configuration | Explicit process input | Effective result |
+| --- | --- | --- |
+| `outbound_proxy=http://127.0.0.1:7890` | `HTTPS_PROXY=http://127.0.0.1:9999` | HTTPS uses port 9999; HTTP also uses it unless separately set |
+| Same saved proxy | `HTTPS_PROXY=""`, with no other proxy variables | Saved proxy is shadowed; no nonempty proxy is synthesized |
+| `no_proxy=["internal.example"]` | `NO_PROXY="api.example"` | Combined value is `127.0.0.1,localhost,internal.example,api.example` |
+| `ingress.mode=external`, URL `https://saved.example` | `HEXAGON_ACCESS_URL=https://explicit.example` | Explicit origin wins; temporary tunnel is disabled |
+| Same external ingress | `HEXAGON_ACCESS_URL=""`, no explicit tunnel | Saved origin is shadowed; origin and tunnel both remain empty, so credential access is not configured |
+| Default cloudflare ingress | `NODE_USE_ENV_PROXY=0` | Local environment assembly replaces it with `1`; this does not disable its proxy path |
+
+An empty proxy field is not a general “disable all proxies” switch: other inherited HTTP(S) variables and dedicated protected-upstream routing can still apply. Hosted startup does not call this local assembler; its outbound dispatcher honors `NODE_USE_ENV_PROXY=0` directly.
+
+### Dedicated protected-upstream routing
+
+These optional settings apply to both deployment modes. Set them before starting the process and restart to apply an operator change. The local assembler can supply defaults as described above; direct hosted startup has no such saved-setting fallback.
+
+| Name | Type / default without local synthesis | Sensitive / behavior |
+| --- | --- | --- |
+| `HEXAGON_ACCESS_EGRESS_PROXY_URL` | HTTP(S) proxy URL string; unset | Treat as private configuration, especially if it contains authentication. Selects a dedicated upstream proxy only for matching hosts; does not authorize an account or change Sandbox egress policy |
+| `HEXAGON_ACCESS_EGRESS_HOSTS` | Comma-separated host names; empty | Normally nonsecret. Names are trimmed and lowercased, then matched exactly; wildcard matching is not implemented |
+
+See the [protected transport implementation](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/mcp/remote.ts) for proxy selection and endpoint validation. A proxy URL without matching hosts does not route every protected request through that proxy. A matching proxy with another URL scheme raises `credential_egress_proxy_invalid`; malformed URLs can raise the URL parser error. Selecting this trusted proxy delegates DNS enforcement to it; keep its policy under operator control.
+
+### Applying a saved change
+
+Prepare the complete desired JSON, including fields you want to retain, then run `npm run local -- configure /absolute/path/deployment.json`. For example, replacing a configuration that contains an outbound proxy with only `{"ingress":{"mode":"disabled"}}` removes the saved proxy and resets `no_proxy` to `[]`. Shell overrides can still apply after restart.
+
+The command saves privately and returns `restart_required: true`; it does not restart the running instance. Arrange the restart using the [local workspace guide](/en/operate/local-workspace), then inspect health/readiness and test the intended access path. A healthy management listener alone does not establish working credential ingress. If the revision changed, read the latest configuration and reconcile your intended change; do not retry an obsolete replacement blindly.
+
+## Session settings and guest environment
+
+| Setting | Type / default | Scope and application time |
+| --- | --- | --- |
+| `harness` or `agent_id` | Exactly one; Agent revision optional | Resolved/pinned at creation; do not combine saved Agent with configuration overrides |
+| Sandbox/model connection IDs | Required UUIDs | Tenant-owned, compatible, ready connections; not credential values |
+| `resources` | Idle default 60 seconds; timeout default 600 | Pinned at creation; see limits and lifecycle semantics |
+| `network` | Default unrestricted; allowed_hosts empty | Pinned; allowlist needs provider support and credential-ingress access |
+| `identity`, `instructions`, `context` | Optional behavior fields | Model guidance/background, not caller authorization |
+| `tools`, `connections` | Name-to-connection-ID maps, default empty | Tool bindings and protected HTTP bindings are different |
+| `variables` / `env` | String maps; env default empty | Guest Agent process environment, not control-plane configuration; values may be sensitive |
+
+variables is an alternative to env. Supplying variables together with nonempty env produces `ambiguous_variables`. Names match `[A-Za-z_][A-Za-z0-9_]{0,127}`. Prefixes `HEXAGON_`, `OPENCODE_`, `PI_` and names `PORT`, `NODE_OPTIONS`, `PYTHONPATH`, `PYTHONHOME`, `LD_PRELOAD`, `LD_LIBRARY_PATH` are reserved. Values reject NUL; see [limits](/en/reference/limits) for count/byte bounds. Do not use guest env to bypass control-plane credential storage.
+
+Sources: [Session schema](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/sessions.ts), [environment schema](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/environment.ts), [initialization](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/execution/initialization.ts). Create a new Session for a changed definition; saving deployment settings or restarting does not rewrite an existing Session's pinned behavior.
+
+## Client and provider settings
+
+SDK URL/Token constructor arguments are client configuration. Example `HEXAGON_API_URL` / `HEXAGON_API_TOKEN` variables are read by the example program, not control-plane identity-bootstrap switches. `Hexagon.local()` discovers identity using explicit data-directory selection, workspace descriptors and the user discovery file. Do not weaken private-file checks to make discovery succeed.
+
+Provider settings live in Connection `config`, with managed Secret or OAuth credentials. Their fields, defaults and verification scope are in [integration guides](/en/integrations/choose), not global deployment environment variables. Test-only `TEST_DATABASE_URL` does not select the ordinary service database.
+
+This page was checked against current configuration readers; no running installation was changed or restarted. Next: [installation](/en/start/install), [self-hosting](/en/operate/self-host), [networking](/en/operate/networking).

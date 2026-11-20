@@ -1,0 +1,62 @@
+---
+title: "Reconcile uncertain cloud resources and Tool operations"
+---
+
+Remote operations can take effect before their response is lost. Unknown means investigation is needed, not automatic failure, noncreation, or deletion.
+
+Use a management identity. Retain Session/operation IDs, Provider resource/operation handles, and timing privately; publish redacted summaries.
+
+## Inspect and review
+
+```python
+page = client.resource_operations(limit=50)
+operation = client.resource_operation(operation_id)
+# Explicit review action against the original operation:
+result = client.review_resource_operation(operation_id, 'reconcile', 'Recheck original operation')
+```
+
+```typescript
+const page = await client.resourceOperations(50);
+const operation = await client.resourceOperation(operationId);
+const result = await client.reviewResourceOperation(operationId, 'reconcile', 'Recheck original operation');
+```
+
+Follow next_offset to inspect the full listing. Review applies to unknown operations. Reconcile invokes lifecycle logic and can perform cloud actions; it is not a read-only button. A reconciliation_error remains investigable even if the HTTP request succeeded.
+
+Acknowledge pauses automatic review while retaining unknown. Reopen restores automatic checks. Operator notes do not prove cleanup.
+
+## Three cases
+
+**Lost creation response:** query the original operation ID, exact name, or Provider handle. One trustworthy match can restore a binding; multiple matches require ownership investigation. Zero matches can reflect asynchronous creation, pagination, or eventual consistency. An empty list alone does not justify creating another resource.
+
+**Lost deletion response:** inspect the original resource and associated endpoints. Confirmed absence permits completion only when the Provider deletion contract is also satisfied; presence requires continuing the original deletion intent. Uncertainty retains closing. Stopped compute, retained snapshots, and preview endpoints have distinct cleanup boundaries.
+
+**Lost Tool write response:** correlate the call ID/request hash with external records. Then use resolve_tool_call/resolveToolCall to deliver a verified success or failure without resending the request. Explain the actual evidence; otherwise keep unknown.
+
+## Choose the next action from evidence
+
+| Operation | Evidence available | Decision and stopping condition |
+| --- | --- | --- |
+| Create response lost | Zero exact matches | Keep unknown unless the provider supplies authoritative non-allocation evidence; an empty list is insufficient |
+| Create response lost | One exact owned match | Reconcile the original intent; verify ownership and usable state before binding |
+| Create response lost | Multiple matches | Preserve every candidate privately and investigate ownership; do not arbitrarily choose one |
+| Delete response lost | Receipt exists | Observe that operation's target/type/terminal status and then required resource absence |
+| Delete response lost | Resource absent but receipt missing | Apply the specific Provider contract; Boat cannot infer completed purge from absence alone |
+| Tool write response lost | Matching remote record and request hash | Resolve the original call as completed with actual evidence; send no new write |
+| Tool write response lost | No conclusive remote result | Keep unknown or cancel the Run; cancellation does not prove the write was absent |
+
+For Boat, require its original deletion operation to complete for the original target and confirm absence. For E2B OCI, compute absence is not the end: the Session-owned execution template must also be deleted. For Fly Machines, check the owned App, not only its Machine. These examples explain why one universal “404 means cleanup done” rule is insufficient.
+
+Review actions have different effects: `acknowledge` retains unknown and pauses automatic review; `reopen` restores automatic checks; `reconcile` immediately invokes the lifecycle branch appropriate to the operation and Session. A successful HTTP response may still contain `reconciliation_error`. Re-read the operation, related resources and Session after acting. Do not repeatedly press reconcile as an unbounded retry loop.
+
+A Tool resolution must include the original `request_hash`, `outcome`, result `text` and evidence. The evidence is a caller's audit statement, not automatic remote verification. An identical repeated resolution is idempotent; a conflicting one fails. An executing call under the broker lock or a terminal/cancelling Run cannot accept a new resolution. See the [resolution contract](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/tool-reconciliation.md) before applying it.
+
+## Stop blind automation
+
+Unclear ownership, multiple matches, unavailable Providers, and pending asynchronous operations require retained records and bounded backoff. Do not hide uncertainty by deleting connections, editing database states, or creating replacement Sessions.
+
+Cancellation cannot retract dispatched writes. Repeated close can reconcile the same resources, but unknown effects remain accountable. Successful output is not proof of globally zero orphan resources.
+
+Completion requires a verifiable terminal outcome or an explicitly retained unresolved conclusion for every operation. Confirm exact resource/endpoint absence and matching Session state. Tool resolution needs the hash, external facts, and audit result. Test fault cases separately from normal closure.
+
+Sources: [resource review](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/sandboxes/operations.ts), [Tool reconciliation](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/tool-reconciliation.md). Next: [diagnostics](/en/operate/observability), [troubleshooting](/en/operate/troubleshooting), [HTTP API](/en/reference/http).

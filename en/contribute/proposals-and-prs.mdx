@@ -1,0 +1,88 @@
+---
+title: "Propose changes and prepare contributions"
+---
+
+Describe the concrete user problem and desired behavior before selecting modules. Use the main repository, [NexusFox88/Hexagon](https://github.com/NexusFox88/Hexagon), and its available contribution options. Follow the [contribution guide](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/CONTRIBUTING.md) and include the patch, design context and actual verification records.
+
+See the [Apache-2.0 LICENSE](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/LICENSE). This page introduces no CLA, maintainer response deadline, or unestablished governance process.
+
+## Decide when a design is needed
+
+A local fix can use a short problem, trigger, before/after behavior, and validation. Cross-module state, public API, credentials, tenancy, lifecycle, and migration changes need a design covering the user journey, boundaries, alternatives, failure modes, migration/rollback, verification, and documentation.
+
+Before behavior changes read [architecture](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/architecture.md), [acceptance](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/acceptance.md), and the [code map](/en/contribute/codebase). Do not remove requirements to satisfy existing tests. Do not scatter provider branches through generic orchestration or use raw guest credentials as a compatibility fallback.
+
+## Learn from a concrete change
+
+E2B OCI preparation is a cross-module example: selecting a public OCI Harness requires preparing a Session-owned Template before allocating compute. The design must cover Template/build receipts, unknown build outcomes, recovery, and compute-before-template cleanup, not only image pulling. Its [increment evidence](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-e2b-oci-preparation.md) preserves model-output failures and later scoped passes. It illustrates evidence boundaries, not a new execution for this page.
+
+Suggested design order: problem/success journey → current constraints → object/API/state changes → alternatives/tradeoffs → credentials/tenancy → unknown outcomes/cleanup → migration/rollback → actual checks and gaps.
+
+## Prepare reviewable work
+
+Follow the actual [PR template](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/.github/PULL_REQUEST_TEMPLATE.md):
+
+```text
+Problem and resulting behavior
+- Trigger, previous behavior, observable result after the change.
+
+Affected contracts
+- Relevant API / Python / TypeScript / Console / Runtime / Connector changes.
+
+Verification actually run
+- Actual commands, exit results, evidence paths, and scope.
+
+Remaining limitations
+- Unexecuted checks, known constraints, unresolved resources, next actions.
+```
+
+Describe the final implementation, not the whole discussion history. Include abandoned alternatives only when they explain a material tradeoff. UI changes require both-language and keyboard/focus/accessibility review under the [Console contract](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/console-design.md); browser-native dialogs do not replace product components.
+
+## Example: describe a verified local fix
+
+The following adapts the [2026-11-16 Fleet quota diagnosis record](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-16-fleet-quota-audit.md). It illustrates a description, not a newly created or published PR or verification rerun for this page.
+
+**Suggested title: Show quota reasons for rejected resource creation in Fleet**
+
+**Problem and resulting behavior**
+
+When a Provider explicitly rejects Sandbox creation, the database already retains `sandbox_quota_exceeded`, but Fleet only returns reasons for unknown operations. The Console therefore cannot show its existing quota guidance. Return a sanitized reason for rejected operations too, while continuing to omit it for completed operations, so users can distinguish definite rejection from uncertain creation.
+
+**Affected contracts**
+
+Update the Fleet resource-operation projection and regression assertions. Preserve tenant filtering without adding raw upstream responses or changing creation/cleanup semantics. The Console can use existing English and Chinese guidance.
+
+**Verification actually run**
+
+The historical record reports a local PostgreSQL regression pass of 54 files / 154 tests. Type checking subsequently exposed missing constructor dependencies in the new test fixture. After correction, npm run check and the full eight-test worker suite passed. A separate retained-state audit covered 32 journeys / 64 primary Runs, including stored replies, artifact digests and cleanup state in the selected records.
+
+**Remaining limitations**
+
+These checks are not fresh cloud execution or an account-wide resource inventory and do not certify other new connectors or every SaaS account. Actual commands and historical scope remain in the original evidence.
+
+This example states the trigger, observable change, interface impact and verification boundaries. It preserves earlier failures and does not compress checks from different times and scopes into an unqualified all-tests-passed claim.
+
+## Questions a cross-module proposal must answer
+
+For E2B OCI preparation, a design should answer at least:
+
+| Question | Decision to explain |
+| --- | --- |
+| Who owns the new resource? | Whether a Template belongs to one Session, how ownership is recorded and whether sharing is allowed |
+| When are intent and receipts saved? | Separation of image_prepare from Sandbox create and persistence of build handles before polling |
+| What if the response is lost? | Exact original-operation lookup and retained uncertainty for zero or multiple matches |
+| What is the closure order? | Compute cleanup before its owned Template, and how unconfirmed steps prevent closed state |
+| Where does the user see progress? | API operation records, Console state, bilingual copy and failure exits |
+| What remains outside scope? | Private images, shared caching and untested protocols cannot be inferred from a public-image pass |
+
+Separate the proposal from actual verification. Put unexecuted steps in the acceptance plan and add scoped results after execution. A reviewer should understand where irreversible effects occur, who owns recovery and which existing Sessions or configurations are affected without reconstructing those decisions from a code diff.
+
+## Checks and evidence
+
+Run existing package.json checks appropriate to the change using a dedicated test database. Separate deterministic fixtures from real provider/model acceptance. Check both SDKs for API changes, and failures/recovery/cleanup for lifecycle changes. Do not implicitly use personal cloud credentials in routine documentation or external-contribution pipelines.
+
+Public reports contain sanitized conclusions; retain original resource IDs privately for cleanup. Exclude secrets, database backups, user prompts, and .local. Later passes do not erase failures. Missing evidence remains unverified.
+
+Before handoff, align implementation, examples, related documentation, and translations and retain limitations. Commits, PR creation, and publishing depend on task authorization and actual project intake; this product-documentation task performs none of them.
+
+Next: [testing and evidence](/en/contribute/testing), [documentation maintenance](/en/contribute/documentation).

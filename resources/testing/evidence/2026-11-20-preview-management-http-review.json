@@ -1,0 +1,144 @@
+{
+  "date": "2026-11-20",
+  "command": "./node_modules/.bin/tsx .local/docs-content-checks/preview-management-http-contracts.ts",
+  "exit_code": 0,
+  "scope": "Real loopback management HTTP and isolated migrated PostgreSQL fixtures. Provider access stub asserts no calls; no preview browser/proxy traffic or real cloud allocation.",
+  "source_sha256": {
+    "apps/control-plane/server.ts": "90b27ace779174006be88890beb73039a273614f4f9ab378e04e819db990c4ca",
+    "modules/sandboxes/previews.ts": "b941e97d2d72a4f0930a5719fac3c0d73ce52dce2f35737628ee90656b592516"
+  },
+  "checks": [
+    {
+      "name": "open but no sandbox",
+      "status": 409
+    },
+    {
+      "name": "owner creates default grant",
+      "status": 201
+    },
+    {
+      "name": "application TTL boundary 30",
+      "status": 201
+    },
+    {
+      "name": "application TTL boundary 3600",
+      "status": 201
+    },
+    {
+      "name": "invalid input {\"port\":2999}",
+      "status": 400
+    },
+    {
+      "name": "invalid input {\"port\":9000}",
+      "status": 400
+    },
+    {
+      "name": "invalid input {\"port\":8765}",
+      "status": 400
+    },
+    {
+      "name": "invalid input {\"port\":3000.5}",
+      "status": 400
+    },
+    {
+      "name": "invalid input {\"port\":\"3000\"}",
+      "status": 400
+    },
+    {
+      "name": "invalid input {\"port\":3000,\"ttl_seconds\":29}",
+      "status": 400
+    },
+    {
+      "name": "invalid input {\"port\":3000,\"ttl_seconds\":3601}",
+      "status": 400
+    },
+    {
+      "name": "invalid input {\"port\":3000,\"extra\":true}",
+      "status": 400
+    },
+    {
+      "name": "invalid input {}",
+      "status": 400
+    },
+    {
+      "name": "foreign Session hidden",
+      "status": 404
+    },
+    {
+      "name": "unknown Session",
+      "status": 404
+    },
+    {
+      "name": "invalid Session ID",
+      "status": 400
+    },
+    {
+      "name": "invalid credentials",
+      "status": 401
+    },
+    {
+      "name": "unavailable paused",
+      "status": 409
+    },
+    {
+      "name": "unavailable closing",
+      "status": 409
+    },
+    {
+      "name": "unavailable closed",
+      "status": 409
+    },
+    {
+      "name": "first request with key",
+      "status": 201
+    },
+    {
+      "name": "repeat key creates another grant",
+      "status": 201
+    },
+    {
+      "name": "foreign revoke hidden",
+      "status": 404
+    },
+    {
+      "name": "application revoke empty 204",
+      "status": 204
+    },
+    {
+      "name": "repeat revoke empty 204",
+      "status": 204
+    },
+    {
+      "name": "missing revoke",
+      "status": 404
+    },
+    {
+      "name": "invalid revoke ID",
+      "status": 400
+    },
+    {
+      "name": "create/revoke do not call provider or close Session",
+      "passed": true
+    },
+    {
+      "name": "expired cloud allocation blocks creation",
+      "status": 409
+    }
+  ],
+  "passed": true,
+  "cleanup": "Server closed and isolated schema removed.",
+  "reviewed_routes": [
+    "POST /v1/sessions/:id/previews",
+    "DELETE /v1/previews/:id"
+  ],
+  "limitations": [
+    "No browser ticket exchange/cookie/revocation acceptance.",
+    "No live server health or provider preview validation.",
+    "Resource expiry and Session state use controlled fixtures."
+  ],
+  "script_sha256": "fb592233fa4d00df7f23a964b302eb9a59026a5444234612b44c22bf89f64d20",
+  "reviewed_pages": {
+    "docs/product/en/reference/artifacts-previews.md": "395ad2bc3e0f6a7db4caff1339453b734a838d6b00c0681cdad91fc5bc38dbcd",
+    "docs/product/zh-CN/reference/artifacts-previews.md": "a706fce57e5f35fb0e8fdf82f5c1de559758671971d1a55cdadb1d89292b1105"
+  }
+}

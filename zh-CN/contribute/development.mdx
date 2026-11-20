@@ -1,0 +1,88 @@
+---
+title: "搭建开发环境并完成第一个改动"
+---
+
+本教程帮助你启动控制平面，并完成一个不需要 Provider 或模型凭据的文档改动。Local 指控制平面的部署位置；真实执行仍使用云 Sandbox。项目代码采用 Apache-2.0。源码位于主仓库 [NexusFox88/Hexagon](https://github.com/NexusFox88/Hexagon)。
+
+## 准备隔离的开发依赖
+
+在仓库根目录操作。安装 Node.js 22.19 或更高版本、npm、Python 3.10 或更高版本以及 PostgreSQL。通过自己的 PostgreSQL 管理流程准备两个可丢弃的数据库，分别用于开发与测试；数据库角色需要创建 schema 和表的权限。不要使用生产数据库或已有个人 Hexagon 实例的数据。
+
+```sh
+npm ci
+python3 -m venv .venv
+. .venv/bin/activate
+python3 -m pip install 'setuptools>=68' wheel
+python3 -m pip install -e sdk/python
+npm --prefix sdk/typescript run build
+export DATABASE_URL='postgres://hexagon@127.0.0.1:5432/hexagon_dev'
+export TEST_DATABASE_URL='postgres://hexagon@127.0.0.1:5432/hexagon_test'
+export HEXAGON_DATA_DIR="$PWD/.local/contributor-dev"
+export PORT=18787
+export PREVIEW_PORT=18788
+export HEXAGON_ACCESS_PORT=18789
+export HEXAGON_ACCESS_TUNNEL=
+export HEXAGON_ACCESS_URL=
+```
+
+数据库 URL 只是示例，需替换为已创建的数据库及本机认证配置。这些命令不会安装 PostgreSQL 或创建数据库。不要把凭据写入待提交文件。虚拟环境中的打包工具供安装包验证使用；依赖安装可能访问软件包仓库。
+
+这三个端口分别隔离管理 API、私有预览和凭据监听服务，避免与默认本地实例冲突；启动前确认三个端口均可用。显式的空 ingress 环境变量让本次无云练习不启动默认开发隧道，不代表此时能使用受保护的云模型调用。start / status / stop 均在保留这些变量的同一个 shell 中运行。后续单独进行实云练习时，按安装指南选择对应入口策略。只更换数据目录、仍共用数据库，不构成数据隔离。
+
+## 启动并检查控制平面
+
+```sh
+npm run local -- doctor
+npm run local -- start
+npm run local -- status
+```
+
+托管启动器应用迁移，并在所选数据目录保存身份、加密材料、配置和日志。打开 `http://127.0.0.1:18787/console/`，通过启动器检查经过认证的健康状态，不能仅凭端口可连接判断就绪。`doctor` 也报告 cloudflared 和 OpenSSH 是否可用：临时开发凭据入口需要前者，Instabox 需要后者。准备执行云任务时，先按[安装指南](/zh-CN/start/install)配置 ingress。
+
+检查开发 Console 不需要创建云连接。这个入门改动不启用实云测试。如果端口冲突或启动持续未就绪，先检查所选目录中的私有日志和进程身份，再决定下一步。开发实例与个人实例使用独立数据库和数据目录；并行运行时还需要不同端口。
+
+需要前台调试时，先停止托管实例，在相同的开发环境变量下依次执行 `npm run db:migrate`、`npm run dev`。`dev` 不提供文件监听重启；不要误启动两个 worker 同时处理开发数据。
+
+## 完成一个小而可审查的改动
+
+可以从澄清[ E2B 指南](/zh-CN/integrations/sandboxes/e2b)两种语言中的模板前置条件开始。先读页面引用的连接器与带日期的证据，只改有依据的说明，保留内置 OpenCode 内存要求与 Session 专属 OCI 模板准备之间的区别。具体编辑流程见[文档贡献指南](/zh-CN/contribute/documentation)。
+
+这个纯文档改动需要执行结构检查，并逐段比对中英文：
+
+```sh
+python3 tooling/check-product-docs.py --report testing/evidence/2026-11-19-product-docs-structure.json
+```
+
+后续日期的审查使用新的证据文件名。确认本地链接有效、前置条件等价、验证范围没有被扩大。检查器不能证明文字准确或云执行通过；这个练习不需要 Provider 账户。
+
+修改实现时，先运行对应测试，再运行仓库验证门禁：
+
+```sh
+npm run verify
+npm run verify:packages
+npm run release:check
+```
+
+前两个命令都依赖已经导出的 `TEST_DATABASE_URL`。`verify` 执行 TypeScript 检查和 Vitest；安装包验证在临时目录构建并消费 Python wheel 与 npm tarball。二者都不是实云验收。各自范围及启动、备份专项要求见[测试指南](/zh-CN/contribute/testing)。发布审计命令只是检查，不代表发布授权。
+
+## 确认失败的是哪一步检查
+
+| 失败 | 继续之前检查并解决 |
+| --- | --- |
+| `TEST_DATABASE_URL is required` | 验证门禁在执行检查前已停止。在当前 shell 导出可丢弃测试库 URL；不能删除保护条件，也不能将这次运行记为通过。 |
+| 数据库连接被拒绝或认证失败 | 核对目标 PostgreSQL 服务、角色和数据库。安装 npm 依赖不会启动 PostgreSQL。 |
+| Python wheel 构建找不到 setuptools | 确认当前 Python 环境安装了上述构建工具；安装包验证使用 `--no-build-isolation`。 |
+| 服务进程存在但无法认证 | 核对该数据目录的进程身份、API 端口和私有日志。启动器有意拒绝向未经核对的进程发信号。 |
+| 源码检查通过但安装包消费失败 | 检查构建的 wheel / tarball 与独立消费测试；源码导入成功不能证明发布形态的 SDK 可用。 |
+
+## 结束本地练习
+
+```sh
+npm run local -- stop
+```
+
+存在活动 Run 时启动器会拒绝停止。如果已经超出练习范围创建了云 Session，先取消或关闭并对账资源清理；停止控制平面不会销毁 Provider 资源。保留解密凭据、调查未决操作所需的数据目录。本教程不要求提交或发布。
+
+第一个改动的完成标准是：可读的双语差异、真实的检查结果，以及明确列出的未运行检查。改变产品行为前还须阅读[架构](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/architecture.md)与[验收要求](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/acceptance.md)，保留完整用户旅程。
+
+下一步：[代码地图](/zh-CN/contribute/codebase)、[测试与证据](/zh-CN/contribute/testing)、[设计提案和贡献](/zh-CN/contribute/proposals-and-prs)。

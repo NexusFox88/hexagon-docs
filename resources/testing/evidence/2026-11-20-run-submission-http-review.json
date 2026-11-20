@@ -1,0 +1,147 @@
+{
+  "date": "2026-11-20",
+  "command": "./node_modules/.bin/tsx .local/docs-content-checks/run-submission-http-contracts.ts",
+  "exit_code": 0,
+  "scope": "Real loopback HTTP and PostgreSQL isolated migrated fixtures; concurrent HTTP submissions exercise Session locking, no worker/model/cloud execution.",
+  "source_sha256": {
+    "apps/control-plane/server.ts": "90b27ace779174006be88890beb73039a273614f4f9ab378e04e819db990c4ca",
+    "modules/execution/runs.ts": "f462cf48c64b845d29861f4a2fac3d144ee99c61775301cac56249cc09842ecf",
+    "modules/execution/initialization.ts": "02b5d71a73e513a500949e6c5e45973f9cf13fd75c62f05982e43fb41398e91e"
+  },
+  "checks": [
+    {
+      "name": "first accepted",
+      "status": 202
+    },
+    {
+      "name": "same intent replay while active",
+      "status": 202
+    },
+    {
+      "name": "empty origin equivalent",
+      "status": 202
+    },
+    {
+      "name": "changed input conflicts",
+      "status": 409,
+      "code": "idempotency_conflict"
+    },
+    {
+      "name": "changed origin conflicts",
+      "status": 409,
+      "code": "idempotency_conflict"
+    },
+    {
+      "name": "new key while busy",
+      "status": 409,
+      "code": "session_busy"
+    },
+    {
+      "name": "terminal replay despite closed Session and disabled connections",
+      "status": 202
+    },
+    {
+      "name": "new key on closed Session",
+      "status": 409,
+      "code": "session_closed"
+    },
+    {
+      "name": "disabled connection rejects new work",
+      "status": 409,
+      "code": "connection_not_ready"
+    },
+    {
+      "name": "missing key",
+      "status": 400
+    },
+    {
+      "name": "long key",
+      "status": 400,
+      "code": "invalid_request"
+    },
+    {
+      "name": "empty input",
+      "status": 400,
+      "code": "invalid_request"
+    },
+    {
+      "name": "oversize input",
+      "status": 400,
+      "code": "invalid_request"
+    },
+    {
+      "name": "unknown body",
+      "status": 400,
+      "code": "invalid_request"
+    },
+    {
+      "name": "unknown origin",
+      "status": 400,
+      "code": "invalid_request"
+    },
+    {
+      "name": "empty origin member",
+      "status": 400,
+      "code": "invalid_request"
+    },
+    {
+      "name": "whitespace invalid",
+      "status": 400,
+      "code": "invalid_submission"
+    },
+    {
+      "name": "UTF-8 bytes exceed limit",
+      "status": 413,
+      "code": "input_too_large"
+    },
+    {
+      "name": "foreign Session hidden",
+      "status": 404,
+      "code": "session_not_found"
+    },
+    {
+      "name": "unknown Session",
+      "status": 404,
+      "code": "session_not_found"
+    },
+    {
+      "name": "invalid Session UUID",
+      "status": 400,
+      "code": "invalid_request"
+    },
+    {
+      "name": "concurrent identical A",
+      "status": 202
+    },
+    {
+      "name": "concurrent identical B",
+      "status": 202
+    },
+    {
+      "name": "accept paused",
+      "status": 202
+    },
+    {
+      "name": "accept pausing",
+      "status": 202
+    },
+    {
+      "name": "accept resuming",
+      "status": 202
+    },
+    {
+      "name": "different concurrent keys one accepted one busy",
+      "passed": true
+    }
+  ],
+  "passed": true,
+  "cleanup": "Server closed and isolated schema dropped.",
+  "reviewed_routes": [
+    "POST /v1/sessions/:id/runs"
+  ],
+  "limitations": [
+    "No real model/worker result or wake operation.",
+    "Context file and compiled-context limit branches are not exercised here.",
+    "Two-request concurrency observations do not prove all possible interleavings."
+  ]
+}

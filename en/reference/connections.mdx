@@ -1,0 +1,119 @@
+---
+title: "Connections HTTP contract"
+---
+
+Connections describe tenant-owned Sandbox, model, Tool or protected HTTP services. Application tokens may list/read connections; creation, updates, validation, discovery, disconnect, dependency/usage queries and deletion require owner identity. Values in examples assume an API origin without `/v1` and a suitable backend token.
+
+## Create and read
+
+`POST /v1/connections` accepts a strict object: required kind (`sandbox`, `model`, `tool`, `http`), nonempty provider, name (1–200 characters), optional config (object, default `{}`), optional credential (1–32,768 characters) or secret_id (managed Secret UUID). Credential and secret_id are mutually exclusive. The selected adapter parses config; the generic object schema is not proof that arbitrary provider fields are valid. A referenced managed Secret must exist and be enabled.
+
+Prepare `connection-create.json` using the provider-specific [integration guide](/en/integrations/choose). Keep credential-bearing files private. There is no universal JSON body that configures every provider.
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data-binary @connection-create.json "$HEXAGON_API_URL/v1/connections"
+```
+
+Success is **201** with a connection projection: id, kind, provider, name, config, status, enabled, version, validation, created_at, updated_at, has_credential and secret_id. Secret_id here is the managed Secret reference, not the internal encrypted-envelope ID; plaintext credentials are absent. Creation does not validate or enable the connection, and has no idempotency key. Omitting a credential can be appropriate for a later OAuth flow or anonymous MCP, but does not make other providers ready.
+
+`GET /v1/connections` returns **200**, `{connections:[...]}`, nondeleted entries ordered by creation time, no pagination. `GET /v1/connections/{id}` returns **200** with one projection. Path IDs use UUID validation. Missing/deleted/foreign connections return `404 connection_not_found`.
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" "$HEXAGON_API_URL/v1/connections"
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" "$HEXAGON_API_URL/v1/connections/$HEXAGON_CONNECTION_ID"
+```
+
+Config and validation can contain account/configuration metadata; absence of credential plaintext does not make the entire response suitable for public logs.
+
+## Patch, validate, then enable
+
+`PATCH /v1/connections/{id}` accepts strict optional name, config, credential, secret_id and enabled:boolean. Kind/provider cannot be changed. Supplied config replaces the adapter config rather than merging it. Omitted fields retain their value. Credential and secret_id remain mutually exclusive; supplying a direct credential clears the managed Secret association. Null is not a general clear operation.
+
+Config/credential/secret_id presence resets status to draft, disables the connection and clears validation, even when the supplied value is equivalent. Every accepted patch increments version, including name-only or empty patches. There is no expected_version check. Attempting to enable in the same request as such a change, or enabling a non-ready row, returns `409 validation_required`. Enabling against a disabled/deleted managed Secret returns `409 secret_disabled`.
+
+```sh
+curl --fail-with-body --silent --show-error --request PATCH \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data '{"enabled":false}' "$HEXAGON_API_URL/v1/connections/$HEXAGON_CONNECTION_ID"
+```
+
+`POST /v1/connections/{id}/validate` may contact the external provider and, for OAuth, refresh credentials. It returns **200** with the updated connection even when verification failed: inspect status (ready/invalid) and validation.code. Success preserves enabled rather than automatically enabling; failure disables. Validation includes checked_at and the version it checked. If the connection changes during remote validation, the result cannot bless the new configuration: `409 connection_changed_during_validation`.
+
+```sh
+curl --fail-with-body --silent --show-error --request POST \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/connections/$HEXAGON_CONNECTION_ID/validate"
+```
+
+After checking ready, explicitly enable:
+
+```sh
+curl --fail-with-body --silent --show-error --request PATCH \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" -H 'Content-Type: application/json' \
+  --data '{"enabled":true}' "$HEXAGON_API_URL/v1/connections/$HEXAGON_CONNECTION_ID"
+```
+
+Patch returns **200**. Inspect existing Session authorization after version changes; their pinned configuration is not rewritten. Lost mutation responses require re-reading state rather than blind retries that advance versions again.
+
+## Discover Remote MCP tools
+
+`POST /v1/connections/{id}/discover-mcp` takes no required body and returns **200**, updated connection. Only kind tool/provider mcp-remote is accepted; otherwise `400 unsupported_connection_provider`. It resolves credentials and contacts the MCP server. Discovery transport failure becomes `422 mcp_discovery_failed`; credential acquisition may fail separately.
+
+```sh
+curl --fail-with-body --silent --show-error --request POST \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/connections/$HEXAGON_CONNECTION_ID/discover-mcp"
+```
+
+Discovered tools become a new config revision: version increments, status draft, enabled false, validation cleared. Validate and enable before use. A concurrent version change returns `409 connection_changed_during_validation`; discovery does not silently rewrite existing grants.
+
+## Disconnect Tool credentials
+
+`POST /v1/connections/{id}/disconnect` takes no required body and returns **200**, connection projection plus `provider_revoked:false`. Non-Tool kind returns `400 connection_kind_mismatch`.
+
+```sh
+curl --fail-with-body --silent --show-error --request POST \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/connections/$HEXAGON_CONNECTION_ID/disconnect"
+```
+
+It clears local credential and managed Secret links, disables, changes status to draft, clears validation, increments version, cancels pending OAuth flows and deletes connection-purpose encrypted envelopes. It does not delete the shared managed Secret or revoke the provider account. Repetition increments version again. Use provider-side revocation separately when needed.
+
+## Inspect dependencies and usage
+
+`GET /v1/connections/{id}/dependencies` returns **200**, `{agents,sessions,limit:100}`. Agents are templates whose saved bindings reference the ID (including archived ones), with id/name/revision/archived_at. Sessions contain id/state/agent_id and include nonclosed Sessions referencing it as Sandbox, model, Tool or protected API. Each array is capped at 100, newest first, without a continuation cursor; these are not complete exports.
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/connections/$HEXAGON_CONNECTION_ID/dependencies"
+```
+
+`GET /v1/connections/{id}/usage` accepts section agents/sessions/calls (default sessions), offset integer 0–100000 (default 0). Success **200** returns `{section,items,offset,next_offset}`, fixed page size 25. Next_offset is null at the observed end. Unlike dependencies, its sessions section follows **Tool bindings only**, includes closed Sessions and does not enumerate Sandbox/model/protected HTTP usage.
+
+```sh
+curl --fail-with-body --silent --show-error --get \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  --data-urlencode 'section=calls' --data-urlencode 'offset=0' \
+  "$HEXAGON_API_URL/v1/connections/$HEXAGON_CONNECTION_ID/usage"
+```
+
+Agents items have id/name/revision/archived_at. Session items have id/state/agent_id/name/agent_name/created_at. Call items have id/run_id/session_id/session_name/operation_name/agent_id/agent_name/binding/operation/state/is_error/created_at, without arguments or results. Matching uses saved execution_policy.connection_id, with a historical Tool-binding fallback. Results sort newest first; concurrent changes can shift offsets. Usage is not billing telemetry.
+
+## Delete
+
+`DELETE /v1/connections/{id}` returns **204**, no body, after soft-deleting and disabling the connection, setting status deleted and incrementing version. Any nonclosed Session dependency causes `409 connection_in_use`, checked independently of truncated dependency lists. Agent-template references alone are not a deletion guard; update those templates deliberately to avoid future failures.
+
+```sh
+curl --fail-with-body --silent --show-error --request DELETE \
+  -H "Authorization: Bearer $HEXAGON_API_TOKEN" \
+  "$HEXAGON_API_URL/v1/connections/$HEXAGON_CONNECTION_ID"
+```
+
+Deletion does not clean up a Session for you, delete a managed Secret or revoke Provider credentials. Repeated deletion returns `404 connection_not_found`. Other shared errors include `400 invalid_request`, `400 ambiguous_credential`, `400 unsupported_connection_provider`, and managed Secret errors. Inspect returned validation on HTTP 200 instead of equating transport success with readiness.
+
+Sources: [connections](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/connections/connections.ts), [usage queries](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/modules/connections/usage.ts), [routes](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts). No live credentials, provider validation or connection mutations were performed in this documentation pass. For consent and flow-state responses, see the [OAuth contract](/en/reference/oauth). Next: [connection workflow](/en/build/connection-lifecycle), [HTTP overview](/en/reference/http).

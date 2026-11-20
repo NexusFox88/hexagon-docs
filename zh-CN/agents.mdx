@@ -1,0 +1,119 @@
+---
+title: "编程 Agent 集成阅读指南"
+---
+
+在 Hexagon 上开发应用时，从这里开始阅读。这是产品集成指南，不是仓库 AGENTS.md 开发指令；当前 checkout 中的仓库指令仍约束编辑、测试、凭据与发布。本 Markdown 文件提供阅读入口，不代表已有托管文档端点或单独的机器 API。
+
+## 按执行顺序查证
+
+| 步骤 | 阅读并确认 | 保存或验证 |
+| --- | --- | --- |
+| 1. 版本与部署 | [安装](/zh-CN/start/install)、[SDK 源码指南](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/README.md)、[CLI](/zh-CN/reference/cli) | 控制平面实际源码或构建、SDK 安装产物及版本、local 与 hosted 认证方式 |
+| 2. 能力发现 | [选择集成](/zh-CN/integrations/choose)、[Harness](/zh-CN/integrations/harnesses)、[已验证组合](/zh-CN/integrations/verified-combinations) | 精确 Harness id/version/digest、模型协议、Sandbox 能力和带日期的场景证据 |
+| 3. 配置与预检 | [连接生命周期](/zh-CN/build/connection-lifecycle)、[Sandbox 策略](/zh-CN/build/sandbox-policy)、[初始化](/zh-CN/concepts/initialization) | 就绪且启用的连接、所有权、要求的策略和固定 Session 输入 |
+| 4. Session | [第一个 Session](/zh-CN/start/first-session)、[后端集成](/zh-CN/build/backend-integration) | 业务归属、创建意图与返回的 Session ID；保存 Agent 可选 |
+| 5. Run | [后端集成](/zh-CN/build/backend-integration)、[项目上下文](/zh-CN/build/project-context) | 精确 input/origin、稳定幂等键与返回的 Run ID |
+| 6. 持久观察 | [事件流](/zh-CN/build/stream-events) | 在同一应用事务中保存事件和游标，按 Run/event ID 去重 |
+| 7. 授权与审批 | [Tool 授权](/zh-CN/build/tool-authorization)、[审批](/zh-CN/build/approvals) | 原调用和待决定事项；账户访问与副作用审批分开 |
+| 8. 结果 | [产物](/zh-CN/build/artifacts)、[私有预览](/zh-CN/build/private-preview) | 终态查询、实际输出与文件内容、支持情况下的认证预览 |
+| 9. 恢复与清理 | [恢复](/zh-CN/build/recovery)、[对账](/zh-CN/operate/reconciliation) | 原操作和资源 ID、外部核实的结果，以及确认的 Session 关闭 |
+
+不要假设 SDK 版本能证明所有服务端构建兼容。核对运行中 catalog 与安装 SDK 的实际签名。专门参考页尚在补齐期间，精确请求可查仓库中的 [TypeScript SDK](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/typescript/index.ts)、[Python SDK](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/sdk/python/hexagon/__init__.py)与 [HTTP 实现](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/apps/control-plane/server.ts)。这些是源码参考，不代表提供 OpenAPI 端点。
+
+## 构造调用之前先选择契约
+
+按具体资源参考核对参数、权限、响应形状和副作用。指南负责解释如何将调用组合成应用流程，不能代替接口契约。
+
+| 目标动作 | 应读契约 | 必须保留的判断 |
+| --- | --- | --- |
+| 配置／验证执行前提 | [连接](/zh-CN/reference/connections)、[Harness 注册](/zh-CN/reference/harness-registration) | 连接就绪、选定版本和实际能力支持 |
+| 预检、创建、上传或关闭 | [Sessions](/zh-CN/reference/sessions) | 创建意图、固定定义、清理结果 |
+| 提交、查询或取消任务 | [Runs](/zh-CN/reference/runs) | 重试保留原 input／origin／key；取消必须显式请求 |
+| 观察进度 | [事件与状态](/zh-CN/reference/events-and-states) | 公共事件游标不同于 Runtime 游标；未知事件不能凭空推导状态转换 |
+| 决定 Tool 动作 | [审批与 Tool 调用](/zh-CN/reference/approvals-tools) | 账户授权、操作审批和结果对账分别处理 |
+| 交付文件或预览 | [产物与预览](/zh-CN/reference/artifacts-previews) | 产物完整性与预览授权具有不同生命周期 |
+| 调查资源不确定结果 | [资源操作](/zh-CN/reference/resource-operations) | 保留原 operation／resource 身份及 review 状态；acknowledge 不等于完成 |
+| 写成 SDK 调用 | [Python](/zh-CN/reference/python)、[TypeScript](/zh-CN/reference/typescript)、[错误](/zh-CN/reference/errors) | 真实方法签名、错误处理、语言特定字节／游标类型 |
+
+不能确定资源时，从 [HTTP 参考索引](/zh-CN/reference/http)开始。它们是与版本相关的仓库参考；改变契约时按当前检出源码核对，不通过猜测 SDK 方法名来构造端点。
+
+## journal 中的事实必须跨进程重启保留
+
+以下是应用自己的数据要求，不是新增 Hexagon JSON schema：
+
+- 原始提交包含 Session ID、精确 input、精确 origin 和稳定幂等 key；在网络调用前保存，才能恢复丢失响应。
+- Run ID 和十进制字符串事件游标分别标识已接受工作与观察进度。事件和新游标应原子保存；内存 map 不能跨 worker 重启保留。
+- 创建／关闭意图与确认结果分开。operation ID、远程 resource ID 和未知结果是对账依据，不是重复变更操作的指令。
+- 普通 journal 不保存鉴权材料。若必须保留预览 URL，应使用有适当访问控制的私有存储；URL 本身可能授予访问权。
+
+例如，客户端崩溃后 journal 留有 Run R 和已提交游标 `104`，意味着“从 104 之后观察 R”，不是“重新提交任务”。只留有 Session 创建意图，则意味着“调查是否已经创建成功”，不是“再分配一个 Session”。缺失不同字段，对应不同恢复动作。
+
+仓库开发规则仍由 [AGENTS.md](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/AGENTS.md)约束，本集成指南不替代它。下一步：[组合选择](/zh-CN/integrations/choose)、[HTTP 索引](/zh-CN/reference/http)或[对账](/zh-CN/operate/reconciliation)。
+
+## 带持久记录的集成算法
+
+以下为伪代码。`journal`、业务授权与事务由应用实现，不是 Hexagon SDK 方法。具体 Python、TypeScript 调用见上表的构建指南及[首个 Session 示例](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/examples/documentation/first-session.py)。
+
+```text
+核对业务用户对工作上下文的权限
+读取或新建该业务请求的私有 journal
+记录连接、精确 Harness 版本、策略及创建意图
+
+如果尚无 Session ID：
+    若先前创建请求结果未知：
+        调查 Sessions 和资源操作，停止自动创建
+    创建一次 Session，持久化返回的 Session ID
+
+提交前保存意图：
+    Session ID、精确 input、精确 origin、一个稳定幂等键
+提交已保存的意图，持久化返回的 Run ID
+如果提交响应丢失：
+    对同一 Session/input/origin/key 做有界传输重试
+    不通过生成新 key 掩盖冲突
+
+cursor = 最后提交的事件 ID，或字符串 "0"
+从 cursor 后观察原 Run
+对每个有 ID 的事件：
+    事务性去重、保存事件并更新 cursor
+事件连接断开：
+    用已提交 cursor 重连同一个 Run
+等待授权或审批：
+    将原请求展示给有权限的决定者
+Tool 结果未知：
+    保存 call ID、request hash 和执行策略
+    外部调查，不重发写入
+
+查询 Run 终态及最终输出
+验证、下载有权访问的产物，保留需要继续对话的上下文
+不再需要 Session 时：
+    保存关闭意图，请求关闭，确认清理
+    对账结束前保留未决操作与资源 ID
+```
+
+至少记录业务请求与所有者、Session ID、Run ID、精确提交内容和 key、事件游标、清理意图与状态、未决操作引用。资源标识保存为私有证据，不写进公开示例输出。记录时间与错误时排除 Token 和原始账户凭据。即使多个业务用户共享一个 Hexagon 租户，每次外部查询和结果交付仍需应用授权。
+
+Run 提交幂等性不自动扩展到 Session 创建或任意 Provider 操作。事件 ID 保持数字字符串，不转换成 JavaScript Number。`stream.end` 等没有持久 ID 的事件不作游标检查点。事件流结束或事件分页为空，都不能替代 Run 终态查询。网络断开不取消执行。
+
+## 遇到分支时改变下一步动作
+
+| 情况 | 动作 |
+| --- | --- |
+| 模型协议、网络策略或 Tool 能力不兼容 | 分配前修正选择，不能静默降低用户要求 |
+| `session_busy` | 应用保留待提交消息，等活动 Run 结束，或明确创建独立 Session |
+| 幂等冲突 | 比对保存的 input/origin/key，不能制造新请求隐藏冲突 |
+| 认证或权限错误 | 修正身份或授权，不循环执行瞬态重试 |
+| 缺少 Tool 授权 | 通过既有流程取得账户访问，不把上游密钥传入 guest |
+| 写入等待审批 | 等有权限者决定，模型指令不是审批 |
+| 创建、写入、删除结果未知 | 对账原操作，没有响应不证明失败 |
+| Run 失败或取消 | 先查输出、事件与可能副作用，再决定后续任务；取消不撤销写入 |
+| 清理未确认 | 保留 journal 与 Provider 标识，不能宣称账户无遗留资源 |
+
+## 正确使用示例和证据
+
+示例有完整教程、依赖既有变量的 SDK 片段、结构示意和确定性 fixture 等不同范围，执行前先看标注和前置条件。占位连接 ID、`.invalid` 域名、本地镜像标签不是已部署服务。fixture 模型不证明真实模型行为，注册 Harness 不证明其镜像、Provider、协议组合可运行。
+
+每次集成改动报告修改文件、实际命令与结果、精确测试范围、限制和清理状态，保留失败尝试。遵循[测试与证据](/zh-CN/contribute/testing)；影响共享契约时覆盖两种 SDK 旅程。不能以 Agent 生成的“测试通过”文字作为证据，应检查真实测试输出与产物。
+
+这里链接的是仓库内文档草稿，仅链接已存在文件，不宣称公开站点、`llms.txt` 服务或全部规划参考页已经发布。[覆盖台账](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/product/coverage.json)用于识别尚未完成的内容，不能据此推断运行能力。
+
+下一步：[第一个 Session](/zh-CN/start/first-session)、[后端集成](/zh-CN/build/backend-integration)、[对账](/zh-CN/operate/reconciliation)。

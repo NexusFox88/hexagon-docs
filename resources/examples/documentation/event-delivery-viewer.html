@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Event delivery / 事件投递</title>
+<style>body{font:16px system-ui;max-width:56rem;margin:2rem auto;padding:0 1rem}button{padding:.6rem;margin:.2rem}pre{white-space:pre-wrap;overflow-wrap:anywhere}li{margin:.5rem 0}</style>
+<h1>Event delivery / 事件投递</h1>
+<p>Synthetic source, no cloud task. Disconnect, wait, then reconnect; the timeline catches up without duplicate rows.<br>模拟事件，不提交云任务。断开后等待，再恢复连接；时间线补齐且不重复。</p>
+<button id="disconnect">Disconnect / 断开</button>
+<button id="connect">Connect / 恢复连接</button>
+<button id="query">Query Run / 查询 Run</button>
+<pre id="status" role="status"></pre>
+<ol id="timeline"></ol>
+<script type="module">
+import {RunTimeline} from '/event-delivery.mjs';
+const status = document.querySelector('#status');
+const list = document.querySelector('#timeline');
+const run = await fetch('/run').then(response => response.json());
+const timeline = new RunTimeline(run.id);
+timeline.reconcileRun(run);
+let source;
+let retry;
+function render() {
+  status.textContent = JSON.stringify({run_id:timeline.runId, connection:timeline.connection, run_state:timeline.run.state, cursor:timeline.cursor, unique_rows:timeline.rows.size}, null, 2);
+}
+function disconnect() {
+  clearTimeout(retry);
+  source?.close();
+  timeline.connectionChanged('disconnected');
+  render();
+}
+function connect() {
+  clearTimeout(retry);
+  source?.close();
+  timeline.connectionChanged('connecting');
+  source = new EventSource('/events?after=' + encodeURIComponent(timeline.cursor));
+  source.onopen = () => { timeline.connectionChanged('connected'); render(); };
+  source.onerror = () => { source.close(); timeline.connectionChanged('reconnecting'); render(); retry = setTimeout(connect, 1000); };
+  source.onmessage = message => {
+    const envelope = JSON.parse(message.data);
+    if (timeline.apply(envelope)) {
+      const row = document.createElement('li');
+      row.textContent = JSON.stringify(envelope.event);
+      row.dataset.eventId = envelope.event.id;
+      list.append(row);
+    }
+    render();
+  };
+  render();
+}
+document.querySelector('#disconnect').onclick = disconnect;
+document.querySelector('#connect').onclick = connect;
+document.querySelector('#query').onclick = async () => {
+  timeline.reconcileRun(await fetch('/run').then(response => response.json()));
+  render();
+};
+connect();
+</script>
+</html>

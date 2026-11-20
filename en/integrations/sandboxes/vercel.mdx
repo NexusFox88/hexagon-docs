@@ -1,0 +1,116 @@
+---
+title: "Connect Vercel Sandbox"
+---
+
+Use a persistent Vercel Sandbox to execute a Hexagon Harness. This page does not publish an application as a Vercel website. Sessions manage tasks/workspaces; private preview is not public deployment.
+
+## Credentials and project binding
+
+Prepare a Vercel Token authorized for the intended team/project and Sandbox operations. Supply real project_id and team_id values together. Project display names and the browser's current team do not replace these identifiers.
+
+| Field | Constraint |
+| --- | --- |
+| project_id | `prj_` followed by letters or digits |
+| team_id | `team_` followed by letters or digits |
+| vcpus | Default 2; either 1 or an even integer from 2 through 32 |
+
+Use vcpus. The schema does not accept invented image or memory_mb fields. The Token stays in the control plane, not ordinary Agent environment. These examples use a local management client; see [self-hosting](/en/operate/self-host) for hosted initialization. Rerunning creates additional connections, so retain and reuse the ID.
+
+```python
+import os
+from hexagon import Hexagon
+client = Hexagon.local()
+connection = client.create_connection(
+    kind="sandbox", provider="vercel", name="Vercel workspace",
+    credential=os.environ["VERCEL_TOKEN"],
+    config={"project_id": os.environ["VERCEL_PROJECT_ID"],
+            "team_id": os.environ["VERCEL_TEAM_ID"], "vcpus": 2},
+)
+checked = client.validate_connection(connection["id"])
+if checked["status"] != "ready":
+    raise RuntimeError("Inspect Vercel connection diagnostics")
+client.update_connection(connection["id"], enabled=True)
+```
+
+```typescript
+import { Hexagon } from '@hexagon/agent-sdk';
+const client = await Hexagon.local();
+const credential = process.env.VERCEL_TOKEN;
+const projectId = process.env.VERCEL_PROJECT_ID;
+const teamId = process.env.VERCEL_TEAM_ID;
+if (!credential || !projectId || !teamId) throw new Error('Set Vercel account configuration');
+const connection = await client.createConnection({
+  kind: 'sandbox', provider: 'vercel', name: 'Vercel workspace', credential,
+  config: { project_id: projectId, team_id: teamId, vcpus: 2 },
+});
+const checked = await client.validateConnection(connection.id);
+if (checked.status !== 'ready') throw new Error('Inspect Vercel connection diagnostics');
+await client.updateConnection(connection.id, { enabled: true });
+```
+
+Validation only lists Sandboxes in the specified team/project; it does not prove task execution or recovery. Enable explicitly after ready validation. Revalidate/enable after Token, project, or resource edits; existing Sessions remain pinned.
+
+## Execution and private preview
+
+Use connection.id as sandbox_connection_id in the [first Session](/en/start/first-session), with a compatible Harness/model. Independently verify task execution, actual artifacts, and close through Python and TypeScript. The connector creates persistent=true Sandboxes without public ports. Nonpersistent resources or unexpected public routes violate its resource policy.
+
+Preview reaches the internal port through an authenticated command channel, governed by [Hexagon preview authorization](/en/build/private-preview). Browsers do not receive the Vercel Token. Do not create public routes to access the task's development server. Diagnose listening service, command transport, Runtime health, and user authorization separately.
+
+## Networking and native credential injection
+
+The native_credential_auth capability configures network-layer delegated Token injection for scoped control-plane access paths. Original model/Tool account keys remain in the control plane. The access proxy continues checking method, path, Run state, version, and revocation; provider injection does not bypass platform authorization.
+
+This internal mechanism does not expose general network_allowlist to applications. The connector declares neither ordinary Sandbox allowlists nor OCI, and creation requires unrestricted networking. Choose a supporting provider for domain restrictions instead of adding unsupported Vercel fields.
+
+## Idle, stop, and recovery
+
+Platform suspension stops the persistent Sandbox. The next submit resumes it through the same Session. Filesystem and managed conversation data persist while Runtime is prepared again. Arbitrary processes, memory, and network connections have no continuity guarantee; preview services may need restarting.
+
+Inspection uses resume=false so observing state does not itself wake compute. A stopped persistent Sandbox maps to paused, **not deleted**. Active Runs, including authorization/approval waits, are not idle workspaces to suspend arbitrarily.
+
+Follow [idle and wake](/en/build/idle-and-wake) to independently verify both turns, files, and conversation. Write known content before idle and read/check it afterward. Record exact Harness, model protocol, and both SDK results. One successful turn does not prove restoration.
+
+## Close and unknown outcomes
+
+Close deletes with deleteOrphanSnapshots and then checks resource absence. Accepted deletion, stopped state, or local control-plane exit is not confirmed cleanup. The control plane owns durable deadlines; downtime can delay the cleanup it enforces.
+
+Creation derives an exact name from the persisted operation ID. Reconciliation lists by namePrefix and filters by the complete name; another prefix match cannot be bound to this Session. Transport/authentication errors do not mean absence; only explicit 404 is treated that way. Preserve original resource records for unknown restore/delete outcomes and [reconcile](/en/operate/reconciliation).
+
+| Symptom | Check |
+| --- | --- |
+| Validation fails | Token, team/project pairing, actual access permissions |
+| Allocation fails | Quota, vcpus, resource policy mismatch |
+| vercel_sandbox_not_running | Whether paused; restore through normal Session wake |
+| vercel_unexpected_public_route | External route changes; do not bypass the check |
+| Preview fails after restore | Retained files separately from running services |
+| vercel_deletion_unconfirmed | Retain original name; inspect deletion and snapshot cleanup |
+
+## What has been verified
+
+Use the following records to distinguish task execution from recovery. Each record applies to its own programs, combination and date.
+
+| Record | Observed result | Scope limit |
+| --- | --- | --- |
+| [First Session, 2026-11-20](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-first-session-docs-cloud.json) | Independent Python and TypeScript Runs completed on built-in Pi 1.5.2 with the configured Messages / DeepSeek-V4-Flash endpoint; artifact text and hashes matched; Sessions closed and deletion operations completed | One Run per SDK; no idle/wake or preview assertion |
+| [Project task, 2026-11-20](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-project-docs-cloud.json) | Each SDK completed two Runs in one Session, actual fixed tests, filtering and Reset browser checks through private preview; old previews were denied after close and artifact bytes remained readable | Does not establish process survival, natural grant expiry, external Tools or approvals |
+| [Idle/wake ledger, 2026-11-19](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-19-harness-serverless-matrix.json) | Vercel/OpenCode/MiniMax-M3 rows record idle, wake, retained file, native Session, conversation and closure: Python with Chat Completions; TypeScript with Messages | Historical OpenCode evidence; not a Pi/DeepSeek recovery result or all SDK/protocol intersections |
+
+The current connector source separately shows stop/resume, read-only inspection without wake, Runtime-facing command transport and confirmed deletion. Filesystem continuity and a running process are different claims: the recovery ledger does not promise arbitrary processes survive suspension. The tutorial evidence uses existing verified connections; it does not establish a clean-account credential setup. Follow [installation](/en/start/install), configure this connection, and run the linked tutorial in your environment. Preserve its journal until deletion is confirmed.
+
+The browser accesses the Hexagon preview route; Provider credentials stay in the control plane according to the connector and transport implementation. Browser behavior alone is not an audit of every credential boundary. Historical combinations remain in the [execution matrix](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/execution-matrix.md); none of these scoped passes proves account-wide cleanup.
+
+Sources: [Vercel connector](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/sandboxes/vercel.ts), [private transport](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/integrations/sandboxes/vercel-transport.ts). Next: [Sandbox overview](/en/integrations/sandboxes), [credential boundaries](/en/concepts/security-boundaries).
+
+## Separate account, resource and task readiness
+
+| Check | Establishes | Does not establish |
+| --- | --- | --- |
+| Schema accepts project/team IDs | Identifier shape and supported CPU field | Token access to those actual resources |
+| Connection validation lists Sandboxes | A scoped account request succeeded | Available allocation quota, task execution or cleanup |
+| Run completes and exports verified files | That task's execution and exported result | Idle restoration or a healthy background Web server |
+| Stopped resource remains queryable | Resource is retained and can be inspected without wake | Deletion, absent storage cost or arbitrary process survival |
+| Product close plus confirmed provider absence | Disposition of the tracked resource | Account-wide orphan cleanup or public website deployment |
+
+A new team/project binding is a connection change, not a transfer of an existing Sandbox. Preserve the original resource identity and permissions needed to reconcile it. Use the tutorial journal to resume observation; recreating the connection or Session is not the default response to a lost request.
+
+Sources: [execution architecture](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/docs/architecture.md). Next: [private previews](/en/build/private-preview), [idle/wake](/en/build/idle-and-wake), [deployment networking](/en/operate/networking).
