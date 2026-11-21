@@ -81,6 +81,19 @@
       ],
       "language": "en",
       "draft": false
+    },
+    {
+      "slug": "hexagon-and-temporal",
+      "title": "Hexagon and Temporal: which state does each own?",
+      "summary": "Compare durable workflow execution with agent execution management, follow a failed request, and see where Temporal and Hexagon can work together.",
+      "date": "2026-11-21",
+      "author": "Hexagon",
+      "tags": [
+        "Engineering",
+        "Agent infrastructure"
+      ],
+      "language": "en",
+      "draft": false
     }
   ]
 }
