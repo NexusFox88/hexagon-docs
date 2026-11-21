@@ -94,6 +94,19 @@
       ],
       "language": "en",
       "draft": false
+    },
+    {
+      "slug": "delete-the-sandbox",
+      "title": "Delete the sandbox. Can you still tell what your agent did?",
+      "summary": "Your agent finishes. The machine disappears. Check what remains: deliverables, execution history, and evidence of external actions.",
+      "date": "2026-11-21",
+      "author": "Hexagon",
+      "tags": [
+        "Engineering",
+        "Agent infrastructure"
+      ],
+      "language": "en",
+      "draft": false
     }
   ]
 }
