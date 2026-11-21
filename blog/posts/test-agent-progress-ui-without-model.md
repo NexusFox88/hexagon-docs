@@ -6,6 +6,8 @@ In the small example below, the same timeline grows from eight rows to twelve. T
 
 That is the behavior to get right before involving a model. You can reproduce it with Node.js, a browser, and three source files. There is no package install, model key, or cloud account involved.
 
+You can also [try the browser simulation](https://hexagon.autos/try/event-replay/) before downloading anything. It demonstrates the two timelines in memory; the local version below exercises an actual SSE connection.
+
 ## Run the example
 
 Clone the documentation repository, then start the standalone server. Use Node.js 24, the version used for this check.
