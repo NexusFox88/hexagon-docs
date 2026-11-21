@@ -48,9 +48,12 @@ An Agent template is optional. Cloud Sandboxes must reach the credential ingress
 Use a separate Python virtual environment:
 
 ```sh
+python3 -c 'import sys; assert sys.version_info >= (3, 10), "Python 3.10 or newer is required"; print(sys.version)'
 python3 -m venv .local/docs-example-venv
 .local/docs-example-venv/bin/python -m pip install -e sdk/python
 ```
+
+The version check must pass before creating the environment. If `python3` points to an older interpreter, use an installed supported executable (for example, `python3.13`) for both the check and `-m venv`. Installing a newer Python does not change an existing virtual environment: inspect `.local/docs-example-venv/bin/python --version`; preserve an existing environment before recreating it with the selected interpreter. `doctor` reporting Python available does not establish its version.
 
 The tutorials use this explicit Python path, so opening another terminal does not require activating the environment again. If you installed into a different virtual environment, replace the interpreter path consistently.
 

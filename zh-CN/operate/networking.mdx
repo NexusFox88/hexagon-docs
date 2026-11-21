@@ -27,6 +27,12 @@ Hexagon 有三种不同的入站流量。它们服务不同调用方，必须按
 
 停止临时入口是运行时动作；下次执行可能按保存模式自动恢复。要持续禁止入口，保存 disabled 模式。活动 invocation 使用中的 origin 不应被换成另一个通道。
 
+## Quick Tunnel 不可用或被限流
+
+Console 可打开、连接验证通过，并不证明凭据入口可达。创建 Session 返回 `credential_proxy_tunnel_unavailable` 时，先检查 Network & ingress 与 cloudflared 的诊断，再决定下一步。Quick Tunnel 的 HTTP 429 表示供应商限流：停止重复创建，等待供应商允许请求，或为持续使用部署本文说明的稳定外部入口；不要切换 IP 或代理绕过限流。
+
+没有活动 Run 时，可在 Network & ingress 停止临时通道，暂停自动恢复尝试。这不会修改保存的部署模式；下一次 SDK 请求仍可能尝试启动通道。保留失败示例的 journal，检查 Sessions 和资源操作，确认是否发生创建后，才归档该 journal 并发起新的独立尝试。隧道失败不证明云资源已清理。
+
 ## hosted 与预览
 
 hosted 使用稳定 HTTPS 凭据 origin，并拒绝临时 tunnel。云 Sandbox 必须可以访问它；从控制平面 curl 自己成功不能证明云网络可达。

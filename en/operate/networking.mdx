@@ -27,6 +27,12 @@ Save through local configure and restart without active work. Replace the placeh
 
 Stopping a temporary channel is a runtime action; future work can restore the saved mode. Save disabled mode to keep ingress disabled. Do not rotate an origin currently used by active invocations.
 
+## Quick Tunnel unavailable or rate limited
+
+A working Console and validated connections do not prove the credential ingress is reachable. If Session creation returns `credential_proxy_tunnel_unavailable`, inspect Network & ingress and the cloudflared diagnostic before submitting again. A Quick Tunnel HTTP 429 is a provider rate limit: stop repeated tunnel creation and wait for the provider to permit requests, or provision the documented stable external ingress for sustained use. Do not switch IPs or proxies to evade a limit.
+
+With no active Runs, stop the temporary channel in Network & ingress to pause automatic recovery attempts. This leaves the saved deployment mode unchanged; the next SDK request may try to start it again. Preserve the failed example journal. Inspect Sessions and resource operations to establish whether creation happened before archiving that journal and starting a new independent attempt. Never infer cloud cleanup from a tunnel failure.
+
 ## Hosted and preview routing
 
 Hosted requires stable HTTPS credential ingress and rejects temporary tunnels. Verify reachability from a real Sandbox: a loopback health request from the control plane is insufficient.

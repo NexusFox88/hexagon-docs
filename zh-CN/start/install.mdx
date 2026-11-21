@@ -48,9 +48,12 @@ npm run local -- status
 Python 建议使用独立虚拟环境：
 
 ```sh
+python3 -c 'import sys; assert sys.version_info >= (3, 10), "Python 3.10 or newer is required"; print(sys.version)'
 python3 -m venv .local/docs-example-venv
 .local/docs-example-venv/bin/python -m pip install -e sdk/python
 ```
+
+创建虚拟环境前必须通过版本检查。如果 `python3` 指向旧解释器，请在检查命令和 `-m venv` 命令中都改用已安装且受支持的解释器，例如 `python3.13`。安装新版 Python 不会升级已有虚拟环境；先检查 `.local/docs-example-venv/bin/python --version`，保留原环境后再用选定解释器重建。`doctor` 显示 Python 可用不表示版本满足要求。
 
 教程使用这个明确的 Python 路径，换一个终端也无需重新激活环境。若使用其他虚拟环境，请在后续命令中一致地替换解释器路径。
 
