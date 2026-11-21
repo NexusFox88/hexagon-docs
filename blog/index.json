@@ -68,6 +68,19 @@
       ],
       "language": "en",
       "draft": false
+    },
+    {
+      "slug": "test-agent-progress-ui-without-model",
+      "title": "Test an agent progress UI without a model or cloud account",
+      "summary": "A runnable SSE example for dropped connections, missing timeline rows, and event IDs too large for JavaScript Numbers.",
+      "date": "2026-11-21",
+      "author": "Hexagon",
+      "tags": [
+        "Engineering",
+        "Agent infrastructure"
+      ],
+      "language": "en",
+      "draft": false
     }
   ]
 }
