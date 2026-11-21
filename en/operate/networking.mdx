@@ -13,6 +13,19 @@ Hexagon has three inbound traffic roles. Route each deliberately rather than poi
 
 These are defaults, not recommendations to expose them publicly. Corresponding HOST/PORT settings change listeners; reverse proxies should route only the intended role.
 
+## Control-plane calls and model calls travel in different directions
+
+The local control plane is a client of the cloud Sandbox provider and Sandbox Runtime. Protected model calls travel in the opposite direction: Sandbox Harness → dedicated credential listener → configured model endpoint. This route does not expose the management API.
+
+Sandbox provider account credentials stay in the control-plane connector. Original model and protected HTTP credentials are encrypted in the control plane and added only to authorized upstream requests by the credential listener. The common backend gives the Harness a scoped delegated grant. Vercel native Header transforms inject that delegated grant at the provider boundary; the guest receives a placeholder. Vercel does not inject the original model key or eliminate the proxy.
+
+Native direct-to-model access is not implemented. Ordinary Session environment variables are guest-readable and are not an alternative protected-credential mode.
+
+Session creation and preflight await credential readiness before inserting a Session. The Worker checks again before Sandbox provisioning. This probes the listener from the control-plane host, not from the Sandbox: acceptance still requires a real cloud model call. An ingress error can therefore precede resource creation; a lost response still requires reconciliation.
+
+Source: [Session readiness](https://github.com/NexusFox88/Hexagon/blob/e64574111fabee1e3bfa2f7c08eb403d6fda1c34/modules/execution/sessions.ts#L125), [invocation grants](https://github.com/NexusFox88/Hexagon/blob/e64574111fabee1e3bfa2f7c08eb403d6fda1c34/modules/execution/worker.ts#L231), [upstream authentication](https://github.com/NexusFox88/Hexagon/blob/e64574111fabee1e3bfa2f7c08eb403d6fda1c34/apps/control-plane/access-server.ts), and [Vercel policy](https://github.com/NexusFox88/Hexagon/blob/e64574111fabee1e3bfa2f7c08eb403d6fda1c34/integrations/sandboxes/vercel.ts#L25).
+
+
 ## Development ingress
 
 The managed launcher defaults to a Cloudflare development channel and needs cloudflared. It forwards the credential listener, not management. Console Network & ingress displays its status; management remains independently available when the tunnel fails.

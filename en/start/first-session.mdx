@@ -11,6 +11,8 @@ Start a [local control plane](/en/start/install). Verify and enable a Sandbox co
 
 Both programs passed independent real-cloud runs on 2026-11-20 with **Vercel + built-in Pi 1.5.2 + the configured Messages endpoint using deepseek-ai/DeepSeek-V4-Flash**. The [execution record](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-first-session-docs-cloud.json) covers task completion, artifact size/hash/content, closed Sessions, completed deletion operations and identical bytes downloaded after closure. It does not certify another endpoint, account or combination, nor Tools, approvals, multi-turn or preview behavior. Running the programs consumes your Provider and model resources. No saved Agent template or additional Tool is required.
 
+The Sandbox must reach the dedicated credential listener for model requests. The current implementation does not inject the original model key into the guest, including with Vercel native Header transforms. The SDK can use local management while the remote Harness uses a separate HTTPS path. Check [request directions and credential access](/en/operate/networking); a working Console or successful model validation alone is insufficient.
+
 ## Run the complete example
 
 From the repository root, set your verified connection IDs. These values are identifiers, not Provider credentials:

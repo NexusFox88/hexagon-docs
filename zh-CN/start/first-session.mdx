@@ -11,6 +11,8 @@ description: "本教程使用内置 Pi 1.5.2，让 Agent 在云 Sandbox 中生�
 
 两套程序已于 2026-11-20 分别在 **Vercel + 内置 Pi 1.5.2 + 已配置 Messages 端点的 deepseek-ai/DeepSeek-V4-Flash** 组合完成独立实云运行。[执行记录](https://github.com/NexusFox88/hexagon-docs/blob/main/resources/testing/evidence/2026-11-20-first-session-docs-cloud.json)覆盖任务完成、产物大小/hash/内容、Session 关闭、删除操作完成，以及关闭后下载字节一致。该结果不认证其他端点、账户或组合，也不覆盖 Tools、审批、多轮和预览。执行会使用云资源和模型额度；不需要额外 Tool 或预先注册 Agent 模板。
 
+Sandbox 必须能访问专用凭证监听器来发送模型请求。当前实现不把原始模型密钥注入 guest，Vercel 原生 Header 变换也不例外。SDK 可以使用本地管理 API，而远程 Harness 使用另一条 HTTPS 通路。请先核对[请求方向与凭证访问](/zh-CN/operate/networking)；Console 可用或模型验证成功都不足以证明这条通路可用。
+
 ## 运行完整程序
 
 在仓库根目录设置已经验证的连接 ID。这两个值是标识，不是供应商密钥：

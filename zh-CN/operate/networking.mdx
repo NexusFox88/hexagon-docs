@@ -13,6 +13,19 @@ Hexagon 有三种不同的入站流量。它们服务不同调用方，必须按
 
 默认值不是公网暴露建议。部署时可通过对应 HOST / PORT 配置改变监听地址，反向代理只路由指定用途。
 
+## 控制请求与模型请求的方向不同
+
+本地控制平面主动调用云 Sandbox 平台和 Sandbox Runtime。受保护的模型调用则沿另一条路径：Sandbox Harness → 专用凭证监听器 → 配置的模型端点。该入口不暴露管理 API。
+
+Sandbox 平台账号凭证留在控制平面的连接器中。原始模型及受保护 HTTP 凭证加密保留在控制平面，仅由凭证监听器添加到已授权的上游请求。通用后端给 Harness 一个受限委托令牌；Vercel 原生 Header 变换在提供商边界注入这个委托令牌，guest 仅收到占位值。Vercel 不注入原始模型密钥，也不省略代理。
+
+当前未实现原生直连模型后端。普通 Session 环境变量可被 guest 读取，不是另一种受保护凭证模式。
+
+创建 Session 和 preflight 在插入 Session 前等待凭证就绪；Worker 在创建 Sandbox 前再次检查。这是从控制平面主机探测监听器，不是从 Sandbox 探测；验收仍须真实云模型调用。入口故障可能先于资源创建发生，但 HTTP 响应丢失时仍须协调核实结果。
+
+源码：[Session 就绪检查](https://github.com/NexusFox88/Hexagon/blob/e64574111fabee1e3bfa2f7c08eb403d6fda1c34/modules/execution/sessions.ts#L125)、[调用授权生成](https://github.com/NexusFox88/Hexagon/blob/e64574111fabee1e3bfa2f7c08eb403d6fda1c34/modules/execution/worker.ts#L231)、[上游认证](https://github.com/NexusFox88/Hexagon/blob/e64574111fabee1e3bfa2f7c08eb403d6fda1c34/apps/control-plane/access-server.ts)、[Vercel 策略](https://github.com/NexusFox88/Hexagon/blob/e64574111fabee1e3bfa2f7c08eb403d6fda1c34/integrations/sandboxes/vercel.ts#L25)。
+
+
 ## 本地开发入口
 
 受管理启动器默认配置 Cloudflare 开发通道，要求 cloudflared 可用。它只转发凭据 listener，不转发管理 API。Console 的 Network & ingress 展示通道状态，管理界面可在通道失败时独立工作。
