@@ -28,6 +28,6 @@ Use package.json scripts as they become implemented. Record real command results
 - Run `testing/source-language.test.ts` to enforce this boundary.
 
 ## Marketing website ownership
-- The marketing website is maintained only in https://github.com/NexusFox88/Haxegon-Website. The original local checkout is `/Users/hexagon-maintainer/CodeProject/Haxegon-Website`; on other devices, clone that repository into any directory.
+- The marketing website is maintained only in https://github.com/NexusFox88/Haxegon-Website. The original local checkout is `/path/to/Haxegon-Website`; on other devices, clone that repository into any directory.
 - The former `website/` directory has been removed from this product repository. Do not recreate it, copy website changes back here, or deploy this repository as the marketing website.
 - For website work, switch to the standalone repository and follow its `AGENTS.md` and `DEPLOYMENT.md`. Its `main` pushes automatically deploy to Cloudflare; the product Console and shared brand masters remain in this repository.

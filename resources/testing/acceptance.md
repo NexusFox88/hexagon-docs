@@ -16,7 +16,7 @@ Current scope closure: [Daytona moved to future candidates](evidence/2026-11-16-
 
 Latest current-code verification (2026-11-16): [fresh Instabox/Pi dual SDK Web journey and local application form review](evidence/2026-11-16-current-dual-sdk-journey.md). Both independent cloud tasks passed, including fixed tests, runtime authorization, approval, replay, previews, cross-language continuation and cleanup. The 17 added SaaS forms were reviewed locally in both languages without external account validation, following the user's explicit waiver for that expansion. [Fleet quota diagnosis](evidence/2026-11-16-fleet-quota-audit.md) and [uncertain application writes](evidence/2026-11-16-application-write-outcomes.md) have separate focused evidence. On 2026-11-16 the user explicitly removed Daytona from current compatibility and retained it only as a future candidate. Historical notes below remain chronological evidence, not the current support scope.
 
-Source: /Users/hexagon-maintainer/.codex/attachments/f44b2df2-1795-4fd9-8cad-74608b4167d5/pasted-text-1.txt
+Source: User-supplied acceptance journey (original attachment retained privately).
 
 Checked items have direct evidence linked below. Unchecked items remain incomplete or lack full-scope evidence. Evidence includes commands, runtime observations and relevant resource/run IDs; secrets are excluded.
 

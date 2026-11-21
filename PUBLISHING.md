@@ -26,9 +26,9 @@
 | 线上地址 | [docs.hexagon.autos](https://docs.hexagon.autos) |
 | 发布记录 | [Mintlify Publishes](https://app.mintlify.com/sponson/hexagon/publishes/overview) |
 | Git 连接配置 | [Mintlify Git settings](https://app.mintlify.com/sponson/hexagon/settings/project/git-settings) |
-| 当前维护机器的工作副本 | `/Users/hexagon-maintainer/CodeProject/hexagon-docs-publishing` |
+| 当前维护机器的工作副本 | `/path/to/hexagon-docs-publishing` |
 
-本地目录可以采用其他名字，判断发布目标以 `git remote get-url origin` 为准。旧目录 `/Users/hexagon-maintainer/CodeProject/hexagon-docs` 指向旧仓库 `NexusFox88/docs`，不要继续在那里发布。产品仓库 `NexusFox88/Hexagon` 的 push 不会自动同步文档到本仓库。
+本地目录可以采用其他名字，判断发布目标以 `git remote get-url origin` 为准。旧目录 `/path/to/hexagon-docs` 指向旧仓库 `NexusFox88/docs`，不要继续在那里发布。产品仓库 `NexusFox88/Hexagon` 的 push 不会自动同步文档到本仓库。
 
 日常发布无需重新设置域名、DNS，也无需手动上传文件到 Mintlify。
 
@@ -37,7 +37,7 @@
 已有工作副本：
 
 ```bash
-cd /Users/hexagon-maintainer/CodeProject/hexagon-docs-publishing
+cd /path/to/hexagon-docs-publishing
 git remote get-url origin
 git branch --show-current
 git status --short
@@ -58,7 +58,7 @@ cd hexagon-docs-publishing
 
 需要 Git、Node.js/npm；仅使用产品导入脚本时需要 Python 3。GitHub 账号必须有该仓库写权限，浏览器已登录不代表命令行账号有写权限。
 
-当前维护机器已为这个工作副本配置仓库级 credential helper，使用 GitHub CLI 中已登录的 `hexagon-maintainer` 账号。凭据从系统密钥存储读取，不写进 Git；其他设备需要自己的有效授权。
+当前维护机器已为这个工作副本配置仓库级 credential helper，使用 GitHub CLI 中已登录且具有仓库写权限的维护者账号。凭据从系统密钥存储读取，不写进 Git；其他设备需要自己的有效授权。
 
 ## 3. 在本地更新文档
 
@@ -83,7 +83,7 @@ cd hexagon-docs-publishing
 如果本次更新发生在产品仓库的 `docs/product/en/`、`docs/product/zh-CN/`，在文档工作副本内执行：
 
 ```bash
-python3 tooling/import-product-docs.py /Users/hexagon-maintainer/CodeProject/Hexagon
+python3 tooling/import-product-docs.py /path/to/Hexagon
 ```
 
 在其他机器上，把参数换成产品仓库的绝对路径。该命令读取当前本地文件，包括未提交的修改，不会从 GitHub 自动拉取产品内容，也不会自动提交或发布。

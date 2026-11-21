@@ -27,7 +27,7 @@ API 的 `credential` 是 JSON 字符串：`{"token_id":"…","token_secret":"…
 
 2026-11-15：实际账号列举 Sandbox 成功；四次镜像构建尝试均返回 `Image build … terminated due to external shut-down`。基础来源包括 Docker Hub 的 Node/Python 镜像与 ECR 的 Python 镜像。读取构建日志只看到基础 `FROM` 步骤，尚不能据此断定是额度、账单、账号策略或平台故障。所有尝试均按 operation ID 查询，确认没有遗留运行 Sandbox。
 
-随后用户登录浏览器，发现原文件凭证属于 `hexagon-maintainer`，浏览器登录的是 `wangyouzhuo1994`。已在后者创建专用凭证并完成真实 Sandbox 和网络验证；原工作区失败原因仍未确定。新凭证保存在 `.local/credentials/modal.json`（0600），测试工具优先级为显式环境变量 → 专用本地文件 → 原桌面文件。没有覆盖原凭证或撤销已有 token。
+随后用户登录浏览器，发现原文件凭证属于 `original-workspace`，浏览器登录的是 `verified-workspace`。已在后者创建专用凭证并完成真实 Sandbox 和网络验证；原工作区失败原因仍未确定。新凭证保存在 `.local/credentials/modal.json`（0600），测试工具优先级为显式环境变量 → 专用本地文件 → 原桌面文件。没有覆盖原凭证或撤销已有 token。
 
 本地私有证据位于 `.local/evidence/modal-*.json`；[验证记录](../testing/evidence/2026-11-15-modal.md)区分确定性测试和真实供应商测试。
 
