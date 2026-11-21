@@ -33,3 +33,21 @@ Likewise, a stopped local control plane is not proof that cloud resources have t
 For one verified sandbox/harness/model path, test the normal task first. Then deliberately disconnect observation, restart the application consumer, and inspect what is replayed. Check response-loss handling with durable submission intent. Exercise authorization for resumed reads, and verify cleanup using the original resource references.
 
 These are integration checks to perform, not new benchmark results claimed by this article. Start from the existing [backend integration](https://docs.hexagon.autos/en/build/backend-integration) and [verified combinations](https://docs.hexagon.autos/en/integrations/verified-combinations) documentation. Hexagon remains a developer preview; inspect the current implementation and limitations before relying on a specific recovery guarantee.
+
+## Frequently asked questions
+
+### Does an event stream disconnect cancel an agent Run?
+
+A client disconnect does not cancel a Run in Hexagon. Retain the original Run ID and reconnect to observe that Run before deciding whether another submission is necessary. A missing response alone does not establish task failure.
+
+### What should I retain when a submission response is lost?
+
+Retain the Session, exact input, origin and original submission key. Retry the identical submission under the existing idempotency contract. Generating a new key can create duplicate work; reusing a key for different input is also incorrect.
+
+### Where should I persist the event cursor?
+
+Persist it at the boundary where your application considers the event consumed. Committing a backend cursor before the browser receives an event can leave the browser missing an update unless you provide delivery or replay at that boundary. Make replayed processing safe for your application.
+
+### Does submission idempotency make external tool writes safe to retry?
+
+No. An external service may perform a write even when the response is lost. Preserve the operation identity and evidence, and reconcile the outcome before repeating the write.
